@@ -1,0 +1,17 @@
+export default () => ({
+    env: process.env.NODE_ENV,
+    port: 3000,
+    mongo_db_uri: process.env.MONGO_CON_STRING,
+    jwtSecret: process.env.JWT_SECRET,
+    jwtExpiration: process.env.JWT_EXPIRATION,
+    encryptJwtSecret: process.env.ENCRYPT_JWT_SECRET,
+    encryptDataSecret: process.env.ENCRYPT_DATA_SECRET,
+    accessKeyId: process.env.ACCESS_KEY_ID,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY,
+    region: process.env.REGION,
+    bucket: process.env.BUCKET,
+    cacheTTL: process.env.CACHE_TTL,
+    appDomain: process.env.APP_DOMAIN,
+    fromEmail: process.env.FROM_EMAIL,
+    sendGridApiKey: process.env.SENDGRID_API_KEY,
+});
