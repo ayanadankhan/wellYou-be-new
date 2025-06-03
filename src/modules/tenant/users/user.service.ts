@@ -11,14 +11,14 @@ import * as bcrypt from 'bcrypt';
 export class UserService {
   constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const createdUser = new this.userModel({
-      ...createUserDto,
-      password: hashedPassword,
-    });
-    return createdUser.save();
-  }
+async create(createUserDto: CreateUserDto): Promise<User> {
+  // Remove the hashing - it should already be done by AuthService
+  const createdUser = new this.userModel({
+    ...createUserDto,
+    // password is already hashed when it comes here
+  });
+  return createdUser.save();
+}
 
   async findAll(): Promise<User[]> {
     return this.userModel.find().exec();

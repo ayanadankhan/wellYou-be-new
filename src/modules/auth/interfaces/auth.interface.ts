@@ -1,10 +1,30 @@
-
-// import { Types } from 'mongoose'; // Removed for MVP simplicity
-// import { UserRole } from '@/modules/tenant/users/schemas/user.schema'; // Use string for MVP simplicity
-
+// src/modules/auth/interfaces/auth.interface.ts
 export interface UserPayload {
-  _id: string; // Changed from Types.ObjectId to string for simplicity
+  _id: string;
   email: string;
-  role: string; // Changed from UserRole to string for simplicity
-  // tenantId?: string; // Removed for MVP simplicity
+  role: string;
+  iat?: number;
+  exp?: number;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token?: string;
+  user: {
+    _id: string;
+    email: string;
+    role: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  expiresIn: number;
+}
+
+
+export interface AuthenticatedUser {
+  _id: string;
+  email: string;
+  role: string;
+  firstName?: string;
+  lastName?: string;
 }

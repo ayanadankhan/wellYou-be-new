@@ -30,7 +30,7 @@ interface AuthenticatedRequest extends Request {
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
-
+@Public()
   @Post()
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) 
   // Super Admin or Tenant Admin can create users
@@ -53,7 +53,7 @@ export class UserController {
     }
     return this.userService.create(createUserDto);
   }
-
+@Public()
   @Get()
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get all users' })
@@ -149,4 +149,13 @@ export class UserController {
     }
     throw new HttpException('Access forbidden', HttpStatus.FORBIDDEN);
   }
-}
+
+  @Get('profile')
+@Public()
+getCurrentUser(@Req() req: AuthenticatedRequest) {
+  console.log('Current user from JWT:', req.user);
+  return {
+    user: req.user,
+    message: 'Current user info'
+  };
+}}

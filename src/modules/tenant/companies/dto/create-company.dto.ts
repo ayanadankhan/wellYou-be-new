@@ -15,7 +15,7 @@ export class CreateCompanyDto {
 
   @ApiProperty({ description: 'Phone number of the company', required: false })
   @IsOptional()
-  @IsPhoneNumber()
+ 
   phone?: string;
 
   @ApiProperty({ example: 'info@example.com', description: 'Email of the company', required: false })

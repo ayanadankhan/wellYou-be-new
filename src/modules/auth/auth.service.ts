@@ -1,59 +1,281 @@
-
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+// src/modules/auth/auth.service.ts
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  Logger,
+  InternalServerErrorException
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { UserService } from '@/modules/tenant/users/user.service';
 import * as bcrypt from 'bcrypt';
-import { UserPayload } from './interfaces/auth.interface';
-import { CreateUserDto } from '@/modules/tenant/users/dto/create-user.dto';
+import { UserPayload, LoginResponse, AuthenticatedUser } from './interfaces/auth.interface';
+import { RegisterDto } from './dto/registerDto';
+import { ChangePasswordDto } from './dto/changePasswordDto';
+
+interface User {
+  _id: string | { toString(): string }; // Accept string or ObjectId-like
+  email: string;
+  password: string;
+  role: string;
+  firstName: string;
+  lastName: string;
+  // ... other properties
+}
+
+
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  private readonly saltRounds = 12;
+
   constructor(
-    private userService: UserService,
-    private jwtService: JwtService,
-  ) {}
+    private readonly userService: UserService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) { }
 
-  async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.userService.findOneByEmail(email);
-    if (!user) {
-      return null; // User not found
+  async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
+    try {
+      this.logger.debug(`Validating user with email: ${email}`);
+
+      if (!email || !password) {
+        throw new UnauthorizedException('Email and password are required');
+      }
+
+      const user = await this.userService.findOneByEmail(email.toLowerCase().trim());
+      if (!user) {
+        this.logger.warn(`Login attempt with non-existent email: ${email}`);
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      const isPasswordValid = await this.validatePassword(password, user.password);
+      if (!isPasswordValid) {
+        this.logger.warn(`Invalid password attempt for user: ${email}`);
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      this.logger.debug(`User validated successfully: ${email}`);
+
+      return {
+        _id: (user as any)._id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error(`Error validating user: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Authentication failed');
     }
-    const isPasswordValid = await bcrypt.compare(pass, user.password);
-    // if (user && isPasswordValid) {
-    //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    //   const { password, ...result } = user.toObject(); // Exclude password from the result
-    //   return result;
-    // }
-    return null; // Invalid password
   }
 
-  async login(user: any) {
-    const payload: UserPayload = {
-      email: user.email,
-      _id: user._id,
-      role: user.role,
-      // tenantId: user.tenantId, // Removed for MVP simplicity
-    };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
+  async login(user: AuthenticatedUser): Promise<LoginResponse> {
+    try {
+      if (!user || !user.email || !user._id) {
+        throw new UnauthorizedException('Invalid user data');
+      }
+
+      const payload: UserPayload = {
+        email: user.email,
+        _id: user._id.toString(),
+        role: user.role,
+      };
+
+      const expiresIn = this.configService.get<string>('JWT_EXPIRATION') || '24h';
+      const accessToken = this.jwtService.sign(payload, { expiresIn });
+
+      this.logger.debug(`User logged in successfully: ${user.email}`);
+
+      return {
+        access_token: accessToken,
+        user: {
+          _id: user._id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        expiresIn: this.parseExpirationTime(expiresIn),
+      };
+    } catch (error) {
+      this.logger.error(`Error during login: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Login failed');
+    }
   }
 
-  async register(createUserDto: CreateUserDto): Promise<any> {
-    const existingUser = await this.userService.findOneByEmail(createUserDto.email);
+ async register(registerDto: RegisterDto): Promise<AuthenticatedUser> {
+  try {
+    const { email, password, firstName, lastName, role } = registerDto;
+
+    // Add debugging here
+    console.log('=== Registration Debug ===');
+    console.log('Original password from DTO:', `"${password}"`);
+    console.log('Password length:', password.length);
+    console.log('Password bytes:', Buffer.from(password).toString('hex'));
+
+    // Check if user already exists
+    const existingUser = await this.userService.findOneByEmail(email.toLowerCase().trim());
     if (existingUser) {
-      throw new ConflictException('User with this email already exists.');
+      this.logger.warn(`Registration attempt with existing email: ${email}`);
+      throw new ConflictException('User with this email already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    // Hash password with debugging
+    console.log('About to hash password...');
+    const hashedPassword = await this.hashPassword(password);
+    console.log('Hashed password result:', hashedPassword);
+    
+    // Test the hash immediately after creation
+    const testHash = await bcrypt.compare(password, hashedPassword);
+    console.log('Immediate hash test (should be true):', testHash);
+    console.log('=== End Registration Debug ===');
+
+    // Create user
     const newUser = await this.userService.create({
-      ...createUserDto,
+      email: email.toLowerCase().trim(),
       password: hashedPassword,
-      role: createUserDto.role || 'employee', // Default to 'employee' if not specified
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      role: role || 'employee',
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // const { password, ...result } = newUser.toObject(); // Exclude password from response
-    // return result;
+    this.logger.debug(`User registered successfully: ${email}`);
+
+    return {
+      _id: (newUser as any)._id.toString(),
+      email: newUser.email,
+      role: newUser.role,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+    };
+  } catch (error) {
+    if (error instanceof ConflictException) {
+      throw error;
+    }
+    this.logger.error(`Error during registration: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Registration failed');
+  }
+}
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
+    try {
+      const { currentPassword, newPassword, confirmPassword } = changePasswordDto;
+
+      // Validate password confirmation
+      if (newPassword !== confirmPassword) {
+        throw new BadRequestException('New password and confirm password do not match');
+      }
+
+      // Check if new password is same as current password
+      if (currentPassword === newPassword) {
+        throw new BadRequestException('New password must be different from current password');
+      }
+
+      // Find user
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      // Validate current password
+      const isCurrentPasswordValid = await this.validatePassword(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
+        this.logger.warn(`Invalid current password attempt for user: ${user.email}`);
+        throw new BadRequestException('Current password is incorrect');
+      }
+
+      // Hash new password and update
+      const hashedNewPassword = await this.hashPassword(newPassword);
+      await this.userService.update(userId, { password: hashedNewPassword });
+
+      this.logger.debug(`Password changed successfully for user: ${user.email}`);
+
+      return { message: 'Password changed successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Error changing password: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Password change failed');
+    }
+  }
+
+  async logout(userId: string): Promise<{ message: string }> {
+    try {
+      // In a production app, you might want to blacklist the token
+      // or store active sessions in Redis for better control
+      this.logger.debug(`User logged out: ${userId}`);
+      return { message: 'Logged out successfully' };
+    } catch (error) {
+      this.logger.error(`Error during logout: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Logout failed');
+    }
+  }
+
+  // Private helper methods
+  async hashPassword(password: string): Promise<string> {
+  try {
+    console.log('=== Hash Password Debug ===');
+    console.log('Input to hashPassword:', `"${password}"`);
+    console.log('Input length:', password.length);
+    
+    const saltRounds = 10;
+    console.log('Salt rounds:', saltRounds);
+    
+    const hash = await bcrypt.hash(password, saltRounds);
+    console.log('Generated hash:', hash);
+    console.log('Hash length:', hash.length);
+    console.log('=== End Hash Password Debug ===');
+    
+    return hash;
+  } catch (error) {
+    console.error('Error in hashPassword:', error);
+    throw error;
+  }
+}
+
+async validatePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+  try {
+    // Add detailed debugging
+    console.log('=== Password Validation Debug ===');
+    console.log('Plain password:', `"${plainPassword}"`);
+    console.log('Plain password length:', plainPassword.length);
+    console.log('Plain password bytes:', Buffer.from(plainPassword).toString('hex'));
+    console.log('Hashed password:', hashedPassword);
+    console.log('Hash length:', hashedPassword.length);
+    console.log('Hash starts with $2b$:', hashedPassword.startsWith('$2b$'));
+    
+    const isValid = await bcrypt.compare(plainPassword, hashedPassword);
+    console.log('Bcrypt compare result:', isValid);
+    console.log('=== End Debug ===');
+    
+    return isValid;
+  } catch (error) {
+    this.logger.error('Error comparing passwords:', error);
+    console.log('Bcrypt error:', error);
+    return false;
+  }
+}
+
+  private parseExpirationTime(expiration: string): number {
+    // Convert JWT expiration string to seconds
+    const timeMap: { [key: string]: number } = {
+      's': 1,
+      'm': 60,
+      'h': 3600,
+      'd': 86400,
+    };
+
+    const match = expiration.match(/^(\d+)([smhd])$/);
+    if (!match) return 86400; // Default 24 hours
+
+    const [, time, unit] = match;
+    return parseInt(time) * (timeMap[unit] || 86400);
   }
 }

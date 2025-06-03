@@ -1,16 +1,15 @@
-
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+// src/modules/auth/dto/login.dto.ts
+import { IsEmail, IsString, MinLength, IsNotEmpty } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class LoginDto {
-  @ApiProperty({ example: 'test@example.com', description: 'User email' })
-  @IsEmail({}, { message: 'Invalid email format' })
-  @IsNotEmpty({ message: 'Email cannot be empty' })
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsNotEmpty({ message: 'Email is required' })
   email: string;
 
-  @ApiProperty({ example: 'password123', description: 'User password' })
   @IsString({ message: 'Password must be a string' })
-  @IsNotEmpty({ message: 'Password cannot be empty' })
   @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @IsNotEmpty({ message: 'Password is required' })
   password: string;
 }

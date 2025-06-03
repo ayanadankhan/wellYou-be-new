@@ -1,53 +1,44 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsEmail, IsDateString, IsOptional, IsNumber, IsArray, IsBoolean, ValidateNested } from 'class-validator';
+import { IsString, IsEmail, IsDateString, IsNumber, IsArray, IsBoolean, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class SkillDto {
   @ApiProperty({ description: 'Name of the skill', example: 'React' })
   @IsString()
-  @IsNotEmpty()
   name: string;
 
   @ApiProperty({ description: 'Proficiency level of the skill', example: 'expert' })
   @IsString()
-  @IsNotEmpty()
   level: string;
 
   @ApiProperty({ description: 'Category of the skill', example: 'Frontend' })
   @IsString()
-  @IsNotEmpty()
   category: string;
 
   @ApiProperty({ description: 'Years of experience with the skill', example: 5 })
   @IsNumber()
-  @IsNotEmpty()
   yearsOfExperience: number;
 }
 
 class EducationDto {
   @ApiProperty({ description: 'Unique ID for the education record', example: 'edu-1' })
   @IsString()
-  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Name of the institution', example: 'Stanford University' })
   @IsString()
-  @IsNotEmpty()
   institution: string;
 
   @ApiProperty({ description: 'Degree obtained', example: 'Master of Science' })
   @IsString()
-  @IsNotEmpty()
   degree: string;
 
   @ApiProperty({ description: 'Field of study', example: 'Computer Science' })
   @IsString()
-  @IsNotEmpty()
   fieldOfStudy: string;
 
   @ApiProperty({ description: 'Start date of education', example: '2018-09-01' })
   @IsString()
-  @IsNotEmpty()
   startDate: string;
 
   @ApiProperty({ description: 'End date of education', example: '2020-06-15', required: false })
@@ -64,35 +55,23 @@ class EducationDto {
   @IsString()
   @IsOptional()
   honors?: string;
-
-    @ApiProperty({ description: 'Whether this is the current role', example: true })
-  @IsBoolean()
-  @IsNotEmpty()
-  isEnrolled: boolean;
-
-
-  
 }
 
 class CertificationDto {
   @ApiProperty({ description: 'Unique ID for the certification', example: 'cert-1' })
   @IsString()
-  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Name of the certification', example: 'AWS Solutions Architect Associate' })
   @IsString()
-  @IsNotEmpty()
   name: string;
 
   @ApiProperty({ description: 'Issuing organization', example: 'Amazon Web Services' })
   @IsString()
-  @IsNotEmpty()
   issuingOrganization: string;
 
   @ApiProperty({ description: 'Issue date of the certification', example: '2023-04-10' })
   @IsString()
-  @IsNotEmpty()
   issueDate: string;
 
   @ApiProperty({ description: 'Expiration date of the certification', example: '2026-04-10', required: false })
@@ -114,22 +93,18 @@ class CertificationDto {
 class ExperienceDto {
   @ApiProperty({ description: 'Unique ID for the experience', example: 'exp-1' })
   @IsString()
-  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Name of the company', example: 'TechCorp Solutions' })
   @IsString()
-  @IsNotEmpty()
   companyName: string;
 
   @ApiProperty({ description: 'Position held', example: 'Senior Software Engineer' })
   @IsString()
-  @IsNotEmpty()
   position: string;
 
   @ApiProperty({ description: 'Start date of employment', example: '2021-01-01T00:00:00.000Z' })
   @IsString()
-  @IsNotEmpty()
   startDate: string;
 
   @ApiProperty({ description: 'End date of employment', example: '2022-03-15T00:00:00.000Z', required: false })
@@ -139,7 +114,6 @@ class ExperienceDto {
 
   @ApiProperty({ description: 'Whether this is the current role', example: true })
   @IsBoolean()
-  @IsNotEmpty()
   isCurrentRole: boolean;
 
   @ApiProperty({ description: 'Description of the role', example: 'Lead development of microservices architecture', required: false })
@@ -168,51 +142,46 @@ class ExperienceDto {
   @IsOptional()
   company?: string;
 
-  // @ApiProperty({ description: 'Whether this is the current employment', example: true })
-  // @IsBoolean()
-  // @IsNotEmpty()
-  // isCurrent: boolean;
+  @ApiProperty({ description: 'Whether this is the current employment', example: true })
+  @IsBoolean()
+  isCurrent: boolean;
 }
 
-export class CreateEmployeeDto {
+export class GetEmployeeDto {
+  @ApiProperty({ description: 'MongoDB ObjectID of the employee', example: '60c72b2f9b1e8c001c8b4567' })
+  @IsString()
+  _id: string;
+
   @ApiProperty({ description: 'Name of the employee', example: 'Sarah Johnson' })
   @IsString()
-  @IsNotEmpty()
   name: string;
 
   @ApiProperty({ description: 'Email of the employee', example: 'sarah.johnson@companyName.com' })
   @IsEmail()
-  @IsNotEmpty()
   email: string;
 
   @ApiProperty({ description: 'Role of the employee', example: 'senior' })
   @IsString()
-  @IsNotEmpty()
   role: string;
 
   @ApiProperty({ description: 'Department of the employee', example: 'Engineering' })
   @IsString()
-  @IsNotEmpty()
   department: string;
 
   @ApiProperty({ description: 'Position of the employee', example: 'Senior Software Engineer' })
   @IsString()
-  @IsNotEmpty()
   position: string;
 
   @ApiProperty({ description: 'Type of employment', example: 'full-time' })
   @IsString()
-  @IsNotEmpty()
   employmentType: string;
 
   @ApiProperty({ description: 'Status of the employee', example: 'active' })
   @IsString()
-  @IsNotEmpty()
   status: string;
 
   @ApiProperty({ description: 'Start date of employment', example: '2022-03-15T00:00:00.000Z' })
   @IsDateString()
-  @IsNotEmpty()
   startDate: string;
 
   @ApiProperty({ description: 'Phone number of the employee', example: '+1 (555) 123-4567', required: false })
@@ -229,17 +198,14 @@ export class CreateEmployeeDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SkillDto)
-  @IsNotEmpty()
   skills: SkillDto[];
 
   @ApiProperty({ description: 'Salary of the employee', example: 125000 })
   @IsNumber()
-  @IsNotEmpty()
   salary: number;
 
   @ApiProperty({ description: 'Performance rating of the employee', example: 4 })
   @IsNumber()
-  @IsNotEmpty()
   performance: number;
 
   @ApiProperty({ description: 'Biography of the employee', example: 'Experienced software engineer...', required: false })
@@ -251,115 +217,25 @@ export class CreateEmployeeDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EducationDto)
-  @IsNotEmpty()
   education: EducationDto[];
 
   @ApiProperty({ description: 'Certifications of the employee', type: [CertificationDto] })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CertificationDto)
-  @IsNotEmpty()
   certifications: CertificationDto[];
 
   @ApiProperty({ description: 'Work experiences of the employee', type: [ExperienceDto] })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ExperienceDto)
-  @IsNotEmpty()
   experiences: ExperienceDto[];
-}
 
-export class UpdateEmployeeDto {
-  @ApiProperty({ description: 'Name of the employee', example: 'Sarah Johnson', required: false })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty({ description: 'Email of the employee', example: 'sarah.johnson@companyName.com', required: false })
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-  @ApiProperty({ description: 'Role of the employee', example: 'senior', required: false })
-  @IsString()
-  @IsOptional()
-  role?: string;
-
-  @ApiProperty({ description: 'Department of the employee', example: 'Engineering', required: false })
-  @IsString()
-  @IsOptional()
-  department?: string;
-
-  @ApiProperty({ description: 'Position of the employee', example: 'Senior Software Engineer', required: false })
-  @IsString()
-  @IsOptional()
-  position?: string;
-
-  @ApiProperty({ description: 'Type of employment', example: 'full-time', required: false })
-  @IsString()
-  @IsOptional()
-  employmentType?: string;
-
-  @ApiProperty({ description: 'Status of the employee', example: 'active', required: false })
-  @IsString()
-  @IsOptional()
-  status?: string;
-
-  @ApiProperty({ description: 'Start date of employment', example: '2022-03-15T00:00:00.000Z', required: false })
+  @ApiProperty({ description: 'Creation timestamp', example: '2023-01-01T00:00:00.000Z' })
   @IsDateString()
-  @IsOptional()
-  startDate?: string;
+  createdAt: string;
 
-  @ApiProperty({ description: 'Phone number of the employee', example: '+1 (555) 123-4567', required: false })
-  @IsString()
-  @IsOptional()
-  phoneNumber?: string;
-
-  @ApiProperty({ description: 'Location of the employee', example: 'San Francisco, CA', required: false })
-  @IsString()
-  @IsOptional()
-  location?: string;
-
-  @ApiProperty({ description: 'Skills of the employee', type: [SkillDto], required: false })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SkillDto)
-  @IsOptional()
-  skills?: SkillDto[];
-
-  @ApiProperty({ description: 'Salary of the employee', example: 125000, required: false })
-  @IsNumber()
-  @IsOptional()
-  salary?: number;
-
-  @ApiProperty({ description: 'Performance rating of the employee', example: 4, required: false })
-  @IsNumber()
-  @IsOptional()
-  performance?: number;
-
-  @ApiProperty({ description: 'Biography of the employee', example: 'Experienced software engineer...', required: false })
-  @IsString()
-  @IsOptional()
-  bio?: string;
-
-  @ApiProperty({ description: 'Education history of the employee', type: [EducationDto], required: false })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => EducationDto)
-  @IsOptional()
-  education?: EducationDto[];
-
-  @ApiProperty({ description: 'Certifications of the employee', type: [CertificationDto], required: false })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CertificationDto)
-  @IsOptional()
-  certifications?: CertificationDto[];
-
-  @ApiProperty({ description: 'Work experiences of the employee', type: [ExperienceDto], required: false })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ExperienceDto)
-  @IsOptional()
-  experiences?: ExperienceDto[];
+  @ApiProperty({ description: 'Update timestamp', example: '2023-01-02T00:00:00.000Z' })
+  @IsDateString()
+  updatedAt: string;
 }
