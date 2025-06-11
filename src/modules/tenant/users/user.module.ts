@@ -1,5 +1,4 @@
-
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -11,6 +10,12 @@ import { User, UserSchema } from './schemas/user.schema';
   ],
   controllers: [UserController],
   providers: [UserService],
-  exports: [UserService, MongooseModule], // Export service and MongooseModule for auth module
+  exports: [UserService, MongooseModule],
 })
-export class UserModule {}
+export class UserModule implements OnModuleInit {
+  constructor(private readonly userService: UserService) {}
+
+  async onModuleInit() {
+    await this.userService.createDefaultSuperAdmin();
+  }
+}
