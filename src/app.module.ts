@@ -7,6 +7,10 @@ import { CompanyModule } from './modules/tenant/companies/company.module';
 import { AdditionsModule } from './modules/masterTables/additions/additions.module';
 import { DeductionsModule } from './modules/masterTables/deductions/deductions.module';
 import { EmployeesModule } from './modules/employees/employees.module';
+import { EducationModule } from './modules/education/education.module';
+import { SalaryModule } from './modules/salary/salary.module';
+import { DesignationsModule } from './modules/designations/designations.module';
+import { DepartmentsModule } from './modules/departments/departments.module';
 // ... other imports
 
 @Module({
@@ -23,6 +27,10 @@ import { EmployeesModule } from './modules/employees/employees.module';
     AdditionsModule,
     DeductionsModule,
     EmployeesModule,
+    EducationModule,
+    SalaryModule,
+    DesignationsModule,
+    DepartmentsModule
   ],
   // ... controllers and providers
 })

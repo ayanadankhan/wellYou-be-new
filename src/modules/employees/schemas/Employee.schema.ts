@@ -49,6 +49,7 @@ class Education {
   isEnrolled: boolean;
 }
 
+export const EducationSchema = SchemaFactory.createForClass(Education);
 @Schema()
 class Certification {
   @Prop({ required: true, type: String })
@@ -129,7 +130,6 @@ class EmergencyContact {
 
 @Schema({
   timestamps: true,
-  collection: 'employees',
 })
 
 export class Employee {
@@ -161,13 +161,13 @@ nationality: string[];
   @Prop({ required: true, type: Date })
   hireDate: Date;
 
-  @Prop({ type: Date })
+  @Prop({ required: false, type: Date })
   terminationDate?: Date;
 
   @Prop({ required: true, type: String, enum: EmploymentStatus })
   employmentStatus: EmploymentStatus;
 
-  @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "Department Id" })
+  @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "departments" })
   departmentId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "Position Id" })
@@ -176,8 +176,8 @@ nationality: string[];
   @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "Manager Id" })
   managerId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "Location Id" })
-  locationId: MongooseSchema.Types.ObjectId;
+  @Prop({ required: false, type: String, ref: "Location" })
+  location: string;
 
   @Prop({ type: String })
   profilePicture?: string;
@@ -191,8 +191,8 @@ nationality: string[];
   @Prop({ type: [Skill] })
   skills?: Skill[];
 
-  @Prop({ type: [Education] })
-  education?: Education[];
+@Prop({ type: [EducationSchema] })
+education?: Education[];
 
   @Prop({ type: [Certification] })
   certifications?: Certification[];

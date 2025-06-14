@@ -488,7 +488,6 @@ export class CreateEmployeeDto {
     example: null, 
     required: false 
   })
-  @IsDateString()
   @IsOptional()
   terminationDate?: string;
 
@@ -530,13 +529,13 @@ export class CreateEmployeeDto {
   managerId?: Types.ObjectId;
 
   @ApiProperty({ 
-    description: 'Location ID of employee', 
+    description: 'Location of employee', 
     example: '423e4567-e89b-12d3-a456-426614174003',
     required: true
   })
   @IsString()
-  @IsNotEmpty()
-  locationId: Types.ObjectId;
+  @IsOptional()
+  location: string;
 
   @ApiProperty({ 
     description: 'Profile picture URL of employee', 
@@ -751,13 +750,13 @@ export class UpdateEmployeeDto {
   managerId?: string;
 
   @ApiProperty({ 
-    description: 'Location ID of employee', 
+    description: 'Location of employee', 
     example: '423e4567-e89b-12d3-a456-426614174003', 
     required: false 
   })
   @IsString()
   @IsOptional()
-  locationId?: string;
+  location?: string;
 
   @ApiProperty({ 
     description: 'Profile picture URL of employee', 

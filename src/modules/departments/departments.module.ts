@@ -1,17 +1,17 @@
-
 import { Module } from '@nestjs/common';
-import { DepartmentController } from './departments.controller';
-import { DepartmentService } from './departments.service';
+import { DepartmentsService } from './departments.service';
+import { DepartmentsController } from './departments.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-// import { Department, DepartmentSchema } from './schemas/departments.schema';
+import { Department, DepartmentSchema } from './entities/department.entity';
 
 @Module({
   imports: [
-    // MongooseModule.forFeature([{ name: Department.name, schema: DepartmentSchema }]),
-    // Uncomment the above line and add schema if you plan to use Mongoose for this module.
+    MongooseModule.forFeature([
+      { name: Department.name, schema: DepartmentSchema },
+    ]),
   ],
-  controllers: [DepartmentController],
-  providers: [DepartmentService],
-  exports: [DepartmentService],
+  controllers: [DepartmentsController],
+  providers: [DepartmentsService],
+  exports: [DepartmentsService],
 })
-export class DepartmentModule {}
+export class DepartmentsModule {}
