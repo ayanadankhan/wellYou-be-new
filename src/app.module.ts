@@ -11,6 +11,7 @@ import { EducationModule } from './modules/education/education.module';
 import { SalaryModule } from './modules/salary/salary.module';
 import { DesignationsModule } from './modules/designations/designations.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 // ... other imports
 
 @Module({
@@ -30,7 +31,8 @@ import { DepartmentsModule } from './modules/departments/departments.module';
     EducationModule,
     SalaryModule,
     DesignationsModule,
-    DepartmentsModule
+    DepartmentsModule,
+    PayrollModule
   ],
   // ... controllers and providers
 })

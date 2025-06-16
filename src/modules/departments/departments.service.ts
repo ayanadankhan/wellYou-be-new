@@ -26,16 +26,11 @@ export class DepartmentsService {
   }
 
   async findAll(): Promise<Department[]> {
-    return this.departmentModel.find()
-      .populate('parentDepartmentId', 'departmentName departmentCode')
-      .populate('departmentHeadId', 'firstName lastName')
-      .exec();
+    return this.departmentModel.find().exec();
   }
 
   async findOne(id: string): Promise<Department> {
     const department = await this.departmentModel.findById(id)
-      .populate('parentDepartmentId', 'departmentName departmentCode')
-      .populate('departmentHeadId', 'firstName lastName')
       .exec();
     if (!department) {
       throw new NotFoundException(`Department with ID ${id} not found`);

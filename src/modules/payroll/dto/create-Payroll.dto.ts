@@ -1,18 +1,32 @@
-
-// import { ApiProperty } from '@nestjs/swagger';
-// import { IsString, IsNotEmpty } from 'class-validator';
-// import { BaseDto } from '@/shared/dto/base.dto';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { PayrollStatus } from '../entities/payroll.entity';
 
 export class CreatePayrollDto {
-  // @ApiProperty({ description: 'Name of the payroll' })
-  // @IsString()
-  // @IsNotEmpty()
-  // name: string;
-}
+  @IsNotEmpty()
+  @IsString()
+  payrollMonth: string;
 
-export class UpdatePayrollDto {
-  // @ApiProperty({ description: 'Name of the payroll', required: false })
-  // @IsString()
-  // @IsNotEmpty()
-  // name?: string;
+  @IsNotEmpty()
+  @IsNumber()
+  totalGross: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  totalDeduction: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  totalAddition: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  netPay: number;
+
+  @IsNotEmpty()
+  @IsEnum(PayrollStatus)
+  status: PayrollStatus;
+
+  @IsArray()
+  @IsNotEmpty()
+  selectedEmployees: Record<string, any>[];
 }

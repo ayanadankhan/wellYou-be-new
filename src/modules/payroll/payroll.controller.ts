@@ -1,12 +1,35 @@
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { PayrollService } from './payroll.service';
+import { CreatePayrollDto } from './dto/create-payroll.dto';
+import { UpdatePayrollDto } from './dto/update-payroll.dto';
 
-import { Controller } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-// import { PayrollService } from './payroll.service';
-
-@ApiTags('payroll')
 @Controller('payroll')
 export class PayrollController {
-  // constructor(private readonly payrollService: PayrollService) {}
+  constructor(private readonly payrollService: PayrollService) {}
 
-  // Add your controller methods here (e.g., @Post, @Get, @Patch, @Delete)
+  @Post()
+  async create(@Body() createPayrollDto: CreatePayrollDto) {
+    return this.payrollService.create(createPayrollDto);
+  }
+
+  @Get()
+  async findAll() {
+    return this.payrollService.findAll();
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.payrollService.findOne(id);
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() updatePayrollDto: UpdatePayrollDto) {
+    return this.payrollService.update(id, updatePayrollDto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Param('id') id: string) {
+    await this.payrollService.remove(id);
+  }
 }

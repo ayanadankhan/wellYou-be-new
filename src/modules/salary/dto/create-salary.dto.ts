@@ -1,8 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsDate,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateIf,
+  ValidateNested
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsArray, IsDate, IsNotEmpty, IsNumber, IsObject, IsString, ValidateNested } from 'class-validator';
 import { Types } from 'mongoose';
 
+// Step 1: Define Enum
+export enum PayFrequency {
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  HOURLY = 'HOURLY'
+}
+
+// Step 2: SalaryPayDto with conditional hourlyRate
 class SalaryPayDto {
   @ApiProperty()
   @IsNumber()
@@ -12,11 +31,13 @@ class SalaryPayDto {
   @IsString()
   currency: string;
 
-  @ApiProperty()
-  @IsString()
-  payFrequency: string;
+  @ApiProperty({ enum: PayFrequency })
+  @IsEnum(PayFrequency)
+  payFrequency: PayFrequency;
 
   @ApiProperty({ required: false })
+  @ValidateIf(o => o.payFrequency === PayFrequency.HOURLY)
+  @IsNotEmpty()
   @IsString()
   hourlyRate?: string;
 }
