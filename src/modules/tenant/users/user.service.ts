@@ -11,28 +11,6 @@ import * as bcrypt from 'bcrypt';
 export class UserService {
   constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
 
-async createDefaultSuperAdmin(): Promise<void> {
-  console.log("🛠️ createDefaultSuperAdmin called");
-
-  const existing = await this.userModel.findOne({ email: 'admin@gmail.com' });
-  console.log("🧪 Existing User Found:", existing);
-
-  if (!existing) {
-    const hashedPassword = await bcrypt.hash('12345678', 10);
-    const superAdmin = new this.userModel({
-      email: 'admin@gmail.com',
-      password: hashedPassword,
-      firstName: 'Super',
-      lastName: 'Admin',
-      role: UserRole.SUPER_ADMIN,
-    });
-    await superAdmin.save();
-    console.log('✅ Default Super Admin created successfully');
-  } else {
-    console.log('ℹ️ Default Super Admin already exists');
-  }
-}
-
 async create(createUserDto: CreateUserDto): Promise<User> {
   // Remove the hashing - it should already be done by AuthService
   const createdUser = new this.userModel({

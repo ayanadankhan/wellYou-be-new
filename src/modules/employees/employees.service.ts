@@ -18,33 +18,13 @@ export class EmployeesService {
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
     try {
-      this.logger.log(`Creating employee with User Id: ${createEmployeeDto.userId}`);
-      
-      // Check if employee with userId already exists
-      const existingEmployee = await this.employeeModel.findOne({ 
-        userId: createEmployeeDto.userId 
-      }).exec();
-      
-      if (existingEmployee) {
-        throw new HttpException(
-          {
-            status: HttpStatus.BAD_REQUEST,
-            error: 'Employee already exists',
-            message: `Employee with User Id ${createEmployeeDto.userId} already exists`,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
+      this.logger.log(`Creating employee with name: ${createEmployeeDto.name}`);
       const employee = new this.employeeModel(createEmployeeDto);
       const savedEmployee = await employee.save();
       this.logger.log(`Employee created successfully with ID: ${savedEmployee._id}`);
       return plainToClass(GetEmployeeDto, savedEmployee.toObject());
     } catch (error) {
       this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-      if (error instanceof HttpException) {
-        throw error;
-      }
       throw new HttpException(
         {
           status: HttpStatus.BAD_REQUEST,
@@ -139,7 +119,6 @@ export class EmployeesService {
           HttpStatus.BAD_REQUEST,
         );
       }
-
       this.logger.log(`Fetching employee with ID: ${id}`);
       
       const employee = await this.employeeModel.aggregate([
@@ -168,7 +147,6 @@ export class EmployeesService {
           HttpStatus.NOT_FOUND,
         );
       }
-
       this.logger.log(`Employee with ID ${id} retrieved successfully`);
       return plainToClass(GetEmployeeDto, employee[0]);
     } catch (error) {
@@ -200,19 +178,10 @@ export class EmployeesService {
           HttpStatus.BAD_REQUEST,
         );
       }
-
       this.logger.log(`Updating employee with ID: ${id}`);
-      
-      // Prevent email updates if provided
-      if (updateEmployeeDto.userId) {
-        delete updateEmployeeDto.userId;
-        this.logger.warn(`Email update attempted for employee ${id}. Email updates are not allowed.`);
-      }
-
       const updatedEmployee = await this.employeeModel
         .findByIdAndUpdate(id, { $set: updateEmployeeDto }, { new: true })
         .exec();
-
       if (!updatedEmployee) {
         this.logger.warn(`Employee with ID ${id} not found`);
         throw new HttpException(
@@ -224,7 +193,6 @@ export class EmployeesService {
           HttpStatus.NOT_FOUND,
         );
       }
-
       this.logger.log(`Employee with ID ${id} updated successfully`);
       return plainToClass(GetEmployeeDto, updatedEmployee.toObject());
     } catch (error) {
@@ -256,10 +224,8 @@ export class EmployeesService {
           HttpStatus.BAD_REQUEST,
         );
       }
-
       this.logger.log(`Deleting employee with ID: ${id}`);
       const deletedEmployee = await this.employeeModel.findByIdAndDelete(id).exec();
-
       if (!deletedEmployee) {
         this.logger.warn(`Employee with ID ${id} not found`);
         throw new HttpException(
@@ -271,7 +237,6 @@ export class EmployeesService {
           HttpStatus.NOT_FOUND,
         );
       }
-
       this.logger.log(`Employee with ID ${id} deleted successfully`);
       return plainToClass(GetEmployeeDto, deletedEmployee.toObject());
     } catch (error) {

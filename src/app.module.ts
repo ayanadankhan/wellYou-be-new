@@ -36,4 +36,4 @@ import { PayrollModule } from './modules/payroll/payroll.module';
   ],
   // ... controllers and providers
 })
-export class AppModule {}
+export class AppModule { }

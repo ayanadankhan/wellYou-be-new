@@ -19,7 +19,7 @@ export class EmployeesController {
   @ApiResponse({ status: 400, description: 'Invalid input data.' })
   async create(@Body() createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
     try {
-      this.logger.log(`Creating employee with User Id: ${createEmployeeDto.userId}`);
+      this.logger.log(`Creating employee with name: ${createEmployeeDto.name}`);
       const result = await this.employeesService.create(createEmployeeDto);
       this.logger.log(`Employee created successfully with ID: ${result._id}`);
       return result;
@@ -38,26 +38,16 @@ export class EmployeesController {
 
   @Get()
   @ApiOperation({ summary: 'Retrieve all employees' })
-  @ApiQuery({ name: 'firstName', required: false, type: String, description: 'Filter by first name (partial match)' })
-  @ApiQuery({ name: 'lastName', required: false, type: String, description: 'Filter by last name (partial match)' })
-  @ApiQuery({ name: 'departmentId', required: false, type: String, description: 'Filter by department ID' })
-  @ApiQuery({ name: 'employmentStatus', required: false, type: String, description: 'Filter by employment status', enum: ['ACTIVE', 'ON_LEAVE', 'TERMINATED', 'RETIRED'] })
+  @ApiQuery({ name: 'name', required: false, type: String, description: 'Filter by name (partial match)' })
+  @ApiQuery({ name: 'department', required: false, type: String, description: 'Filter by department' })
   @ApiResponse({ status: 200, description: 'List of all employees.', type: [GetEmployeeDto] })
   @ApiResponse({ status: 500, description: 'Internal server error.' })
-  async findAll(
-    @Query('firstName') firstName?: string,
-    @Query('lastName') lastName?: string,
-    @Query('departmentId') departmentId?: string,
-    @Query('employmentStatus') employmentStatus?: string
-  ): Promise<GetEmployeeDto[]> {
+  async findAll(@Query('name') name?: string, @Query('department') department?: string): Promise<GetEmployeeDto[]> {
     try {
-      this.logger.log(`Fetching employees with query: firstName=${firstName}, lastName=${lastName}, departmentId=${departmentId}, employmentStatus=${employmentStatus}`);
-      const query: any = {};
-      if (firstName) query.firstName = { $regex: firstName, $options: 'i' };
-      if (lastName) query.lastName = { $regex: lastName, $options: 'i' };
-      if (departmentId) query.departmentId = departmentId;
-      if (employmentStatus) query.employmentStatus = employmentStatus;
-      
+      this.logger.log(`Fetching employees with query: name=${name}, department=${department}`);
+      const query: { name?: string; department?: string } = {};
+      if (name) query.name = name;
+      if (department) query.department = department;
       const employees = await this.employeesService.findAll(query);
       this.logger.log(`Retrieved ${employees.length} employees`);
       return employees;
