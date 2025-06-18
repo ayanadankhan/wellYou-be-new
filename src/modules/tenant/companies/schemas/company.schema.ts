@@ -13,15 +13,6 @@ export class Company extends BaseDto {
   @Prop({ required: true, unique: true })
   name: string;
 
-  @Prop({ required: false })
-  address?: string;
-
-  @Prop({ required: false })
-  phone?: string;
-
-  @Prop({ required: false })
-  email?: string;
-
   @Prop({ default: true })
   isActive: boolean;
 }

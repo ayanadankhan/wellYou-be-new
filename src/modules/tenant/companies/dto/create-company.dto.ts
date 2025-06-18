@@ -7,19 +7,4 @@ export class CreateCompanyDto {
   @IsString()
   @IsNotEmpty()
   name: string;
-
-  @ApiProperty({ description: 'Address of the company', required: false })
-  @IsOptional()
-  @IsString()
-  address?: string;
-
-  @ApiProperty({ description: 'Phone number of the company', required: false })
-  @IsOptional()
- 
-  phone?: string;
-
-  @ApiProperty({ example: 'info@example.com', description: 'Email of the company', required: false })
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 }

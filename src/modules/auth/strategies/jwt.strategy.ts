@@ -20,11 +20,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: UserPayload) {
     // This payload comes from the token signed by JwtService
     // Return the user object that will be attached to req.user
-    return {
-      _id: payload._id, // Changed from Types.ObjectId to string
-      email: payload.email,
-      role: payload.role,
-      // tenantId: payload.tenantId ? new Types.ObjectId(payload.tenantId) : undefined, // Removed for MVP simplicity
-    };
+    return payload
   }
 }

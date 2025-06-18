@@ -3,8 +3,10 @@ export interface UserPayload {
   _id: string;
   email: string;
   role: string;
+  firstName: string;
   iat?: number;
   exp?: number;
+  lastName?: string;
 }
 
 export interface LoginResponse {

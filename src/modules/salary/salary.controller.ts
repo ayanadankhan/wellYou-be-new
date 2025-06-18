@@ -12,6 +12,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { SalaryService } from './salary.service';
 import { CreateSalaryDto } from './dto/create-salary.dto';
 import { UpdateSalaryDto } from './dto/update-salary.dto';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { User } from '../tenant/users/schemas/user.schema';
 
 @ApiTags('Salary')
 @Controller('salary')
@@ -19,12 +21,14 @@ export class SalaryController {
   constructor(private readonly salaryService: SalaryService) {}
 
   @Post()
-  create(@Body() createSalaryDto: CreateSalaryDto) {
+  create(@CurrentUser() user: User, @Body() createSalaryDto: CreateSalaryDto) {
     return this.salaryService.create(createSalaryDto);
   }
 
   @Get()
-  findAll() {
+  findAll(@CurrentUser() user: User) {
+    console.log("ertyu",user);
+    
     return this.salaryService.findAll();
   }
 

@@ -10,7 +10,7 @@ export enum PayrollStatus {
 
 @Schema()
 export class Payroll extends Document {
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true }) // Added unique: true
   payrollMonth: string;
 
   @Prop({ required: true, default: 0 })
@@ -33,3 +33,6 @@ export class Payroll extends Document {
 }
 
 export const PayrollSchema = SchemaFactory.createForClass(Payroll);
+
+// Add index to ensure uniqueness
+PayrollSchema.index({ payrollMonth: 1 }, { unique: true });
