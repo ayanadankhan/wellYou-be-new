@@ -8,244 +8,424 @@ import {
   IsNumber, 
   IsArray, 
   IsBoolean, 
-  ValidateNested, 
-  IsEnum,
-  ArrayNotEmpty
+  ValidateNested,
+  IsEnum 
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Gender, MaritalStatus, EmploymentStatus } from '../schemas/Employee.schema';
+import { Types } from 'mongoose';
+
+// Enums for consistent values
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  OTHER = 'OTHER',
+  PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY'
+}
+
+export enum MaritalStatus {
+  SINGLE = 'SINGLE',
+  MARRIED = 'MARRIED',
+  DIVORCED = 'DIVORCED',
+  WIDOWED = 'WIDOWED',
+  SEPARATED = 'SEPARATED'
+}
+
+export enum EmploymentStatus {
+  ACTIVE = 'ACTIVE',
+  ON_LEAVE = 'ON_LEAVE',
+  TERMINATED = 'TERMINATED',
+  RETIRED = 'RETIRED'
+}
+
+export enum EmploymentType {
+  FULL_TIME = 'FULL_TIME',
+  PART_TIME = 'PART_TIME',
+  CONTRACT = 'CONTRACT',
+  TEMPORARY = 'TEMPORARY',
+  INTERN = 'INTERN'
+}
+
+export enum SkillLevel {
+  BEGINNER = 'BEGINNER',
+  INTERMEDIATE = 'INTERMEDIATE',
+  ADVANCED = 'ADVANCED',
+  EXPERT = 'EXPERT'
+}
 
 class SkillDto {
-  @ApiProperty({ description: 'Name of the skill', example: 'React' })
+  @ApiProperty({ 
+    description: 'Name of the skill', 
+    example: 'React',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'Proficiency level of the skill', example: 'expert' })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Proficiency level of the skill', 
+    example: SkillLevel.EXPERT,
+    enum: SkillLevel,
+    required: true
+  })
+  @IsEnum(SkillLevel)
   @IsNotEmpty()
-  level: string;
+  level: SkillLevel;
 
-  @ApiProperty({ description: 'Category of the skill', example: 'Frontend' })
+  @ApiProperty({ 
+    description: 'Category of the skill', 
+    example: 'Frontend',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   category: string;
 
-  @ApiProperty({ description: 'Years of experience with the skill', example: 5 })
+  @ApiProperty({ 
+    description: 'Years of experience with the skill', 
+    example: 5,
+    minimum: 0,
+    maximum: 50,
+    required: true
+  })
   @IsNumber()
   @IsNotEmpty()
   yearsOfExperience: number;
 }
 
 class EducationDto {
-  @ApiProperty({ description: 'Unique ID for the education record', example: 'edu-1' })
+  @ApiProperty({ 
+    description: 'Unique ID for the education record', 
+    example: 'edu-1',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Name of the institution', example: 'Stanford University' })
+  @ApiProperty({ 
+    description: 'Name of the institution', 
+    example: 'Stanford University',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   institution: string;
 
-  @ApiProperty({ description: 'Degree obtained', example: 'Master of Science' })
+  @ApiProperty({ 
+    description: 'Degree obtained', 
+    example: 'Master of Science',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   degree: string;
 
-  @ApiProperty({ description: 'Field of study', example: 'Computer Science' })
+  @ApiProperty({ 
+    description: 'Field of study', 
+    example: 'Computer Science',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   fieldOfStudy: string;
 
-  @ApiProperty({ description: 'Start date of education', example: '2018-09-01' })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Start date of education (YYYY-MM-DD)', 
+    example: '2018-09-01',
+    required: true
+  })
+  @IsDateString()
   @IsNotEmpty()
   startDate: string;
 
-  @ApiProperty({ description: 'End date of education', example: '2020-06-15', required: false })
-  @IsString()
+  @ApiProperty({ 
+    description: 'End date of education (YYYY-MM-DD)', 
+    example: '2020-06-15', 
+    required: false 
+  })
+  @IsDateString()
   @IsOptional()
   endDate?: string;
 
-  @ApiProperty({ description: 'GPA achieved', example: 3.8, required: false })
+  @ApiProperty({ 
+    description: 'GPA achieved', 
+    example: 3.8, 
+    minimum: 0,
+    maximum: 4,
+    required: false 
+  })
   @IsNumber()
   @IsOptional()
   gpa?: number;
 
-  @ApiProperty({ description: 'Honors received', example: 'Magna Cum Laude', required: false })
+  @ApiProperty({ 
+    description: 'Honors received', 
+    example: 'Magna Cum Laude', 
+    required: false 
+  })
   @IsString()
   @IsOptional()
   honors?: string;
 
-  @ApiProperty({ description: 'Whether this is the current role', example: true })
+  @ApiProperty({ 
+    description: 'Whether currently enrolled in this education', 
+    example: false,
+    required: true
+  })
   @IsBoolean()
   @IsNotEmpty()
   isEnrolled: boolean;
+
+  @ApiProperty({ 
+    description: 'Description of education', 
+    example: 'Description of the education program', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
 }
 
 class CertificationDto {
-  @ApiProperty({ description: 'Unique ID for the certification', example: 'cert-1' })
+  @ApiProperty({ 
+    description: 'Unique ID for the certification', 
+    example: 'cert-1',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Name of the certification', example: 'AWS Solutions Architect Associate' })
+  @ApiProperty({ 
+    description: 'Name of the certification', 
+    example: 'AWS Solutions Architect Associate',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'Issuing organization', example: 'Amazon Web Services' })
+  @ApiProperty({ 
+    description: 'Issuing organization', 
+    example: 'Amazon Web Services',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   issuingOrganization: string;
 
-  @ApiProperty({ description: 'Issue date of the certification', example: '2023-04-10' })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Issue date of the certification (YYYY-MM-DD)', 
+    example: '2023-04-10',
+    required: true
+  })
+  @IsDateString()
   @IsNotEmpty()
   issueDate: string;
 
-  @ApiProperty({ description: 'Expiration date of the certification', example: '2026-04-10', required: false })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Expiration date of the certification (YYYY-MM-DD)', 
+    example: '2026-04-10', 
+    required: false 
+  })
+  @IsDateString()
   @IsOptional()
   expirationDate?: string;
 
-  @ApiProperty({ description: 'Credential ID', example: 'AWS-ASA-12345', required: false })
+  @ApiProperty({ 
+    description: 'Credential ID', 
+    example: 'AWS-ASA-12345', 
+    required: false 
+  })
   @IsString()
   @IsOptional()
   credentialId?: string;
 
-  @ApiProperty({ description: 'Verification URL', example: 'https://aws.amazon.com/verification/12345', required: false })
+  @ApiProperty({ 
+    description: 'Verification URL', 
+    example: 'https://aws.amazon.com/verification/12345', 
+    required: false 
+  })
   @IsString()
   @IsOptional()
   verificationUrl?: string;
+
+  @ApiProperty({ 
+    description: 'Whether certification has no expiration', 
+    example: true, 
+    required: false 
+  })
+  @IsBoolean()
+  @IsOptional()
+  hasNoExpiration?: boolean;
+
+  @ApiProperty({ 
+    description: 'Description of certification', 
+    example: 'Description of certification', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
 }
 
 class ExperienceDto {
-  @ApiProperty({ description: 'Unique ID for the experience', example: 'exp-1' })
+  @ApiProperty({ 
+    description: 'Unique ID for the experience', 
+    example: 'exp-1',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Name of the company', example: 'TechCorp Solutions' })
+  @ApiProperty({ 
+    description: 'Name of the company', 
+    example: 'TechCorp Solutions',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   companyName: string;
 
-  @ApiProperty({ description: 'Position held', example: 'Senior Software Engineer' })
+  @ApiProperty({ 
+    description: 'Position held', 
+    example: 'Senior Software Engineer',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   position: string;
 
-  @ApiProperty({ description: 'Start date of employment', example: '2021-01-01T00:00:00.000Z' })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Start date of employment (ISO 8601 format)', 
+    example: '2021-01-01T00:00:00.000Z',
+    required: true
+  })
+  @IsDateString()
   @IsNotEmpty()
   startDate: string;
 
-  @ApiProperty({ description: 'End date of employment', example: '2022-03-15T00:00:00.000Z', required: false })
-  @IsString()
+  @ApiProperty({ 
+    description: 'End date of employment (ISO 8601 format)', 
+    example: '2022-03-15T00:00:00.000Z', 
+    required: false 
+  })
+  @IsDateString()
   @IsOptional()
   endDate?: string;
 
-  @ApiProperty({ description: 'Whether this is the current role', example: true })
+  @ApiProperty({ 
+    description: 'Whether this is the current role', 
+    example: false,
+    required: true
+  })
   @IsBoolean()
   @IsNotEmpty()
   isCurrentRole: boolean;
 
-  @ApiProperty({ description: 'Description of the role', example: 'Lead development of microservices architecture', required: false })
+  @ApiProperty({ 
+    description: 'Description of the role', 
+    example: 'Lead development of microservices architecture', 
+    required: false 
+  })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ description: 'Location of the role', example: 'San Francisco, CA', required: false })
+  @ApiProperty({ 
+    description: 'Location of the role', 
+    example: 'San Francisco, CA', 
+    required: false 
+  })
   @IsString()
   @IsOptional()
   location?: string;
 
-  @ApiProperty({ description: 'Type of employment', example: 'full-time', required: false })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Type of employment', 
+    example: EmploymentType.FULL_TIME,
+    enum: EmploymentType,
+    required: false 
+  })
+  @IsEnum(EmploymentType)
   @IsOptional()
-  employmentType?: string;
+  employmentType?: EmploymentType;
 
-  @ApiProperty({ description: 'List of achievements', example: ['Reduced system latency by 40%'], required: false })
+  @ApiProperty({ 
+    description: 'List of achievements', 
+    example: ['Reduced system latency by 40%'], 
+    required: false 
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   achievements?: string[];
-
-  @ApiProperty({ description: 'Company name (alias)', example: 'TechCorp Solutions', required: false })
-  @IsString()
-  @IsOptional()
-  company?: string;
 }
 
 class EmergencyContactDto {
-  @ApiProperty({ description: 'Full name of emergency contact', example: 'Jane Doe' })
+  @ApiProperty({ 
+    description: 'Full name of emergency contact', 
+    example: 'Jane Doe',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'Relationship to employee', example: 'Spouse' })
+  @ApiProperty({ 
+    description: 'Relationship with employee', 
+    example: 'spouse',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
   relationship: string;
 
-  @ApiProperty({ description: 'Phone number of emergency contact', example: '+1-555-987-6543' })
+  @ApiProperty({ 
+    description: 'Primary phone number of emergency contact', 
+    example: '+1-555-987-6543',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
-  phoneNumber: string;
-
-  @ApiProperty({ description: 'Email of emergency contact', example: 'jane.doe@example.com', required: false })
-  @IsEmail()
-  @IsOptional()
-  email?: string;
+  phone: string;
 }
 
 export class CreateEmployeeDto {
-  @ApiProperty({ description: 'Name of the employee', example: 'Sarah Johnson' })
+  @ApiProperty({ 
+    description: 'User ID from authentication system', 
+    example: '685250901ba0296a0cd34398',
+    required: true
+  })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  userId: Types.ObjectId;
 
-  @ApiProperty({ description: 'Email of the employee', example: 'sarah.johnson@companyName.com' })
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty({ description: 'Role of the employee', example: 'senior' })
-  @IsString()
-  @IsNotEmpty()
-  role: string;
-
-  @ApiProperty({ description: 'Department of the employee', example: 'Engineering' })
-  @IsString()
-  @IsNotEmpty()
-  department: string;
-
-  @ApiProperty({ description: 'Position of the employee', example: 'Senior Software Engineer' })
-  @IsString()
-  @IsNotEmpty()
-  position: string;
-
-  @ApiProperty({ description: 'Type of employment', example: 'full-time' })
-  @IsString()
-  @IsNotEmpty()
-  employmentType: string;
-
-  @ApiProperty({ description: 'Status of the employee', example: 'active' })
-  @IsString()
-  @IsNotEmpty()
-  status: string;
-
-  @ApiProperty({ description: 'Date of birth', example: '1990-01-01' })
+  @ApiProperty({ 
+    description: 'Date of birth of employee (YYYY-MM-DD)', 
+    example: '1990-05-15',
+    required: true
+  })
   @IsDateString()
   @IsNotEmpty()
   dateOfBirth: string;
 
   @ApiProperty({ 
+    description: 'Profile picture URL', 
+    example: '', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
+
+  @ApiProperty({ 
     description: 'Gender of employee', 
-    example: Gender.MALE,
-    enum: Gender
+    example: Gender.FEMALE,
+    enum: Gender,
+    required: true
   })
   @IsEnum(Gender)
   @IsNotEmpty()
@@ -253,178 +433,195 @@ export class CreateEmployeeDto {
 
   @ApiProperty({ 
     description: 'Marital status of employee', 
-    example: MaritalStatus.SINGLE,
-    enum: MaritalStatus
+    example: MaritalStatus.MARRIED,
+    enum: MaritalStatus,
+    required: true
   })
   @IsEnum(MaritalStatus)
   @IsNotEmpty()
   maritalStatus: MaritalStatus;
 
   @ApiProperty({ 
-    description: 'List of nationalities', 
-    example: ['USA', 'CAN'], 
-    type: [String] 
+    description: 'Phone number of employee', 
+    example: '+1 (555) 123-4567',
+    required: true
   })
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  nationality: string[];
-
-  @ApiProperty({ description: 'SSN/Tax ID of employee', example: '123-45-6789' })
   @IsString()
   @IsNotEmpty()
-  ssnTaxId: string;
-
-  @ApiProperty({ description: 'Hire date', example: '2022-01-01' })
-  @IsDateString()
-  @IsNotEmpty()
-  hireDate: string;
-
-  @ApiProperty({ description: 'Termination date', example: null, required: false })
-  @IsDateString()
-  @IsOptional()
-  terminationDate?: string;
+  phoneNumber: string;
 
   @ApiProperty({ 
-    description: 'Employment status', 
-    example: EmploymentStatus.ACTIVE,
-    enum: EmploymentStatus
+    description: 'Location of employee', 
+    example: 'Punjab, Pakistan',
+    required: true
   })
-  @IsEnum(EmploymentStatus)
-  @IsNotEmpty()
-  employmentStatus: EmploymentStatus;
-
-  @ApiProperty({ description: 'Department ID', example: '507f1f77bcf86cd799439011' })
   @IsString()
   @IsNotEmpty()
-  departmentId: string;
+  location: string;
 
-  @ApiProperty({ description: 'Position ID', example: '507f1f77bcf86cd799439012' })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Nationalities of employee', 
+    example: ['American', 'Canadian'],
+    type: [String],
+    required: true
+  })
+  @IsArray()
+  @IsString({ each: true })
   @IsNotEmpty()
-  positionId: string;
+  nationality: string[];
 
-  @ApiProperty({ description: 'Manager ID', example: null, required: false })
-  @IsString()
-  @IsOptional()
-  managerId?: string;
-
-  @ApiProperty({ description: 'Location', example: 'New York' })
-  @IsString()
-  @IsOptional()
-  location?: string;
-
-  @ApiProperty({ description: 'Phone number', example: '+1-555-123-4567', required: false })
-  @IsString()
-  @IsOptional()
-  phoneNumber?: string;
-
-  @ApiProperty({ description: 'Profile picture URL', example: 'https://example.com/profile.jpg', required: false })
-  @IsString()
-  @IsOptional()
-  profilePicture?: string;
-
-  @ApiProperty({ description: 'Emergency contact', type: EmergencyContactDto })
+  @ApiProperty({ 
+    description: 'Emergency contact information', 
+    type: EmergencyContactDto,
+    required: true
+  })
   @ValidateNested()
   @Type(() => EmergencyContactDto)
   @IsNotEmpty()
   emergencyContact: EmergencyContactDto;
 
-  @ApiProperty({ description: 'Is active', example: true })
-  @IsBoolean()
-  @IsNotEmpty()
-  isActive: boolean;
-
-  @ApiProperty({ description: 'Salary', example: 75000 })
-  @IsNumber()
-  @IsNotEmpty()
-  salary: number;
-
-  @ApiProperty({ description: 'Performance rating', example: 4.5 })
-  @IsNumber()
-  @IsNotEmpty()
-  performance: number;
-
-  @ApiProperty({ description: 'Biography', example: 'Experienced developer...', required: false })
-  @IsString()
-  @IsOptional()
-  bio?: string;
-
-  @ApiProperty({ description: 'Skills', type: [SkillDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SkillDto)
-  @IsOptional()
-  skills?: SkillDto[];
-
-  @ApiProperty({ description: 'Education', type: [EducationDto] })
+  @ApiProperty({ 
+    description: 'Education history', 
+    type: [EducationDto],
+    required: false
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EducationDto)
   @IsOptional()
   education?: EducationDto[];
 
-  @ApiProperty({ description: 'Certifications', type: [CertificationDto] })
+  @ApiProperty({ 
+    description: 'Position ID', 
+    example: '68525d312bec266251cd4c7d',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  positionId: Types.ObjectId;
+
+  @ApiProperty({ 
+    description: 'Department ID', 
+    example: '68525d11901645947fe40724',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  departmentId: Types.ObjectId;
+
+  @ApiProperty({ 
+    description: 'Manager ID', 
+    example: '609e129d8e3a2c1a7890abcd',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  managerId?: string;
+
+  @ApiProperty({ 
+    description: 'Employment status of employee', 
+    example: EmploymentStatus.RETIRED,
+    enum: EmploymentStatus,
+    required: true
+  })
+  @IsEnum(EmploymentStatus)
+  @IsNotEmpty()
+  employmentStatus: EmploymentStatus;
+
+  @ApiProperty({ 
+    description: 'Hire date (YYYY-MM-DD)', 
+    example: '2022-04-21',
+    required: true
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  hireDate: string;
+
+  @ApiProperty({ 
+    description: 'Work experiences', 
+    type: [ExperienceDto],
+    required: false
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceDto)
+  @IsOptional()
+  experiences?: ExperienceDto[];
+
+  @ApiProperty({ 
+    description: 'Certifications', 
+    type: [CertificationDto],
+    required: false
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CertificationDto)
   @IsOptional()
   certifications?: CertificationDto[];
 
-  @ApiProperty({ description: 'Experiences', type: [ExperienceDto] })
+  @ApiProperty({ 
+    description: 'Skills', 
+    type: [SkillDto],
+    required: false
+  })
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ExperienceDto)
+  @Type(() => SkillDto)
   @IsOptional()
-  experiences?: ExperienceDto[];
+  skills?: SkillDto[];
+
+  @ApiProperty({ 
+    description: 'SSN/Tax ID', 
+    example: '684936da00d419b8ac546d00',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  ssnTaxId: string;
+
+  @ApiProperty({ 
+    description: 'Whether employee is active', 
+    example: true,
+    required: true
+  })
+  @IsBoolean()
+  @IsNotEmpty()
+  isActive: boolean;
+
+  @ApiProperty({ 
+    description: 'Tenant ID', 
+    example: '684936da00d419b8ac546d00',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  tenantId: string;
 }
 
 export class UpdateEmployeeDto {
-  @ApiProperty({ description: 'Name of the employee', example: 'Sarah Johnson', required: false })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty({ description: 'Email of the employee', example: 'sarah.johnson@companyName.com', required: false })
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-  @ApiProperty({ description: 'Role of the employee', example: 'senior', required: false })
-  @IsString()
-  @IsOptional()
-  role?: string;
-
-  @ApiProperty({ description: 'Department of the employee', example: 'Engineering', required: false })
-  @IsString()
-  @IsOptional()
-  department?: string;
-
-  @ApiProperty({ description: 'Position of the employee', example: 'Senior Software Engineer', required: false })
-  @IsString()
-  @IsOptional()
-  position?: string;
-
-  @ApiProperty({ description: 'Type of employment', example: 'full-time', required: false })
-  @IsString()
-  @IsOptional()
-  employmentType?: string;
-
-  @ApiProperty({ description: 'Status of the employee', example: 'active', required: false })
-  @IsString()
-  @IsOptional()
-  status?: string;
-
-  @ApiProperty({ description: 'Date of birth', example: '1990-01-01', required: false })
+  @ApiProperty({ 
+    description: 'Date of birth of employee (YYYY-MM-DD)', 
+    example: '1990-05-15', 
+    required: false 
+  })
   @IsDateString()
   @IsOptional()
   dateOfBirth?: string;
 
   @ApiProperty({ 
+    description: 'Profile picture URL', 
+    example: '', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
+
+  @ApiProperty({ 
     description: 'Gender of employee', 
-    example: Gender.MALE,
+    example: Gender.FEMALE,
     enum: Gender,
-    required: false
+    required: false 
   })
   @IsEnum(Gender)
   @IsOptional()
@@ -432,131 +629,167 @@ export class UpdateEmployeeDto {
 
   @ApiProperty({ 
     description: 'Marital status of employee', 
-    example: MaritalStatus.SINGLE,
+    example: MaritalStatus.MARRIED,
     enum: MaritalStatus,
-    required: false
+    required: false 
   })
   @IsEnum(MaritalStatus)
   @IsOptional()
   maritalStatus?: MaritalStatus;
 
   @ApiProperty({ 
-    description: 'List of nationalities', 
-    example: ['USA', 'CAN'], 
+    description: 'Phone number of employee', 
+    example: '+1 (555) 123-4567', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @ApiProperty({ 
+    description: 'Location of employee', 
+    example: 'Punjab, Pakistan', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  location?: string;
+
+  @ApiProperty({ 
+    description: 'Nationalities of employee', 
+    example: ['American', 'Canadian'],
     type: [String],
-    required: false
+    required: false 
   })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   nationality?: string[];
 
-  @ApiProperty({ description: 'SSN/Tax ID of employee', example: '123-45-6789', required: false })
-  @IsString()
-  @IsOptional()
-  ssnTaxId?: string;
-
-  @ApiProperty({ description: 'Hire date', example: '2022-01-01', required: false })
-  @IsDateString()
-  @IsOptional()
-  hireDate?: string;
-
-  @ApiProperty({ description: 'Termination date', example: null, required: false })
-  @IsDateString()
-  @IsOptional()
-  terminationDate?: string;
-
   @ApiProperty({ 
-    description: 'Employment status', 
-    example: EmploymentStatus.ACTIVE,
-    enum: EmploymentStatus,
-    required: false
+    description: 'Emergency contact information', 
+    type: EmergencyContactDto, 
+    required: false 
   })
-  @IsEnum(EmploymentStatus)
-  @IsOptional()
-  employmentStatus?: EmploymentStatus;
-
-  @ApiProperty({ description: 'Department ID', example: '507f1f77bcf86cd799439011', required: false })
-  @IsString()
-  @IsOptional()
-  departmentId?: string;
-
-  @ApiProperty({ description: 'Position ID', example: '507f1f77bcf86cd799439012', required: false })
-  @IsString()
-  @IsOptional()
-  positionId?: string;
-
-  @ApiProperty({ description: 'Manager ID', example: null, required: false })
-  @IsString()
-  @IsOptional()
-  managerId?: string;
-
-  @ApiProperty({ description: 'Location', example: 'New York', required: false })
-  @IsString()
-  @IsOptional()
-  location?: string;
-
-  @ApiProperty({ description: 'Phone number', example: '+1-555-123-4567', required: false })
-  @IsString()
-  @IsOptional()
-  phoneNumber?: string;
-
-  @ApiProperty({ description: 'Profile picture URL', example: 'https://example.com/profile.jpg', required: false })
-  @IsString()
-  @IsOptional()
-  profilePicture?: string;
-
-  @ApiProperty({ description: 'Emergency contact', type: EmergencyContactDto, required: false })
   @ValidateNested()
   @Type(() => EmergencyContactDto)
   @IsOptional()
   emergencyContact?: EmergencyContactDto;
 
-  @ApiProperty({ description: 'Is active', example: true, required: false })
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
-
-  @ApiProperty({ description: 'Salary', example: 75000, required: false })
-  @IsNumber()
-  @IsOptional()
-  salary?: number;
-
-  @ApiProperty({ description: 'Performance rating', example: 4.5, required: false })
-  @IsNumber()
-  @IsOptional()
-  performance?: number;
-
-  @ApiProperty({ description: 'Biography', example: 'Experienced developer...', required: false })
-  @IsString()
-  @IsOptional()
-  bio?: string;
-
-  @ApiProperty({ description: 'Skills', type: [SkillDto], required: false })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SkillDto)
-  @IsOptional()
-  skills?: SkillDto[];
-
-  @ApiProperty({ description: 'Education', type: [EducationDto], required: false })
+  @ApiProperty({ 
+    description: 'Education history', 
+    type: [EducationDto],
+    required: false
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EducationDto)
   @IsOptional()
   education?: EducationDto[];
 
-  @ApiProperty({ description: 'Certifications', type: [CertificationDto], required: false })
+  @ApiProperty({ 
+    description: 'Position ID', 
+    example: '68525d312bec266251cd4c7d', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  positionId?: string;
+
+  @ApiProperty({ 
+    description: 'Department ID', 
+    example: '68525d11901645947fe40724', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  departmentId?: string;
+
+  @ApiProperty({ 
+    description: 'Manager ID', 
+    example: '609e129d8e3a2c1a7890abcd', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  managerId?: string;
+
+  @ApiProperty({ 
+    description: 'Employment status of employee', 
+    example: EmploymentStatus.RETIRED,
+    enum: EmploymentStatus,
+    required: false 
+  })
+  @IsEnum(EmploymentStatus)
+  @IsOptional()
+  employmentStatus?: EmploymentStatus;
+
+  @ApiProperty({ 
+    description: 'Hire date (YYYY-MM-DD)', 
+    example: '2022-04-21', 
+    required: false 
+  })
+  @IsDateString()
+  @IsOptional()
+  hireDate?: string;
+
+  @ApiProperty({ 
+    description: 'Work experiences', 
+    type: [ExperienceDto],
+    required: false
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceDto)
+  @IsOptional()
+  experiences?: ExperienceDto[];
+
+  @ApiProperty({ 
+    description: 'Certifications', 
+    type: [CertificationDto],
+    required: false
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CertificationDto)
   @IsOptional()
   certifications?: CertificationDto[];
 
-  @ApiProperty({ description: 'Experiences', type: [ExperienceDto], required: false })
+  @ApiProperty({ 
+    description: 'Skills', 
+    type: [SkillDto],
+    required: false
+  })
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ExperienceDto)
+  @Type(() => SkillDto)
   @IsOptional()
-  experiences?: ExperienceDto[];
+  skills?: SkillDto[];
+
+  @ApiProperty({ 
+    description: 'SSN/Tax ID', 
+    example: '684936da00d419b8ac546d00', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  ssnTaxId?: string;
+
+  @ApiProperty({ 
+    description: 'Whether employee is active', 
+    example: true, 
+    required: false 
+  })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
+  @ApiProperty({ 
+    description: 'Tenant ID', 
+    example: '684936da00d419b8ac546d00', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  tenantId?: string;
 }

@@ -18,7 +18,7 @@ export class EmployeesService {
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
     try {
-      this.logger.log(`Creating employee with name: ${createEmployeeDto.name}`);
+      this.logger.log(`Creating employee with userId: ${createEmployeeDto.userId}`);
       const employee = new this.employeeModel(createEmployeeDto);
       const savedEmployee = await employee.save();
       this.logger.log(`Employee created successfully with ID: ${savedEmployee._id}`);
@@ -37,30 +37,45 @@ export class EmployeesService {
   }
 
   async findAll(query: {
-    firstName?: string;
-    lastName?: string;
+    userId?: string;
     departmentId?: string;
+    positionId?: string;
+    managerId?: string;
     employmentStatus?: string;
+    isActive?: boolean;
+    tenantId?: string;
   } = {}): Promise<GetEmployeeDto[]> {
     try {
       this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(query)}`);
 
       const matchStage: any = {};
 
-      if (query.firstName) {
-        matchStage.firstName = { $regex: query.firstName, $options: 'i' };
-      }
-
-      if (query.lastName) {
-        matchStage.lastName = { $regex: query.lastName, $options: 'i' };
+      if (query.userId) {
+        matchStage.userId = new Types.ObjectId(query.userId);
       }
 
       if (query.departmentId) {
         matchStage.departmentId = new Types.ObjectId(query.departmentId);
       }
 
+      if (query.positionId) {
+        matchStage.positionId = new Types.ObjectId(query.positionId);
+      }
+
+      if (query.managerId) {
+        matchStage.managerId = new Types.ObjectId(query.managerId);
+      }
+
       if (query.employmentStatus) {
         matchStage.employmentStatus = query.employmentStatus;
+      }
+
+      if (query.isActive !== undefined) {
+        matchStage.isActive = query.isActive;
+      }
+
+      if (query.tenantId) {
+        matchStage.tenantId = new Types.ObjectId(query.tenantId);
       }
 
       const employees = await this.employeeModel.aggregate([
@@ -74,7 +89,6 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-       
         {
           $lookup: {
             from: 'departments',
@@ -84,6 +98,24 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'designations',
+            localField: 'positionId',
+            foreignField: '_id',
+            as: 'position',
+          },
+        },
+        { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+        // {
+        //   $lookup: {
+        //     from: 'employees',
+        //     localField: 'managerId',
+        //     foreignField: '_id',
+        //     as: 'manager',
+        //   },
+        // },
+        // { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
         {
           $project: {
             'user.password': 0,
@@ -132,6 +164,33 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'departments',
+            localField: 'departmentId',
+            foreignField: '_id',
+            as: 'department',
+          },
+        },
+        { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'positions',
+            localField: 'positionId',
+            foreignField: '_id',
+            as: 'position',
+          },
+        },
+        { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'employees',
+            localField: 'managerId',
+            foreignField: '_id',
+            as: 'manager',
+          },
+        },
+        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
         { $project: { 'user.password': 0 } },
         { $limit: 1 }
       ]);

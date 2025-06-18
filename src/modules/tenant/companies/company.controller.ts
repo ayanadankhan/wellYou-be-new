@@ -19,7 +19,7 @@ export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN) // Only Super Admin can create companies
+  // @Roles(UserRole.SUPER_ADMIN) // Only Super Admin can create companies
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new company' })
   @ApiResponse({ status: 201, description: 'The company has been successfully created.' })
@@ -31,7 +31,7 @@ export class CompanyController {
   }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN) // Only Super Admin can view all companies
+  // @Roles(UserRole.SUPER_ADMIN) // Only Super Admin can view all companies
   @ApiOperation({ summary: 'Get all companies' })
   @ApiResponse({ status: 200, description: 'Return all companies.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
