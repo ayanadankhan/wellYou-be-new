@@ -45,9 +45,9 @@ export class EmployeesController {
   async findAll(@Query('name') name?: string, @Query('department') department?: string): Promise<GetEmployeeDto[]> {
     try {
       this.logger.log(`Fetching employees with query: name=${name}, department=${department}`);
-      const query: { name?: string; department?: string } = {};
-      if (name) query.name = name;
-      if (department) query.department = department;
+      const query: { firstName?: string; departmentId?: string } = {};
+      if (name) query.firstName = name;
+      if (department) query.departmentId = department;
       const employees = await this.employeesService.findAll(query);
       this.logger.log(`Retrieved ${employees.length} employees`);
       return employees;

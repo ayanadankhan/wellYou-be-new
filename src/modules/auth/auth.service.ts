@@ -81,15 +81,10 @@ export class AuthService {
       if (!user || !user.email || !user._id) {
         throw new UnauthorizedException('Invalid user data');
       }
-
-      const payload: UserPayload = {
-        email: user.email,
-        _id: user._id.toString(),
-        role: user.role,
-      };
+      const payload = user
 
       const expiresIn = this.configService.get<string>('JWT_EXPIRATION') || '24h';
-      const accessToken = this.jwtService.sign(payload, { expiresIn });
+      const accessToken = this.jwtService.sign(user, { expiresIn });
 
       this.logger.debug(`User logged in successfully: ${user.email}`);
 

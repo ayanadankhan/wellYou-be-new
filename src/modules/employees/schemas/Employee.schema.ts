@@ -1,7 +1,32 @@
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
+
 export type EmployeeDocument = Employee & Document;
+
+// Define enums
+export enum Gender {
+  MALE = 'male',
+  FEMALE = 'female',
+  OTHER = 'other',
+  PREFER_NOT_TO_SAY = 'prefer_not_to_say',
+}
+
+export enum MaritalStatus {
+  SINGLE = 'single',
+  MARRIED = 'married',
+  DIVORCED = 'divorced',
+  WIDOWED = 'widowed',
+  SEPARATED = 'separated',
+  OTHER = 'other',
+}
+
+export enum EmploymentStatus {
+  ACTIVE = 'active',
+  ON_LEAVE = 'on_leave',
+  TERMINATED = 'terminated',
+  RETIRED = 'retired',
+  PROBATION = 'probation',
+}
 
 @Schema()
 class Skill {
@@ -44,9 +69,11 @@ class Education {
   @Prop({ type: String })
   honors?: string;
 
-   @Prop({ type: Boolean, default: false })
+  @Prop({ type: Boolean, default: false })
   isEnrolled: boolean;
 }
+
+export const EducationSchema = SchemaFactory.createForClass(Education);
 
 @Schema()
 class Certification {
@@ -106,14 +133,10 @@ class Experience {
 
   @Prop({ type: String })
   company?: string;
-
-  // @Prop({ type: Boolean, default: false })
-  // isCurrent: boolean;
 }
 
 @Schema({
   timestamps: true,
-  collection: 'employees',
 })
 export class Employee {
   @Prop({ required: true, type: String })
@@ -138,13 +161,43 @@ export class Employee {
   status: string;
 
   @Prop({ required: true, type: Date })
-  startDate: Date;
+  dateOfBirth: Date;
+
+  @Prop({ required: true, type: String, enum: Gender })
+  gender: Gender;
+
+  @Prop({ required: true, type: String, enum: MaritalStatus })
+  maritalStatus: MaritalStatus;
+
+  @Prop({ required: true, type: [String] })
+  nationality: string[];
+
+  @Prop({ required: false, ref: "SSN Tax Id" })
+  ssnTaxId: string;
+
+  @Prop({ required: true, type: Date })
+  hireDate: Date;
+
+  @Prop({ required: false, type: Date })
+  terminationDate?: Date;
+
+  @Prop({ required: true, type: String, enum: EmploymentStatus })
+  employmentStatus: EmploymentStatus;
+
+  @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "departments" })
+  departmentId: MongooseSchema.Types.ObjectId;
+
+  @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "Position Id" })
+  positionId: MongooseSchema.Types.ObjectId;
+
+  @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: "Manager Id" })
+  managerId: MongooseSchema.Types.ObjectId;
+
+  @Prop({ required: false, type: String, ref: "Location" })
+  location: string;
 
   @Prop({ type: String })
   phoneNumber?: string;
-
-  @Prop({ type: String })
-  location?: string;
 
   @Prop({ type: [Skill] })
   skills: Skill[];
@@ -158,8 +211,8 @@ export class Employee {
   @Prop({ type: String })
   bio?: string;
 
-  @Prop({ type: [Education] })
-  education: Education[];
+  @Prop({ type: [EducationSchema] })
+  education?: Education[];
 
   @Prop({ type: [Certification] })
   certifications: Certification[];

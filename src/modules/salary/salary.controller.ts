@@ -1,64 +1,54 @@
-import { Controller, Get, Post, Body, Param, Query, Patch, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { SalaryService } from './salary.service';
-import { CreateSalaryDto, SalaryIncrementDto } from './dto/create-salary.dto';
+import { CreateSalaryDto } from './dto/create-salary.dto';
+import { UpdateSalaryDto } from './dto/update-salary.dto';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { User } from '../tenant/users/schemas/user.schema';
 
+@ApiTags('Salary')
 @Controller('salary')
 export class SalaryController {
-  private readonly logger = new Logger(SalaryController.name);
-
   constructor(private readonly salaryService: SalaryService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async createSalary(@Body() dto: CreateSalaryDto) {
-    this.logger.log(`Creating salary for employee: ${dto.employeeName}`);
-    return this.salaryService.createSalary(dto);
-  }
-
-  @Patch(':employeeId/increment')
-  async incrementSalary(
-    @Param('employeeId') employeeId: string,
-    @Body() dto: SalaryIncrementDto
-  ) {
-    this.logger.log(`Processing salary increment for employee: ${employeeId}`);
-    return this.salaryService.incrementSalary(employeeId, dto);
-  }
-
-  @Get(':employeeId')
-  async getCurrentSalary(@Param('employeeId') employeeId: string) {
-    return this.salaryService.getCurrentSalary(employeeId);
-  }
-
-  @Get(':employeeId/history')
-  async getSalaryHistory(@Param('employeeId') employeeId: string) {
-    return this.salaryService.getSalaryHistory(employeeId);
+  create(@CurrentUser() user: User, @Body() createSalaryDto: CreateSalaryDto) {
+    return this.salaryService.create(createSalaryDto);
   }
 
   @Get()
-  async getAllSalaries(
-    @Query('department') department?: string,
-    @Query('position') position?: string,
-    @Query('employmentStatus') employmentStatus?: string,
-    @Query('search') search?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number
-  ) {
-    return this.salaryService.getAllSalaries({
-      department,
-      position,
-      employmentStatus,
-      search,
-      page,
-      limit
-    });
+  findAll(@CurrentUser() user: User) {
+    console.log("ertyu",user);
+    
+    return this.salaryService.findAll();
   }
 
-  @Patch(':employeeId/terminate')
-  async terminateEmployeeSalary(
-    @Param('employeeId') employeeId: string,
-    @Body() body: { terminationDate: Date; reason: string; terminatedBy: string }
-  ) {
-    const { terminationDate, reason, terminatedBy } = body;
-    return this.salaryService.terminateEmployeeSalary(employeeId, terminationDate, reason, terminatedBy);
+  @Get('employee/:employeeId')
+  findByEmployee(@Param('employeeId') employeeId: string) {
+    return this.salaryService.findByEmployee(employeeId);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.salaryService.findOne(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateSalaryDto: UpdateSalaryDto) {
+    return this.salaryService.update(id, updateSalaryDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.salaryService.remove(id);
   }
 }
