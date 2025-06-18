@@ -38,6 +38,9 @@ export class User extends BaseDto {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ type: [String], default: [] })
+  permissions: string[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

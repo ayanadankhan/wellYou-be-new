@@ -4,6 +4,7 @@ import { CreateEmployeeDto } from './dto/create-Employee.dto';
 import { UpdateEmployeeDto } from './dto/update-Employee.dto';
 import { GetEmployeeDto } from './dto/get-Employee.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { EmploymentStatus } from './dto/create-Employee.dto';
 
 @ApiTags('employees')
 @Controller('employees')
@@ -15,39 +16,126 @@ export class EmployeesController {
   @Post()
   @ApiOperation({ summary: 'Create a new employee' })
   @ApiBody({ type: CreateEmployeeDto })
-  @ApiResponse({ status: 201, description: 'Employee created successfully.', type: GetEmployeeDto })
-  @ApiResponse({ status: 400, description: 'Invalid input data.' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Employee created successfully.', 
+    type: GetEmployeeDto 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Invalid input data.' 
+  })
+  @ApiResponse({ 
+    status: 409, 
+    description: 'Employee with userId already exists.' 
+  })
   async create(@Body() createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
     try {
-      this.logger.log(`Creating employee with name: ${createEmployeeDto.name}`);
+      this.logger.log(`Creating employee with userId: ${createEmployeeDto.userId}`);
       const result = await this.employeesService.create(createEmployeeDto);
       this.logger.log(`Employee created successfully with ID: ${result._id}`);
       return result;
     } catch (error) {
       this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      const status = error.message.includes('duplicate') 
+        ? HttpStatus.CONFLICT 
+        : HttpStatus.BAD_REQUEST;
       throw new HttpException(
         {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Failed to create employee',
+          status,
+          error: status === HttpStatus.CONFLICT 
+            ? 'Employee with userId already exists' 
+            : 'Failed to create employee',
           message: error.message,
         },
-        HttpStatus.BAD_REQUEST,
+        status,
       );
     }
   }
 
   @Get()
-  @ApiOperation({ summary: 'Retrieve all employees' })
-  @ApiQuery({ name: 'name', required: false, type: String, description: 'Filter by name (partial match)' })
-  @ApiQuery({ name: 'department', required: false, type: String, description: 'Filter by department' })
-  @ApiResponse({ status: 200, description: 'List of all employees.', type: [GetEmployeeDto] })
-  @ApiResponse({ status: 500, description: 'Internal server error.' })
-  async findAll(@Query('name') name?: string, @Query('department') department?: string): Promise<GetEmployeeDto[]> {
+  @ApiOperation({ summary: 'Retrieve all employees with optional filtering' })
+  @ApiQuery({ 
+    name: 'userId', 
+    required: false, 
+    type: String, 
+    description: 'Filter by userId (exact match)' 
+  })
+  @ApiQuery({ 
+    name: 'departmentId', 
+    required: false, 
+    type: String, 
+    description: 'Filter by department ID' 
+  })
+  @ApiQuery({ 
+    name: 'positionId', 
+    required: false, 
+    type: String, 
+    description: 'Filter by position ID' 
+  })
+  @ApiQuery({ 
+    name: 'managerId', 
+    required: false, 
+    type: String, 
+    description: 'Filter by manager ID' 
+  })
+  @ApiQuery({ 
+    name: 'employmentStatus', 
+    required: false, 
+    enum: EmploymentStatus,
+    description: 'Filter by employment status' 
+  })
+  @ApiQuery({ 
+    name: 'isActive', 
+    required: false, 
+    type: Boolean, 
+    description: 'Filter by active status' 
+  })
+  @ApiQuery({ 
+    name: 'tenantId', 
+    required: false, 
+    type: String, 
+    description: 'Filter by tenant ID' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of employees.', 
+    type: [GetEmployeeDto] 
+  })
+  @ApiResponse({ 
+    status: 500, 
+    description: 'Internal server error.' 
+  })
+  async findAll(
+    @Query('userId') userId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('positionId') positionId?: string,
+    @Query('managerId') managerId?: string,
+    @Query('employmentStatus') employmentStatus?: EmploymentStatus,
+    @Query('isActive') isActive?: boolean,
+    @Query('tenantId') tenantId?: string,
+  ): Promise<GetEmployeeDto[]> {
     try {
-      this.logger.log(`Fetching employees with query: name=${name}, department=${department}`);
-      const query: { firstName?: string; departmentId?: string } = {};
-      if (name) query.firstName = name;
-      if (department) query.departmentId = department;
+      this.logger.log(`Fetching employees with filters: ${JSON.stringify({
+        userId,
+        departmentId,
+        positionId,
+        managerId,
+        employmentStatus,
+        isActive,
+        tenantId
+      })}`);
+      
+      const query = {
+        ...(userId && { userId }),
+        ...(departmentId && { departmentId }),
+        ...(positionId && { positionId }),
+        ...(managerId && { managerId }),
+        ...(employmentStatus && { employmentStatus }),
+        ...(isActive !== undefined && { isActive }),
+        ...(tenantId && { tenantId }),
+      };
+
       const employees = await this.employeesService.findAll(query);
       this.logger.log(`Retrieved ${employees.length} employees`);
       return employees;
@@ -66,9 +154,20 @@ export class EmployeesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a single employee by ID' })
-  @ApiParam({ name: 'id', description: 'MongoDB ObjectID of the employee' })
-  @ApiResponse({ status: 200, description: 'Employee found.', type: GetEmployeeDto })
-  @ApiResponse({ status: 404, description: 'Employee not found.' })
+  @ApiParam({ 
+    name: 'id', 
+    description: 'MongoDB ObjectID of the employee',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Employee found.', 
+    type: GetEmployeeDto 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Employee not found.' 
+  })
   async findOne(@Param('id') id: string): Promise<GetEmployeeDto> {
     try {
       this.logger.log(`Fetching employee with ID: ${id}`);
@@ -104,12 +203,33 @@ export class EmployeesController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update an employee by ID' })
-  @ApiParam({ name: 'id', description: 'MongoDB ObjectID of the employee' })
+  @ApiParam({ 
+    name: 'id', 
+    description: 'MongoDB ObjectID of the employee',
+    example: '507f1f77bcf86cd799439011'
+  })
   @ApiBody({ type: UpdateEmployeeDto })
-  @ApiResponse({ status: 200, description: 'Employee updated successfully.', type: GetEmployeeDto })
-  @ApiResponse({ status: 404, description: 'Employee not found.' })
-  @ApiResponse({ status: 400, description: 'Invalid input data.' })
-  async update(@Param('id') id: string, @Body() updateEmployeeDto: UpdateEmployeeDto): Promise<GetEmployeeDto> {
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Employee updated successfully.', 
+    type: GetEmployeeDto 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Employee not found.' 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Invalid input data.' 
+  })
+  @ApiResponse({ 
+    status: 409, 
+    description: 'Employee with userId already exists.' 
+  })
+  async update(
+    @Param('id') id: string, 
+    @Body() updateEmployeeDto: UpdateEmployeeDto
+  ): Promise<GetEmployeeDto> {
     try {
       this.logger.log(`Updating employee with ID: ${id}`);
       const updatedEmployee = await this.employeesService.update(id, updateEmployeeDto);
@@ -128,25 +248,43 @@ export class EmployeesController {
       return updatedEmployee;
     } catch (error) {
       this.logger.error(`Failed to update employee with ID ${id}: ${error.message}`, error.stack);
-      if (error instanceof HttpException) {
-        throw error;
-      }
+      const status = error.message.includes('duplicate') 
+        ? HttpStatus.CONFLICT 
+        : HttpStatus.BAD_REQUEST;
       throw new HttpException(
         {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Failed to update employee',
+          status,
+          error: status === HttpStatus.CONFLICT 
+            ? 'Employee with userId already exists' 
+            : 'Failed to update employee',
           message: error.message,
         },
-        HttpStatus.BAD_REQUEST,
+        status,
       );
     }
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an employee by ID' })
-  @ApiParam({ name: 'id', description: 'MongoDB ObjectID of the employee' })
-  @ApiResponse({ status: 200, description: 'Employee deleted successfully.' })
-  @ApiResponse({ status: 404, description: 'Employee not found.' })
+  @ApiParam({ 
+    name: 'id', 
+    description: 'MongoDB ObjectID of the employee',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Employee deleted successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Employee deleted successfully' }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Employee not found.' 
+  })
   async remove(@Param('id') id: string) {
     try {
       this.logger.log(`Deleting employee with ID: ${id}`);

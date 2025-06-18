@@ -18,6 +18,7 @@ export interface LoginResponse {
     role: string;
     firstName?: string;
     lastName?: string;
+    permissions?: string[];
   };
   expiresIn: number;
 }
@@ -29,4 +30,5 @@ export interface AuthenticatedUser {
   role: string;
   firstName?: string;
   lastName?: string;
+  permissions?: string[];
 }

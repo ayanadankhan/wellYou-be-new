@@ -80,11 +80,12 @@ async create(createUserDto: CreateUserDto): Promise<User> {
     return existingUser;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string) {
     const result = await this.userModel.deleteOne({ _id: new Types.ObjectId(id) }).exec();
     if (result.deletedCount === 0) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
+    return result
   }
 
   async removeByTenant(id: string, tenantId: string): Promise<void> { // tenantId is string for MVP

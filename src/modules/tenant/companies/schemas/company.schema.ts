@@ -1,9 +1,14 @@
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { BaseDto } from '@/shared/dto/base.dto';
 
 export type CompanyDocument = Company & Document;
+
+export enum CompanyStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED',
+}
 
 @Schema({
   timestamps: true,
@@ -13,6 +18,35 @@ export class Company extends BaseDto {
   @Prop({ required: true, unique: true })
   name: string;
 
+  @Prop({ required: true })
+  industry: string;
+
+  @Prop({ required: true, unique: true })
+  email: string;
+
+  @Prop({ required: true })
+  number: string;
+
+  @Prop({ required: true })
+  address: string;
+
+  @Prop({ required: true })
+  foundedYear: string;
+
+  @Prop({ required: true })
+  numberOfEmployees: number;
+
+  @Prop({ 
+    required: true,
+    enum: CompanyStatus,
+    default: CompanyStatus.ACTIVE 
+  })
+  status: CompanyStatus;
+
+  @Prop({ required: true })
+  description: string;
+
+  // Keeping isActive for backward compatibility if needed
   @Prop({ default: true })
   isActive: boolean;
 }

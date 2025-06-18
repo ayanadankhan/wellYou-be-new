@@ -42,15 +42,15 @@ export class UserController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   async create(@Body() createUserDto: CreateUserDto, @Req() req: AuthenticatedRequest) {
     // Validate user authentication
-    if (!req.user) {
-      throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    }
+    // if (!req.user) {
+    //   throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    // }
 
     // For MVP, simplify tenantId logic. Super admin can create any user.
     // Tenant admin can only create users within their own tenant.
-    if (req.user.role === UserRole.ADMIN && !createUserDto.tenantId) {
-      createUserDto.tenantId = req.user.tenantId || req.user._id; // Use tenantId if available, fallback to _id for simplicity
-    }
+    // if (req.user.role === UserRole.ADMIN && !createUserDto.tenantId) {
+    //   createUserDto.tenantId = req.user.tenantId || req.user._id; // Use tenantId if available, fallback to _id for simplicity
+    // }
     return this.userService.create(createUserDto);
   }
 @Public()
@@ -62,18 +62,18 @@ export class UserController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   findAll(@Req() req: AuthenticatedRequest) {
     // Validate user authentication
-    if (!req.user) {
-      throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    }
+    // if (!req.user) {
+    //   throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    // }
 
     // For MVP, simplify tenant-based filtering
-    if (req.user.role === UserRole.SUPER_ADMIN) {
+    // if (req.user.role === UserRole.SUPER_ADMIN) {
       return this.userService.findAll(); // Super Admin sees all users
-    } else if (req.user.tenantId || req.user._id) { // Use tenantId if available, fallback to _id for simplicity
-      const tenantId = req.user.tenantId || req.user._id;
-      return this.userService.findAllByTenant(tenantId); // Tenant-specific users
-    }
-    return []; // Should not reach here if user is authenticated
+    // } else if (req.user.tenantId || req.user._id) { // Use tenantId if available, fallback to _id for simplicity
+    //   const tenantId = req.user.tenantId || req.user._id;
+    //   return this.userService.findAllByTenant(tenantId); // Tenant-specific users
+    // }
+    // return []; // Should not reach here if user is authenticated
   }
 
   @Get(':id')
@@ -116,14 +116,8 @@ export class UserController {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
 
-    if (req.user.role === UserRole.SUPER_ADMIN) {
       return this.userService.update(id, updateUserDto);
-    } else if (req.user.tenantId || req.user._id) {
-      // Admins can only update users within their own tenant
-      const tenantId = req.user.tenantId || req.user._id;
-      return this.userService.updateByTenant(id, tenantId, updateUserDto);
-    }
-    throw new HttpException('Access forbidden', HttpStatus.FORBIDDEN);
+  
   }
 
   @Delete(':id')
@@ -140,14 +134,8 @@ export class UserController {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
 
-    if (req.user.role === UserRole.SUPER_ADMIN) {
+ 
       return this.userService.remove(id);
-    } else if (req.user.tenantId || req.user._id) {
-      // Admins can only delete users within their own tenant
-      const tenantId = req.user.tenantId || req.user._id;
-      return this.userService.removeByTenant(id, tenantId);
-    }
-    throw new HttpException('Access forbidden', HttpStatus.FORBIDDEN);
   }
 
   @Get('profile')
