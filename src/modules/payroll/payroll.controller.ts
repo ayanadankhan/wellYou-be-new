@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
-import { CreatePayrollDto } from './dto/create-payroll.dto';
-import { UpdatePayrollDto } from './dto/update-payroll.dto';
+import { CreatePayrollDto } from './dto/create-payroll-dto';
+import { UpdatePayrollDto } from './dto/update-payroll-dto';
+
 
 @Controller('payroll')
 export class PayrollController {

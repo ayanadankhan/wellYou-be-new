@@ -10,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
-import { CreateDepartmentDto } from './dto/create-department.dto';
-import { UpdateDepartmentDto } from './dto/update-department.dto';
+import { CreateDepartmentDto } from './dto/create-Department-dto';
+import { UpdateDepartmentDto } from './dto/update-Department-dto';
 
 @ApiTags('Departments')
 @Controller('departments')

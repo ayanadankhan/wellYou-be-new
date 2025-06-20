@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CreatePayrollDto } from './dto/create-payroll.dto';
-import { UpdatePayrollDto } from './dto/update-payroll.dto';
+import { CreatePayrollDto } from './dto/create-payroll-dto';
+import { UpdatePayrollDto } from './dto/update-payroll-dto';
 import { Payroll } from './entities/payroll.entity';
 
 @Injectable()
