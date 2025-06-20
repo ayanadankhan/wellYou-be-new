@@ -71,26 +71,6 @@ class SkillDto {
   @IsEnum(SkillLevel)
   @IsNotEmpty()
   level: SkillLevel;
-
-  @ApiProperty({ 
-    description: 'Category of the skill', 
-    example: 'Frontend',
-    required: true
-  })
-  @IsString()
-  @IsNotEmpty()
-  category: string;
-
-  @ApiProperty({ 
-    description: 'Years of experience with the skill', 
-    example: 5,
-    minimum: 0,
-    maximum: 50,
-    required: true
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  yearsOfExperience: number;
 }
 
 class EducationDto {
@@ -393,6 +373,44 @@ class EmergencyContactDto {
   phone: string;
 }
 
+export class DependentMemberDto {
+  @ApiProperty({ 
+    description: 'Name of the dependent member', 
+    example: 'John Doe',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ 
+    description: 'Relationship with employee', 
+    example: 'Son',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  relation: string;
+
+  @ApiProperty({ 
+    description: 'Age of the dependent member', 
+    example: 12,
+    required: true
+  })
+  @IsNumber()
+  @IsNotEmpty()
+  age: number;
+
+  @ApiProperty({ 
+    description: 'Date of birth of dependent member (YYYY-MM-DD)', 
+    example: '2012-05-15',
+    required: true
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  dateOfBirth: string;
+}
+
 export class CreateEmployeeDto {
   @ApiProperty({ 
     description: 'User ID from authentication system', 
@@ -479,6 +497,17 @@ export class CreateEmployeeDto {
   @Type(() => EmergencyContactDto)
   @IsNotEmpty()
   emergencyContact: EmergencyContactDto;
+
+  @ApiProperty({ 
+    description: 'Array of dependent members', 
+    type: [DependentMemberDto],
+    required: false
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DependentMemberDto)
+  @IsOptional()
+  dependentMembers?: DependentMemberDto[];
 
   @ApiProperty({ 
     description: 'Education history', 
@@ -580,18 +609,9 @@ export class CreateEmployeeDto {
   ssnTaxId: string;
 
   @ApiProperty({ 
-    description: 'Whether employee is active', 
-    example: true,
-    required: true
-  })
-  @IsBoolean()
-  @IsNotEmpty()
-  isActive: boolean;
-
-  @ApiProperty({ 
     description: 'Tenant ID', 
     example: '684936da00d419b8ac546d00',
-    required: true
+    required: false
   })
   @IsString()
   @IsNotEmpty()
@@ -675,6 +695,17 @@ export class UpdateEmployeeDto {
   @Type(() => EmergencyContactDto)
   @IsOptional()
   emergencyContact?: EmergencyContactDto;
+
+  @ApiProperty({ 
+    description: 'Array of dependent members', 
+    type: [DependentMemberDto],
+    required: false
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DependentMemberDto)
+  @IsOptional()
+  dependentMembers?: DependentMemberDto[];
 
   @ApiProperty({ 
     description: 'Education history', 
@@ -775,14 +806,6 @@ export class UpdateEmployeeDto {
   @IsOptional()
   ssnTaxId?: string;
 
-  @ApiProperty({ 
-    description: 'Whether employee is active', 
-    example: true, 
-    required: false 
-  })
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
 
   @ApiProperty({ 
     description: 'Tenant ID', 

@@ -66,7 +66,8 @@ export class AuthService {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
-        permissions: user.permissions || []
+        permissions: user.permissions || [],
+        tenantId: user.tenantId?.toString()
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -84,6 +85,8 @@ async login(user: AuthenticatedUser): Promise<LoginResponse> {
     }
 
     const expiresIn = this.configService.get<string>('JWT_EXPIRATION') || '24h';
+    console.log(user);
+    
     const accessToken = this.jwtService.sign(user, { expiresIn });
 
     this.logger.debug(`User logged in successfully: ${user.email}`);

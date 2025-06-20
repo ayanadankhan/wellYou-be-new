@@ -12,11 +12,15 @@ export class UserService {
   constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
 
 async create(createUserDto: CreateUserDto): Promise<User> {
-  // Remove the hashing - it should already be done by AuthService
+  // Ensure tenantId is in correct ObjectId format
+  if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
+    createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
+  }
+
   const createdUser = new this.userModel({
     ...createUserDto,
-    // password is already hashed when it comes here
   });
+
   return createdUser.save();
 }
 

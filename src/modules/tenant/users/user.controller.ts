@@ -4,12 +4,14 @@ import { AuthGuard } from '@/common/guards/auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Public } from '@/common/decorators/public.decorator';
 // import { Roles } from '@/common/decorators/roles.decorator';
-import { UserRole } from './schemas/user.schema'; // Import UserRole from its schema
+import { User, UserRole } from './schemas/user.schema'; // Import UserRole from its schema
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+
 
 // Define the authenticated user interface
 interface AuthenticatedUser {
@@ -28,31 +30,24 @@ interface AuthenticatedRequest extends Request {
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
 @Controller('users')
-export class UserController {
-  constructor(private readonly userService: UserService) {}
-@Public()
-  @Post()
-  // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) 
-  // Super Admin or Tenant Admin can create users
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new user' })
-  @ApiResponse({ status: 201, description: 'The user has been successfully created.' })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  async create(@Body() createUserDto: CreateUserDto, @Req() req: AuthenticatedRequest) {
-    // Validate user authentication
-    // if (!req.user) {
-    //   throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    // }
+export class UserController {constructor(private readonly userService: UserService) {}
 
-    // For MVP, simplify tenantId logic. Super admin can create any user.
-    // Tenant admin can only create users within their own tenant.
-    // if (req.user.role === UserRole.ADMIN && !createUserDto.tenantId) {
-    //   createUserDto.tenantId = req.user.tenantId || req.user._id; // Use tenantId if available, fallback to _id for simplicity
-    // }
-    return this.userService.create(createUserDto);
+@Post()
+async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
+  console.log("=================", user);
+  
+  if (!user) {
+    throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
   }
+
+  // Only set tenantId from token if admin/super_admin is creating the user
+  if (user.role !== UserRole.SUPER_ADMIN) {
+    createUserDto.tenantId = user.tenantId?.toString();
+  }
+  
+  return this.userService.create(createUserDto);
+}
+
 @Public()
   @Get()
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)

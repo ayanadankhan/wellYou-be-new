@@ -42,7 +42,6 @@ export class EmployeesService {
     positionId?: string;
     managerId?: string;
     employmentStatus?: string;
-    isActive?: boolean;
     tenantId?: string;
   } = {}): Promise<GetEmployeeDto[]> {
     try {
@@ -68,10 +67,6 @@ export class EmployeesService {
 
       if (query.employmentStatus) {
         matchStage.employmentStatus = query.employmentStatus;
-      }
-
-      if (query.isActive !== undefined) {
-        matchStage.isActive = query.isActive;
       }
 
       if (query.tenantId) {

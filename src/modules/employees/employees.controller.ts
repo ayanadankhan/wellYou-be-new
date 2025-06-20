@@ -86,12 +86,6 @@ export class EmployeesController {
     description: 'Filter by employment status' 
   })
   @ApiQuery({ 
-    name: 'isActive', 
-    required: false, 
-    type: Boolean, 
-    description: 'Filter by active status' 
-  })
-  @ApiQuery({ 
     name: 'tenantId', 
     required: false, 
     type: String, 
@@ -112,7 +106,6 @@ export class EmployeesController {
     @Query('positionId') positionId?: string,
     @Query('managerId') managerId?: string,
     @Query('employmentStatus') employmentStatus?: EmploymentStatus,
-    @Query('isActive') isActive?: boolean,
     @Query('tenantId') tenantId?: string,
   ): Promise<GetEmployeeDto[]> {
     try {
@@ -122,7 +115,6 @@ export class EmployeesController {
         positionId,
         managerId,
         employmentStatus,
-        isActive,
         tenantId
       })}`);
       
@@ -132,7 +124,6 @@ export class EmployeesController {
         ...(positionId && { positionId }),
         ...(managerId && { managerId }),
         ...(employmentStatus && { employmentStatus }),
-        ...(isActive !== undefined && { isActive }),
         ...(tenantId && { tenantId }),
       };
 
