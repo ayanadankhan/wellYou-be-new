@@ -10,14 +10,6 @@ class SkillDto {
   @ApiProperty({ description: 'Proficiency level of the skill', example: 'expert' })
   @IsString()
   level: string;
-
-  @ApiProperty({ description: 'Category of the skill', example: 'Frontend' })
-  @IsString()
-  category: string;
-
-  @ApiProperty({ description: 'Years of experience with the skill', example: 5 })
-  @IsNumber()
-  yearsOfExperience: number;
 }
 
 class EducationDto {
