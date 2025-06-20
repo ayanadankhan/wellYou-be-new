@@ -11,12 +11,6 @@ class Skill {
 
   @Prop({ required: true, type: String, enum: SkillLevel })
   level: SkillLevel;
-
-  @Prop({ required: true, type: String })
-  category: string;
-
-  @Prop({ required: true, type: Number, min: 0, max: 50 })
-  yearsOfExperience: number;
 }
 
 @Schema({ _id: false })
@@ -127,6 +121,21 @@ class EmergencyContact {
   phone: string;
 }
 
+@Schema({ _id: false })
+class DependentMember {
+  @Prop({ required: true, type: String })
+  name: string;
+
+  @Prop({ required: true, type: String })
+  relation: string;
+
+  @Prop({ required: true, type: Number })
+  age: number;
+
+  @Prop({ required: true, type: Date })
+  dateOfBirth: Date;
+}
+
 @Schema({
   timestamps: true,
   collection: 'employees',
@@ -190,11 +199,11 @@ export class Employee {
   @Prop({ required: true, type: String })
   ssnTaxId: string;
 
-  @Prop({ required: true, type: Boolean })
-  isActive: boolean;
-
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   tenantId: string;
+
+  @Prop({ type: [DependentMember] })
+  dependentMembers?: DependentMember[];
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

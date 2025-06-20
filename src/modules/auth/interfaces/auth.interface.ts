@@ -7,6 +7,7 @@ export interface UserPayload {
   iat?: number;
   exp?: number;
   lastName?: string;
+  tenantId?: string;
 }
 
 export interface LoginResponse {
@@ -30,5 +31,6 @@ export interface AuthenticatedUser {
   role: string;
   firstName?: string;
   lastName?: string;
+  tenantId?: string;
   permissions?: string[];
 }
