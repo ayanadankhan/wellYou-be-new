@@ -12,6 +12,8 @@ import { SalaryModule } from './modules/salary/salary.module';
 import { DesignationsModule } from './modules/designations/designations.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { SharedModule } from './modules/shared/shared.module';
 // ... other imports
 
 @Module({
@@ -32,7 +34,9 @@ import { PayrollModule } from './modules/payroll/payroll.module';
     SalaryModule,
     DesignationsModule,
     DepartmentsModule,
-    PayrollModule
+    PayrollModule,
+    UploadModule,
+    SharedModule
   ],
   // ... controllers and providers
 })
