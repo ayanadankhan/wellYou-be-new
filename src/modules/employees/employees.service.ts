@@ -102,15 +102,6 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-        // {
-        //   $lookup: {
-        //     from: 'employees',
-        //     localField: 'managerId',
-        //     foreignField: '_id',
-        //     as: 'manager',
-        //   },
-        // },
-        // { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
         {
           $project: {
             'user.password': 0,
@@ -205,6 +196,81 @@ export class EmployeesService {
       return plainToClass(GetEmployeeDto, employee[0]);
     } catch (error) {
       this.logger.error(`Failed to fetch employee with ID ${id}: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findByUserId(userId: string): Promise<GetEmployeeDto> {
+    try {
+      this.logger.log(`Fetching employee with userId: ${userId}`);
+      
+      const employee = await this.employeeModel.aggregate([
+        { $match: { userId: new Types.ObjectId(userId) } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'departments',
+            localField: 'departmentId',
+            foreignField: '_id',
+            as: 'department',
+          },
+        },
+        { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'positions',
+            localField: 'positionId',
+            foreignField: '_id',
+            as: 'position',
+          },
+        },
+        { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'employees',
+            localField: 'managerId',
+            foreignField: '_id',
+            as: 'manager',
+          },
+        },
+        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $project: { 'user.password': 0 } },
+        { $limit: 1 }
+      ]);
+
+      if (!employee || employee.length === 0) {
+        this.logger.warn(`Employee with userId ${userId} not found`);
+        throw new HttpException(
+          {
+            status: HttpStatus.NOT_FOUND,
+            error: 'Employee not found',
+            message: `Employee with userId ${userId} does not exist`,
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      this.logger.log(`Employee with userId ${userId} retrieved successfully`);
+      return plainToClass(GetEmployeeDto, employee[0]);
+    } catch (error) {
+      this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
       if (error instanceof HttpException) {
         throw error;
       }
