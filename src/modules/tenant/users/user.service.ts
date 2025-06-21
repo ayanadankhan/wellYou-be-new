@@ -25,7 +25,19 @@ async create(createUserDto: CreateUserDto): Promise<User> {
 }
 
   async findAll(): Promise<User[]> {
-    return this.userModel.find().exec();
+    return this.userModel.aggregate([
+      // Step 1: Lookup employee
+      {
+        $lookup: {
+          from: 'companies',
+          localField: 'tenantId',
+          foreignField: '_id',
+          as: 'companies'
+        }
+      },
+      { $unwind: { path: '$companies', preserveNullAndEmptyArrays: true } },
+
+    ]).exec();
   }
 
   async findAllByTenant(tenantId: string): Promise<User[]> { // tenantId is string for MVP
