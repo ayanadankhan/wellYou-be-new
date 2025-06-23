@@ -545,7 +545,7 @@ export class CreateEmployeeDto {
   })
   @IsString()
   @IsOptional()
-  managerId?: string;
+  managerId?: Types.ObjectId;
 
   @ApiProperty({ 
     description: 'Employment status of employee', 

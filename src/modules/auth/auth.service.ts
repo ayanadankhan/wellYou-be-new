@@ -162,48 +162,45 @@ async login(user: AuthenticatedUser): Promise<LoginResponse> {
     throw new InternalServerErrorException('Registration failed');
   }
 }
-  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
-    try {
-      const { currentPassword, newPassword, confirmPassword } = changePasswordDto;
+async changePassword(
+  userId: string,
+  changePasswordDto: ChangePasswordDto
+): Promise<{ message: string }> {
+  try {
+    const { oldPassword, newPassword } = changePasswordDto;
 
-      // Validate password confirmation
-      if (newPassword !== confirmPassword) {
-        throw new BadRequestException('New password and confirm password do not match');
-      }
-
-      // Check if new password is same as current password
-      if (currentPassword === newPassword) {
-        throw new BadRequestException('New password must be different from current password');
-      }
-
-      // Find user
-      const user = await this.userService.findById(userId);
-      if (!user) {
-        throw new BadRequestException('User not found');
-      }
-
-      // Validate current password
-      const isCurrentPasswordValid = await this.validatePassword(currentPassword, user.password);
-      if (!isCurrentPasswordValid) {
-        this.logger.warn(`Invalid current password attempt for user: ${user.email}`);
-        throw new BadRequestException('Current password is incorrect');
-      }
-
-      // Hash new password and update
-      const hashedNewPassword = await this.hashPassword(newPassword);
-      await this.userService.update(userId, { password: hashedNewPassword });
-
-      this.logger.debug(`Password changed successfully for user: ${user.email}`);
-
-      return { message: 'Password changed successfully' };
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      this.logger.error(`Error changing password: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Password change failed');
+    // 2. Prevent same password
+    if (oldPassword === newPassword) {
+      throw new BadRequestException('New password must be different from current password');
     }
+
+    // 3. Fetch user
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // 4. Check current password is correct
+    const isValid = await this.validatePassword(oldPassword, user.password);
+    if (!isValid) {
+      this.logger.warn(`Invalid current password for user: ${user.email}`);
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    // 5. Hash and update
+    const hashed = await this.hashPassword(newPassword);
+    await this.userService.update(userId, { password: hashed });
+
+    this.logger.debug(`Password updated successfully for user: ${user.email}`);
+    return { message: 'Password changed successfully' };
+
+  } catch (error) {
+    if (error instanceof BadRequestException) throw error;
+    this.logger.error(`Failed to change password: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Password change failed');
   }
+}
+
 
   async logout(userId: string): Promise<{ message: string }> {
     try {
