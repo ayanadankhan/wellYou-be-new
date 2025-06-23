@@ -373,6 +373,35 @@ class EmergencyContactDto {
   phone: string;
 }
 
+class DocumentDto {
+  @ApiProperty({ 
+    description: 'Type of document', 
+    example: 'RESUME',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  type: string;
+
+  @ApiProperty({ 
+    description: 'Name of the document', 
+    example: 'John_Doe_Resume.pdf',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ 
+    description: 'URL to access the document', 
+    example: 'https://example.com/documents/john_doe_resume.pdf',
+    required: true
+  })
+  @IsString()
+  @IsNotEmpty()
+  url: string;
+}
+
 export class DependentMemberDto {
   @ApiProperty({ 
     description: 'Name of the dependent member', 
@@ -440,6 +469,15 @@ export class CreateEmployeeDto {
   profilePicture?: string;
 
   @ApiProperty({ 
+    description: 'Cover picture URL', 
+    example: '', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  coverPicture?: string;
+
+  @ApiProperty({ 
     description: 'Gender of employee', 
     example: Gender.FEMALE,
     enum: Gender,
@@ -487,6 +525,17 @@ export class CreateEmployeeDto {
   @IsString({ each: true })
   @IsNotEmpty()
   nationality: string[];
+
+  @ApiProperty({ 
+    description: 'Array of employee documents (name, type, url)', 
+    type: [DocumentDto],
+    required: false
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DocumentDto)
+  @IsOptional()
+  documents?: DocumentDto[];
 
   @ApiProperty({ 
     description: 'Emergency contact information', 
@@ -638,6 +687,15 @@ export class UpdateEmployeeDto {
   profilePicture?: string;
 
   @ApiProperty({ 
+    description: 'COver picture URL', 
+    example: '', 
+    required: false 
+  })
+  @IsString()
+  @IsOptional()
+  coverPicture?: string;
+
+  @ApiProperty({ 
     description: 'Gender of employee', 
     example: Gender.FEMALE,
     enum: Gender,
@@ -685,6 +743,17 @@ export class UpdateEmployeeDto {
   @IsString({ each: true })
   @IsOptional()
   nationality?: string[];
+
+  @ApiProperty({ 
+    description: 'Array of employee documents (name, type, url)', 
+    type: [DocumentDto],
+    required: false
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DocumentDto)
+  @IsOptional()
+  documents?: DocumentDto[];
 
   @ApiProperty({ 
     description: 'Emergency contact information', 
