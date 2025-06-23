@@ -14,6 +14,7 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { SharedModule } from './modules/shared/shared.module';
+import { LeaveTypeModule } from './modules/leave-type/leave-type.module';
 // ... other imports
 
 @Module({
@@ -36,8 +37,7 @@ import { SharedModule } from './modules/shared/shared.module';
     DepartmentsModule,
     PayrollModule,
     UploadModule,
-    SharedModule
-  ],
-  // ... controllers and providers
-})
-export class AppModule { }
+    SharedModule,
+    LeaveTypeModule, // Importing the LeaveTypeModule
+  ]
+})export class AppModule { }

@@ -36,7 +36,7 @@ export default registerAs('database', () => {
       retryDelay: 2000,
       maxPoolSize: 10,
       minPoolSize: 1,
-      maxIdleTimeMS: 30000,
+      maxIdleTimeMS: 30010,
     }
   };
 });
