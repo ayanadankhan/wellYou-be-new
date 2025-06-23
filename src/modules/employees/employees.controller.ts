@@ -143,6 +143,55 @@ export class EmployeesController {
     }
   }
 
+  @Get('user/:userId')
+  @ApiOperation({ summary: 'Retrieve an employee by userId' })
+  @ApiParam({ 
+    name: 'userId', 
+    description: 'User ID of the employee',
+    example: 'user123'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Employee found.', 
+    type: GetEmployeeDto 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Employee not found.' 
+  })
+  async findByUserId(@Param('userId') userId: string): Promise<GetEmployeeDto> {
+    try {
+      this.logger.log(`Fetching employee with userId: ${userId}`);
+      const employee = await this.employeesService.findByUserId(userId);
+      if (!employee) {
+        this.logger.warn(`Employee with userId ${userId} not found`);
+        throw new HttpException(
+          {
+            status: HttpStatus.NOT_FOUND,
+            error: 'Employee not found',
+            message: `Employee with userId ${userId} does not exist`,
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      this.logger.log(`Employee with userId ${userId} retrieved successfully`);
+      return employee;
+    } catch (error) {
+      this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a single employee by ID' })
   @ApiParam({ 
