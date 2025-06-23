@@ -40,7 +40,7 @@ export class AuthController {
     return this.authService.login(user);
   }
 
-  @Patch('change-password')
+  @Patch('changePassword')
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @Body() changePasswordDto: ChangePasswordDto,

@@ -65,9 +65,6 @@ async create(createUserDto: CreateUserDto): Promise<User> {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-    }
     const existingUser = await this.userModel.findByIdAndUpdate(
       id,
       { $set: updateUserDto },

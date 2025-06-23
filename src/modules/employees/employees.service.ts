@@ -170,10 +170,10 @@ export class EmployeesService {
         { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
-            from: 'employees',
+            from: 'users',
             localField: 'managerId',
             foreignField: '_id',
-            as: 'manager',
+            as: 'user',
           },
         },
         { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
@@ -210,7 +210,7 @@ export class EmployeesService {
     }
   }
 
-  async findByUserId(userId: string): Promise<GetEmployeeDto> {
+async findByUserId(userId: string): Promise<GetEmployeeDto> {
     try {
       this.logger.log(`Fetching employee with userId: ${userId}`);
       
@@ -236,7 +236,7 @@ export class EmployeesService {
         { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
-            from: 'positions',
+            from: 'designations',
             localField: 'positionId',
             foreignField: '_id',
             as: 'position',
@@ -245,13 +245,22 @@ export class EmployeesService {
         { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
-            from: 'employees',
+            from: 'users',
             localField: 'managerId',
             foreignField: '_id',
             as: 'manager',
           },
         },
         { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'salaries',
+            localField: '_id',
+            foreignField: 'employeesId',
+            as: 'salary',
+          },
+        },
+        { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
         { $project: { 'user.password': 0 } },
         { $limit: 1 }
       ]);

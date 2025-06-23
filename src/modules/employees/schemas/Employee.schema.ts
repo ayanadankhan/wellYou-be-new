@@ -178,8 +178,8 @@ export class Employee {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'departments', default: null })
   departmentId?: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: String })
-  managerId?: string;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'users', default: null })
+  managerId?: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, type: String, enum: EmploymentStatus })
   employmentStatus: EmploymentStatus;
