@@ -24,7 +24,7 @@ const logger = new Logger('MongoDB');
           retryDelay: 1000,
           serverSelectionTimeoutMS: 5000,
           socketTimeoutMS: 45000,
-          connectTimeoutMS: 30000,
+          connectTimeoutMS: 30010,
           connectionFactory: (connection) => {
             connection.on('connected', () => {
               logger.log('MongoDB connected successfully');

@@ -1,6 +1,6 @@
 export default () => ({
     env: process.env.NODE_ENV,
-    port: 3000,
+    port: 3001,
     mongo_db_uri: process.env.MONGO_CON_STRING,
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiration: process.env.JWT_EXPIRATION,
