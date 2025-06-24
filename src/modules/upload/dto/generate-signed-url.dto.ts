@@ -3,8 +3,8 @@ import { IsEnum, IsNotEmpty, Matches, MaxLength, IsString } from "class-validato
 export class GenerateSignedUrlDto {
   @IsNotEmpty()
   @MaxLength(500)
-  @Matches(/\.(jpe?g|png|webp|mp4|3gp|srt)$/i, {
-    message: "Only jpg, jpeg, png, webp, mp4, 3gp, and srt files are allowed."
+  @Matches(/\.(jpe?g|png|webp|mp4|jfif|3gp|pdf|srt)$/i, {
+    message: "Only jpg, jpeg, png, webp, mp4, 3gp, pdf, jfif and srt files are allowed."
   })
   name: string;
 
