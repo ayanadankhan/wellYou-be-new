@@ -6,35 +6,35 @@ import { User, UserDocument, UserRole } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { MailService } from '../../mail/mail.service';
 
 @Injectable()
 export class UserService {
-  mailService: any;
-  constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly mailService: MailService
+  ) {}
 
 async create(createUserDto: CreateUserDto): Promise<User> {
-  // Store original password before hashing
-  const originalPassword = createUserDto.password;
-
-  // Hash for database storage
+  if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
+    createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
+  }
+  const originalPassword = createUserDto.password; 
   createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
-
-  // Create user
   const user = await this.userModel.create(createUserDto);
-
-  // Send DEV email with original password
   if (user.email) {
-    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-    await this.mailService.sendDevCredentials(
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'User';
+    await this.mailService.sendWelcomeEmail(
       user.email,
-      fullName || 'User',
+      fullName,
       user.email,
-      originalPassword // Sending the raw password
+      originalPassword
     );
   }
 
   return user;
 }
+
 
   async findAll(): Promise<User[]> {
     return this.userModel.aggregate([
