@@ -45,44 +45,150 @@ export class AuthService {
   ) { }
 
   async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
-    try {
-      this.logger.debug(`Validating user with email: ${email}`);
+  try {
+    this.logger.debug(`Validating user with email: ${email}`);
 
-      if (!email || !password) {
-        throw new UnauthorizedException('Email and password are required');
+    if (!email || !password) {
+      throw new UnauthorizedException('Email and password are required');
+    }
+
+    const user = await this.userService.findOneByEmail(email.toLowerCase().trim());
+    if (!user) {
+      this.logger.warn(`Login attempt with non-existent email: ${email}`);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await this.validatePassword(password, user.password);
+    if (!isPasswordValid) {
+      this.logger.warn(`Invalid password attempt for user: ${email}`);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    this.logger.debug(`User validated successfully: ${email}`);
+
+    // Create authenticated user object
+    const authenticatedUser: AuthenticatedUser = {
+      _id: (user as any)._id,
+      email: user.email,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      permissions: user.permissions || [],
+      tenantId: user.tenantId?.toString()
+    };
+
+    // Handle attendance after successful validation
+    await this.handleAttendanceOnLogin(authenticatedUser);
+
+    return authenticatedUser;
+  } catch (error) {
+    if (error instanceof UnauthorizedException) {
+      throw error;
+    }
+    this.logger.error(`Error validating user: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Authentication failed');
+  }
+}
+
+// Add this new private method to handle attendance
+private async handleAttendanceOnLogin(user: AuthenticatedUser): Promise<void> {
+  try {
+    this.logger.log(`Checking attendance for user: ${user.email}`);
+    
+    // Get employee ID from employees collection using user ID
+    const employee = await this.employeeModel.findOne({ userId: user._id }).exec();
+    this.logger.log(`Employee found for user ${user._id}: ${employee ? employee._id : 'None'}`);
+    
+    if (employee && employee._id) {
+      try {
+        // Trigger auto check-in for the employee
+        await this.attendanceService.checkin(employee._id.toString());
+        this.logger.log(`Auto check-in successful for employee: ${employee._id}`);
+      } catch (checkinError) {
+        // Log the error but don't fail the login process
+        this.logger.warn(`Auto check-in failed for employee ${employee._id}: ${checkinError.message}`);
+        // Don't throw the error - attendance failure shouldn't prevent login
       }
+    } else {
+      this.logger.warn(`No employee record found for user: ${user._id}`);
+    }
+  } catch (error) {
+    // Log attendance handling errors but don't fail the authentication
+    this.logger.error(`Error handling attendance for user ${user._id}: ${error.message}`);
+    // Don't throw - attendance errors shouldn't prevent successful login
+  }
+}
 
-      const user = await this.userService.findOneByEmail(email.toLowerCase().trim());
-      if (!user) {
-        this.logger.warn(`Login attempt with non-existent email: ${email}`);
-        throw new UnauthorizedException('Invalid credentials');
-      }
+// Simplify the login method since attendance is now handled in validateUser
+async login(user: AuthenticatedUser): Promise<LoginResponse> {
+  this.logger.log(`Generating JWT for user: ${user.email}`);
+  try {
+    if (!user || !user.email || !user._id) {
+      throw new UnauthorizedException('Invalid user data');
+    }
 
-      const isPasswordValid = await this.validatePassword(password, user.password);
-      if (!isPasswordValid) {
-        this.logger.warn(`Invalid password attempt for user: ${email}`);
-        throw new UnauthorizedException('Invalid credentials');
-      }
+    const expiresIn = this.configService.get<string>('JWT_EXPIRATION') || '24h';
+    const accessToken = this.jwtService.sign(user, { expiresIn });
 
-      this.logger.debug(`User validated successfully: ${email}`);
+    this.logger.debug(`JWT generated successfully for user: ${user.email}`);
 
-      return {
-        _id: (user as any)._id,
+    return {
+      access_token: accessToken,
+      user: {
+        _id: user._id,
         email: user.email,
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
-        permissions: user.permissions || [],
-        tenantId: user.tenantId?.toString()
-      };
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      this.logger.error(`Error validating user: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Authentication failed');
-    }
+        permissions: user.permissions || []
+      },
+      expiresIn: this.parseExpirationTime(expiresIn),
+    };
+  } catch (error) {
+    this.logger.error(`Error during login: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Login failed');
   }
+}
+
+  // async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
+  //   try {
+  //     this.logger.debug(`Validating user with email: ${email}`);
+
+  //     if (!email || !password) {
+  //       throw new UnauthorizedException('Email and password are required');
+  //     }
+
+  //     const user = await this.userService.findOneByEmail(email.toLowerCase().trim());
+  //     if (!user) {
+  //       this.logger.warn(`Login attempt with non-existent email: ${email}`);
+  //       throw new UnauthorizedException('Invalid credentials');
+  //     }
+
+  //     const isPasswordValid = await this.validatePassword(password, user.password);
+  //     if (!isPasswordValid) {
+  //       this.logger.warn(`Invalid password attempt for user: ${email}`);
+  //       throw new UnauthorizedException('Invalid credentials');
+  //     }
+
+  //     this.logger.debug(`User validated successfully: ${email}`);
+
+  //     return {
+  //       _id: (user as any)._id,
+  //       email: user.email,
+  //       role: user.role,
+  //       firstName: user.firstName,
+  //       lastName: user.lastName,
+  //       permissions: user.permissions || [],
+  //       tenantId: user.tenantId?.toString()
+  //     };
+  //   } catch (error) {
+  //     if (error instanceof UnauthorizedException) {
+  //       throw error;
+  //     }
+  //     this.logger.error(`Error validating user: ${error.message}`, error.stack);
+  //     throw new InternalServerErrorException('Authentication failed');
+  //   }
+  // }
 
 // async login(user: AuthenticatedUser): Promise<LoginResponse> {
 //   try {
@@ -115,62 +221,6 @@ export class AuthService {
 //   }
 // }
 
-async login(user: AuthenticatedUser): Promise<LoginResponse> {
-  try {
-    if (!user || !user.email || !user._id) {
-      throw new UnauthorizedException('Invalid user data');
-    }
-
-    const expiresIn = this.configService.get<string>('JWT_EXPIRATION') || '24h';
-    console.log(user);
-    
-    const accessToken = this.jwtService.sign(user, { expiresIn });
-
-    // Get employee ID from employees collection using user ID
-    const employee = await this.employeeModel.findOne({ userId: user._id }).exec();
-    
-    if (employee && employee._id) {
-      try {
-        // Trigger auto check-in for the employee
-        await this.triggerAutoCheckin(employee._id.toString());
-        this.logger.debug(`Auto check-in triggered for employee: ${employee._id}`);
-      } catch (checkinError) {
-        // Log the error but don't fail the login process
-        this.logger.warn(`Auto check-in failed for employee ${employee._id}: ${checkinError.message}`);
-      }
-    } else {
-      this.logger.warn(`No employee record found for user: ${user._id}`);
-    }
-
-    this.logger.debug(`User logged in successfully: ${user.email}`);
-
-    return {
-      access_token: accessToken,
-      user: {
-        _id: user._id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        permissions: user.permissions || []
-      },
-      expiresIn: this.parseExpirationTime(expiresIn),
-    };
-  } catch (error) {
-    this.logger.error(`Error during login: ${error.message}`, error.stack);
-    throw new InternalServerErrorException('Login failed');
-  }
-}
-
-private async triggerAutoCheckin(employeeId: string): Promise<void> {
-  try {
-    await this.attendanceService.checkin(employeeId);
-    this.logger.log(`Auto check-in successful for employee: ${employeeId}`);
-  } catch (error) {
-    this.logger.error(`Auto check-in failed for employee ${employeeId}: ${error.message}`);
-    throw error;
-  }
-}
 
  async register(registerDto: RegisterDto): Promise<AuthenticatedUser> {
   try {
