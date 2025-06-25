@@ -17,7 +17,7 @@ export class MailService {
     to: string, 
     name: string, 
     email: string, 
-    temporaryPassword: string // Now accepting plain text temporary password
+    originalPassword: string // Now accepting plain text temporary password
   ) {
     try {
       const mailOptions = {
@@ -39,7 +39,7 @@ export class MailService {
               <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <h3 style="margin-top: 0; color: #2c3e50;">Your Login Credentials:</h3>
                 <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Temporary Password:</strong> ${temporaryPassword}</p>
+                <p><strong>Temporary Password:</strong> ${originalPassword}</p>
               </div>
               
               <p>For security reasons, please change your password after first login.</p>

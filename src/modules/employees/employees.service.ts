@@ -128,6 +128,15 @@ if (user?.email && user?.password) {
           },
         },
         { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+                {
+          $lookup: {
+            from: 'users',
+            localField: 'managerId',
+            foreignField: '_id',
+            as: 'manager',
+          },
+        },
+        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
         {
           $project: {
             'user.password': 0,
