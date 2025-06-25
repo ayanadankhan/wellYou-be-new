@@ -9,19 +9,31 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
+  mailService: any;
   constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
 
 async create(createUserDto: CreateUserDto): Promise<User> {
-  // Ensure tenantId is in correct ObjectId format
-  if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
-    createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
+  // Store original password before hashing
+  const originalPassword = createUserDto.password;
+
+  // Hash for database storage
+  createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
+
+  // Create user
+  const user = await this.userModel.create(createUserDto);
+
+  // Send DEV email with original password
+  if (user.email) {
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+    await this.mailService.sendDevCredentials(
+      user.email,
+      fullName || 'User',
+      user.email,
+      originalPassword // Sending the raw password
+    );
   }
 
-  const createdUser = new this.userModel({
-    ...createUserDto,
-  });
-
-  return createdUser.save();
+  return user;
 }
 
   async findAll(): Promise<User[]> {
