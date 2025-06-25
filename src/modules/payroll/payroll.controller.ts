@@ -28,6 +28,11 @@ export class PayrollController {
     return this.payrollService.update(id, updatePayrollDto);
   }
 
+  @Get('employee/:employeeId') 
+  async findByEmployeeId(@Param('employeeId') employeeId: string) {
+    return this.payrollService.findByEmployeeId(employeeId);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string) {

@@ -1,8 +1,20 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Schema as MongooseSchema, Document, Types } from "mongoose";
+import { Schema as MongooseSchema, Types } from "mongoose";
 import { Gender, MaritalStatus, EmploymentStatus, EmploymentType, SkillLevel } from '../dto/create-Employee.dto';
 
 export type EmployeeDocument = Employee & Document;
+
+@Schema({ _id: false })
+class Document {
+  @Prop({ required: true, type: String })
+  type: string;
+
+  @Prop({ required: true, type: String })
+  name: string;
+
+  @Prop({ required: true, type: String })
+  url: string;
+}
 
 @Schema({ _id: false })
 class Skill {
@@ -150,6 +162,9 @@ export class Employee {
   @Prop({ type: String })
   profilePicture?: string;
 
+  @Prop({ type: String })
+  coverPicture?: string;
+
   @Prop({ required: true, type: String, enum: Gender })
   gender: Gender;
 
@@ -168,12 +183,14 @@ export class Employee {
   @Prop({ required: true, type: EmergencyContact })
   emergencyContact: EmergencyContact;
 
+  @Prop({ type: [DependentMember] })
+  dependentMembers?: DependentMember[];
+
   @Prop({ type: [Education] })
   education?: Education[];
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'designations', default: null })
   positionId?: MongooseSchema.Types.ObjectId;
-
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'departments', default: null })
   departmentId?: MongooseSchema.Types.ObjectId;
@@ -196,14 +213,14 @@ export class Employee {
   @Prop({ type: [Skill] })
   skills?: Skill[];
 
+  @Prop({ type: [Document] })
+  documents?: Document[];
+
   @Prop({ required: true, type: String })
   ssnTaxId: string;
 
   @Prop({ required: false, type: String })
   tenantId: string;
-
-  @Prop({ type: [DependentMember] })
-  dependentMembers?: DependentMember[];
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);
