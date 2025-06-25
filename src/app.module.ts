@@ -15,6 +15,7 @@ import { PayrollModule } from './modules/payroll/payroll.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { SharedModule } from './modules/shared/shared.module';
 import { LeaveTypeModule } from './modules/leave-type/leave-type.module';
+import { LeaveRequestModule } from './modules/leave-request/leave-request.module';
 // ... other imports
 
 @Module({
@@ -39,5 +40,6 @@ import { LeaveTypeModule } from './modules/leave-type/leave-type.module';
     UploadModule,
     SharedModule,
     LeaveTypeModule, // Importing the LeaveTypeModule
+    LeaveRequestModule, // Importing the LeaveRequestModule
   ]
 })export class AppModule { }
