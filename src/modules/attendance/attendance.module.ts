@@ -1,17 +1,18 @@
-
+// src/attendance/attendance.module.ts
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
-import { MongooseModule } from '@nestjs/mongoose';
-// import { Attendance, AttendanceSchema } from './schemas/attendance.schema';
+import { Attendance, AttendanceSchema } from './schemas/Attendance.schema';
 
 @Module({
   imports: [
-    // MongooseModule.forFeature([{ name: Attendance.name, schema: AttendanceSchema }]),
-    // Uncomment the above line and add schema if you plan to use Mongoose for this module.
+    MongooseModule.forFeature([
+      { name: Attendance.name, schema: AttendanceSchema }
+    ]),
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService],
-  exports: [AttendanceService],
+  exports: [AttendanceService], // Export service for use in other modules
 })
 export class AttendanceModule {}

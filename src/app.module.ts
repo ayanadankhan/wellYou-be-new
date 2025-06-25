@@ -16,6 +16,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { SharedModule } from './modules/shared/shared.module';
 import { LeaveTypeModule } from './modules/leave-type/leave-type.module';
 import { LeaveRequestModule } from './modules/leave-request/leave-request.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 // ... other imports
 
 @Module({
@@ -41,5 +42,7 @@ import { LeaveRequestModule } from './modules/leave-request/leave-request.module
     SharedModule,
     LeaveTypeModule, // Importing the LeaveTypeModule
     LeaveRequestModule, // Importing the LeaveRequestModule
+    LeaveTypeModule,
+    AttendanceModule, // Importing the AttendanceModule
   ]
 })export class AppModule { }

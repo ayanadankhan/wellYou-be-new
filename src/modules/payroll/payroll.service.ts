@@ -135,14 +135,7 @@ export class PayrollService {
         { $unwind: '$employeeDetails' },
         {
           $project: {
-            _id: 1,
-            payrollMonth: 1,
-            totalGross: 1,
-            totalDeduction: 1,
-            totalAddition: 1,
-            netPay: 1,
-            status: 1,
-            employeeData: {
+            salaryData: {
               payPeriodStart: '$selectedEmployees.payPeriodStart',
               payPeriodEnd: '$selectedEmployees.payPeriodEnd',
               salaryPay: '$selectedEmployees.salaryPay',
