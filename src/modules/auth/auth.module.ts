@@ -7,13 +7,24 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.gaurd'
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.gaurd';
 import { APP_GUARD } from '@nestjs/core';
+import { MongooseModule } from '@nestjs/mongoose';
+
+// Import AttendanceModule - adjust path as needed
+import { AttendanceModule } from '../attendance/attendance.module';
+
+// Import Employee schema - adjust path based on your project structure
+import { EmployeeSchema } from '../employees/schemas/Employee.schema';
 
 @Module({
   imports: [
     UserModule,
+    AttendanceModule, // Add AttendanceModule
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    MongooseModule.forFeature([
+      { name: 'Employee', schema: EmployeeSchema }, // Add Employee model
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -39,51 +50,3 @@ import { APP_GUARD } from '@nestjs/core';
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
-
-// src/common/filters/http-exception.filter.ts
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
-import { Request, Response } from 'express';
-
-@Catch()
-export class HttpExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(HttpExceptionFilter.name);
-
-  catch(exception: any, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-
-    const status = exception instanceof HttpException
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
-
-    const message = exception instanceof HttpException
-      ? exception.message
-      : 'Internal server error';
-
-    const errorResponse = {
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      message: message,
-      ...(process.env.NODE_ENV === 'development' && { 
-        stack: exception.stack 
-      }),
-    };
-
-    this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${message}`,
-      exception.stack,
-    );
-
-    response.status(status).json(errorResponse);
-  }
-}
