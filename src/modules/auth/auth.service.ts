@@ -14,6 +14,10 @@ import * as bcrypt from 'bcrypt';
 import { UserPayload, LoginResponse, AuthenticatedUser } from './interfaces/auth.interface';
 import { RegisterDto } from './dto/registerDto';
 import { ChangePasswordDto } from './dto/changePasswordDto';
+import { AttendanceService } from '../attendance/attendance.service';
+import { Model } from 'mongoose';
+import { Employee } from '../employees/schemas/Employee.schema';
+import { InjectModel } from '@nestjs/mongoose';
 
 interface User {
   _id: string | { toString(): string }; // Accept string or ObjectId-like
@@ -36,6 +40,8 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly attendanceService: AttendanceService,
+     @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
   ) { }
 
   async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
@@ -78,6 +84,37 @@ export class AuthService {
     }
   }
 
+// async login(user: AuthenticatedUser): Promise<LoginResponse> {
+//   try {
+//     if (!user || !user.email || !user._id) {
+//       throw new UnauthorizedException('Invalid user data');
+//     }
+
+//     const expiresIn = this.configService.get<string>('JWT_EXPIRATION') || '24h';
+//     console.log(user);
+    
+//     const accessToken = this.jwtService.sign(user, { expiresIn });
+
+//     this.logger.debug(`User logged in successfully: ${user.email}`);
+
+//     return {
+//       access_token: accessToken,
+//       user: {
+//         _id: user._id,
+//         email: user.email,
+//         role: user.role,
+//         firstName: user.firstName,
+//         lastName: user.lastName,
+//         permissions: user.permissions || [] // ✅ Add this line
+//       },
+//       expiresIn: this.parseExpirationTime(expiresIn),
+//     };
+//   } catch (error) {
+//     this.logger.error(`Error during login: ${error.message}`, error.stack);
+//     throw new InternalServerErrorException('Login failed');
+//   }
+// }
+
 async login(user: AuthenticatedUser): Promise<LoginResponse> {
   try {
     if (!user || !user.email || !user._id) {
@@ -89,6 +126,22 @@ async login(user: AuthenticatedUser): Promise<LoginResponse> {
     
     const accessToken = this.jwtService.sign(user, { expiresIn });
 
+    // Get employee ID from employees collection using user ID
+    const employee = await this.employeeModel.findOne({ userId: user._id }).exec();
+    
+    if (employee && employee._id) {
+      try {
+        // Trigger auto check-in for the employee
+        await this.triggerAutoCheckin(employee._id.toString());
+        this.logger.debug(`Auto check-in triggered for employee: ${employee._id}`);
+      } catch (checkinError) {
+        // Log the error but don't fail the login process
+        this.logger.warn(`Auto check-in failed for employee ${employee._id}: ${checkinError.message}`);
+      }
+    } else {
+      this.logger.warn(`No employee record found for user: ${user._id}`);
+    }
+
     this.logger.debug(`User logged in successfully: ${user.email}`);
 
     return {
@@ -99,13 +152,23 @@ async login(user: AuthenticatedUser): Promise<LoginResponse> {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
-        permissions: user.permissions || [] // ✅ Add this line
+        permissions: user.permissions || []
       },
       expiresIn: this.parseExpirationTime(expiresIn),
     };
   } catch (error) {
     this.logger.error(`Error during login: ${error.message}`, error.stack);
     throw new InternalServerErrorException('Login failed');
+  }
+}
+
+private async triggerAutoCheckin(employeeId: string): Promise<void> {
+  try {
+    await this.attendanceService.checkin(employeeId);
+    this.logger.log(`Auto check-in successful for employee: ${employeeId}`);
+  } catch (error) {
+    this.logger.error(`Auto check-in failed for employee ${employeeId}: ${error.message}`);
+    throw error;
   }
 }
 
