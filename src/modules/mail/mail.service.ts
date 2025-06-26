@@ -13,6 +13,49 @@ export class MailService {
     },
   });
 
+  // mail.service.ts
+async sendOtpEmail(to: string, otp: number) {
+  try {
+    const mailOptions = {
+      from: '"BitsBuffer" <akhtarsaharan336@gmail.com>',
+      to,
+      subject: 'Your Password Reset OTP',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://bitsbuffer.com/logo.png" alt="BitsBuffer Logo" style="max-width: 150px;">
+            <h1 style="color: #2c3e50;">Password Reset Request</h1>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+            <p>You requested to reset your password. Here's your OTP:</p>
+            
+            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0; text-align: center; font-size: 24px; font-weight: bold;">
+              ${otp}
+            </div>
+            
+            <p>This OTP is valid for 15 minutes. Please don't share it with anyone.</p>
+            
+            <p style="font-size: 0.9em; color: #7f8c8d;">
+              If you didn't request this password reset, please contact our IT support team immediately.
+            </p>
+          </div>
+          
+          <div style="margin-top: 20px; text-align: center; font-size: 0.8em; color: #7f8c8d;">
+            <p>© ${new Date().getFullYear()} BitsBuffer. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+          console.log(`OTP email sent to ${to}`);
+  } catch (error) {
+          console.error('Failed to send OTP email:', error);
+    throw error;
+  }
+}
+
   async sendWelcomeEmail(
     to: string, 
     name: string, 
@@ -43,14 +86,6 @@ export class MailService {
               </div>
               
               <p>For security reasons, please change your password after first login.</p>
-              
-              <p style="margin-top: 30px;">
-                <a href="https://bitsbuffer.com/login" 
-                   style="background-color: #3498db; color: white; padding: 10px 20px; 
-                          text-decoration: none; border-radius: 5px; display: inline-block;">
-                  Login to Your Account
-                </a>
-              </p>
               
               <p style="font-size: 0.9em; color: #7f8c8d;">
                 If you didn't request this account or need any assistance, 

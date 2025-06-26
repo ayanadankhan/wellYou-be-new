@@ -18,6 +18,12 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { Model } from 'mongoose';
 import { Employee } from '../employees/schemas/Employee.schema';
 import { InjectModel } from '@nestjs/mongoose';
+import { GetUserDto } from '../tenant/users/dto/get-user.dto';
+import { ForgotPasswordDto } from './dto/forgotPasswordDto';
+import { ForgotPassword } from '../auth/schemas/forgotPassword.schema';
+import { VerifyOtpDto } from './dto/verifyOtpDto';
+import { ResetPasswordDto } from './dto/resetPasswordDto';
+import { MailService } from '../mail/mail.service';
 
 interface User {
   _id: string | { toString(): string }; // Accept string or ObjectId-like
@@ -41,7 +47,10 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly attendanceService: AttendanceService,
+        private readonly mailService: MailService,
      @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
+     @InjectModel('User') private readonly userModel: Model<User>,
+     @InjectModel(ForgotPassword.name) private readonly forgotPasswordModel: Model<ForgotPassword>
   ) { }
 
   async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
@@ -313,8 +322,69 @@ async changePassword(
     throw new InternalServerErrorException('Password change failed');
   }
 }
+async findUsers(getUserDto: GetUserDto) {
+  const where: Record<string, any> = {};
 
+  if (getUserDto.email) {
+    where.email = { $regex: getUserDto.email, $options: 'i' };
+  }
 
+  const skip = getUserDto.o ? Number(getUserDto.o) : 0;
+  const limit = getUserDto.l ? Number(getUserDto.l) : 10;
+
+  return this.userModel.aggregate([
+    { $match: where },
+    {
+      $project: { 
+        verification: 0, 
+        password: 0, 
+        verificationExpires: 0, 
+        config: 0 
+      }
+    },
+    { $skip: skip },
+    { $limit: limit }
+  ]);
+}
+
+// auth.service.ts
+async forgotPassword(createForgotPasswordDto: ForgotPasswordDto, isForLogin = false) {
+  try {
+    const user = await this.userModel.findOne({ 
+      email: createForgotPasswordDto.email.toLowerCase().trim() 
+    }).exec();
+
+    if (!user) {
+      return {
+        email: createForgotPasswordDto.email,
+        success: true,
+        message: 'If the email exists in our system, you will receive a password reset link'
+      };
+    }
+
+    const pin = Math.floor(1000 + Math.random() * 9000);
+    await this.forgotPasswordModel.create({
+      email: createForgotPasswordDto.email,
+      verification: pin,
+      isForLogin,
+      userId: user._id,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes expiration
+    });
+
+    // Send OTP via email
+    await this.mailService.sendOtpEmail(createForgotPasswordDto.email, pin);
+
+    return {
+      email: createForgotPasswordDto.email,
+      success: true,
+      message: 'Password reset OTP sent to your email'
+    };
+  } catch (error) {
+    this.logger.error(`Forgot password error: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Failed to process forgot password request');
+  }
+}
+  
   async logout(userId: string): Promise<{ message: string }> {
     try {
       // In a production app, you might want to blacklist the token
@@ -347,6 +417,63 @@ async changePassword(
     console.error('Error in hashPassword:', error);
     throw error;
   }
+}
+
+async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<{ isValid: boolean; message: string }> {
+  try {
+    const { email, otp } = verifyOtpDto;
+    const otpRecord = await this.forgotPasswordModel.findOne({
+      email: email.toLowerCase().trim(),
+      verification: otp,
+      isUsed: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!otpRecord) {
+      return {
+        isValid: false,
+        message: 'Invalid OTP or OTP has expired'
+      };
+    }
+    const user = await this.userModel.findById(otpRecord.userId);
+    if (!user) {
+      return {
+        isValid: false,
+        message: 'User not found'
+      };
+    }
+    await this.forgotPasswordModel.findByIdAndUpdate(otpRecord._id, {
+      isUsed: true
+    });
+    return {
+      isValid: true,
+      message: 'OTP verified successfully'
+    };
+    
+  } catch (error) {
+    this.logger.error(`OTP verification error: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('OTP verification failed');
+  }
+}
+
+async resetPassword(resetPasswordDto: ResetPasswordDto) {
+  const { email, password } = resetPasswordDto;
+
+  // 1. Find user (skip OTP check)
+  const user = await this.userModel.findOne({ email: email.toLowerCase().trim() });
+  if (!user) throw new BadRequestException('User not found');
+
+  // 2. Update password
+  const hashedPassword = await this.hashPassword(password);
+  await this.userModel.updateOne({ _id: user._id }, { password: hashedPassword });
+
+  // 3. Optional: Invalidate all OTPs for this email
+  await this.forgotPasswordModel.updateMany(
+    { email: email.toLowerCase().trim() },
+    { isUsed: true }
+  );
+
+  return { success: true, message: 'Password reset successfully' };
 }
 
 async validatePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
