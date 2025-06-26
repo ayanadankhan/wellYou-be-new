@@ -59,12 +59,6 @@ export class GetSalaryDto {
   employeesId: string;
 
   @ApiProperty()
-  payPeriodStart: Date;
-
-  @ApiProperty()
-  payPeriodEnd: Date;
-
-  @ApiProperty()
   salaryPay: SalaryPayResponseDto;
 
   @ApiProperty({ type: [DeductionsResponseDto], required: false })

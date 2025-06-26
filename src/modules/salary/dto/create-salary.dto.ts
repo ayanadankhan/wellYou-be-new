@@ -95,16 +95,6 @@ export class CreateSalaryDto {
   employeesId: Types.ObjectId;
 
   @ApiProperty()
-  @IsDate()
-  @Type(() => Date)
-  payPeriodStart: Date;
-
-  @ApiProperty()
-  @IsDate()
-  @Type(() => Date)
-  payPeriodEnd: Date;
-
-  @ApiProperty()
   @IsObject()
   @ValidateNested()
   @Type(() => SalaryPayDto)

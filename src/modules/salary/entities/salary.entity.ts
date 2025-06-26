@@ -8,14 +8,6 @@ export class Salary extends Document {
 @Prop({ required: false, type: MongooseSchema.Types.ObjectId, ref: 'Employee' })
 employeesId: Types.ObjectId;
 
-
-
-  @Prop({ required: true })
-  payPeriodStart: Date;
-
-  @Prop({ required: true })
-  payPeriodEnd: Date;
-
   @Prop({
     type: {
       basePay: { type: Number, required: true },
