@@ -409,7 +409,7 @@ export class DependentMemberDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
   @ApiProperty({ 
@@ -418,7 +418,7 @@ export class DependentMemberDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   relation: string;
 
   @ApiProperty({ 
@@ -427,7 +427,7 @@ export class DependentMemberDto {
     required: true
   })
   @IsNumber()
-  @IsNotEmpty()
+  @IsOptional()
   age: number;
 
   @ApiProperty({ 
@@ -436,7 +436,7 @@ export class DependentMemberDto {
     required: true
   })
   @IsDateString()
-  @IsNotEmpty()
+  @IsOptional()
   dateOfBirth: string;
 }
 
@@ -521,10 +521,9 @@ export class CreateEmployeeDto {
     type: [String],
     required: true
   })
-  @IsArray()
-  @IsString({ each: true })
+  @IsString()
   @IsNotEmpty()
-  nationality: string[];
+  nationality: string;
 
   @ApiProperty({ 
     description: 'Array of employee documents (name, type, url)', 
@@ -739,10 +738,9 @@ export class UpdateEmployeeDto {
     type: [String],
     required: false 
   })
-  @IsArray()
-  @IsString({ each: true })
+  @IsString()
   @IsOptional()
-  nationality?: string[];
+  nationality?: string;
 
   @ApiProperty({ 
     description: 'Array of employee documents (name, type, url)', 

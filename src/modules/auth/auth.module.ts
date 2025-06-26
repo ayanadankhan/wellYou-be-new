@@ -16,14 +16,18 @@ import { AttendanceModule } from '../attendance/attendance.module';
 
 // Import Employee schema - adjust path based on your project structure
 import { EmployeeSchema } from '../employees/schemas/Employee.schema';
+import { ForgotPassword, ForgotPasswordSchema } from '../auth/schemas/forgotPassword.schema';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     UserModule,
+    MailModule,
     AttendanceModule, // Add AttendanceModule
     PassportModule.register({ defaultStrategy: 'jwt' }),
     MongooseModule.forFeature([
       { name: 'Employee', schema: EmployeeSchema }, // Add Employee model
+            { name: 'ForgotPassword', schema: ForgotPasswordSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

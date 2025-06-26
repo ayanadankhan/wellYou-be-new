@@ -7,7 +7,9 @@ import {
   HttpStatus, 
   UseGuards,
   Get,
-  Patch
+  Patch,
+  Req,
+  BadRequestException
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -18,6 +20,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { AuthenticatedUser } from './interfaces/auth.interface';
 import { User } from '@/common/decorators/user.decorator';
+import { ForgotPasswordDto } from './dto/forgotPasswordDto';
+import { VerifyOtpDto } from './dto/verifyOtpDto';
+import { ResetPasswordDto } from './dto/resetPasswordDto';
 
 @Controller('auth')
 @UseGuards(AuthGuard)
@@ -48,6 +53,34 @@ export class AuthController {
   ) {
     return this.authService.changePassword(userId, changePasswordDto);
   }
+
+@Public()
+@Post('forgotPassword')
+async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+  return this.authService.forgotPassword(forgotPasswordDto);
+}
+
+@Public()
+@Post('verifyOtp')
+async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+  const result = await this.authService.verifyOtp(verifyOtpDto);
+  console.log(result, "controler");
+  
+    if (!result.isValid) {
+      throw new BadRequestException(result.message);
+    }
+    return { success: true, message: result.message };
+}
+
+@Public()
+@Post('resetPassword')
+async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+  const result = await this.authService.resetPassword(resetPasswordDto);
+  if (!result.success) {
+    throw new BadRequestException(result.message);
+  }
+  return result;
+}
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)

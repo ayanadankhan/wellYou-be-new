@@ -135,16 +135,16 @@ class EmergencyContact {
 
 @Schema({ _id: false })
 class DependentMember {
-  @Prop({ required: true, type: String })
+  @Prop({ type: String })
   name: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ type: String })
   relation: string;
 
-  @Prop({ required: true, type: Number })
+  @Prop({ type: Number })
   age: number;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ type: Date })
   dateOfBirth: Date;
 }
 
@@ -177,8 +177,8 @@ export class Employee {
   @Prop({ required: true, type: String })
   location: string;
 
-  @Prop({ required: true, type: [String] })
-  nationality: string[];
+  @Prop({ required: true, type: String })
+  nationality: string;
 
   @Prop({ required: true, type: EmergencyContact })
   emergencyContact: EmergencyContact;
