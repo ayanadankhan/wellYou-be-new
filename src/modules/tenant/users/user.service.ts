@@ -6,23 +6,35 @@ import { User, UserDocument, UserRole } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { MailService } from '../../mail/mail.service';
 
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly mailService: MailService
+  ) {}
 
 async create(createUserDto: CreateUserDto): Promise<User> {
-  // Ensure tenantId is in correct ObjectId format
   if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
     createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
   }
+  const originalPassword = createUserDto.password; 
+  createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
+  const user = await this.userModel.create(createUserDto);
+  if (user.email) {
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'User';
+    await this.mailService.sendWelcomeEmail(
+      user.email,
+      fullName,
+      user.email,
+      originalPassword
+    );
+  }
 
-  const createdUser = new this.userModel({
-    ...createUserDto,
-  });
-
-  return createdUser.save();
+  return user;
 }
+
 
   async findAll(): Promise<User[]> {
     return this.userModel.aggregate([
