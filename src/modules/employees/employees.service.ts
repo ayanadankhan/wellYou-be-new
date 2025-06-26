@@ -123,6 +123,28 @@ export class EmployeesService {
       );
     }
   }
+  async findEmployeeIdByUserId(userId: string): Promise<string | null> {
+  try {
+    this.logger.log(`Searching for employee ID with userId: ${userId}`);
+    
+    // Assuming you're using a repository pattern
+    const employee = await this.employeeModel.findOne({
+      where: { userId },
+      select: ['id'] // Only select the employee ID field
+    });
+    
+    if (!employee) {
+      this.logger.warn(`No employee found with userId: ${userId}`);
+      return null;
+    }
+    
+    this.logger.log(`Employee ID found for userId ${userId}: ${employee.id}`);
+    return employee.id;
+  } catch (error) {
+    this.logger.error(`Error finding employee ID for userId ${userId}: ${error.message}`, error.stack);
+    throw error;
+  }
+}
 
   async findOne(id: string): Promise<GetEmployeeDto> {
     try {

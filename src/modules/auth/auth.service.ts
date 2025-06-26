@@ -131,9 +131,10 @@ async login(user: AuthenticatedUser): Promise<LoginResponse> {
     const accessToken = this.jwtService.sign(user, { expiresIn });
 
     this.logger.debug(`JWT generated successfully for user: ${user.email}`);
-
+ console.log(user,"adanuser");
     return {
       access_token: accessToken,
+     
       user: {
         _id: user._id,
         email: user.email,
@@ -141,7 +142,9 @@ async login(user: AuthenticatedUser): Promise<LoginResponse> {
         firstName: user.firstName,
         lastName: user.lastName,
         permissions: user.permissions || []
-      },
+      }
+    ,
+      
       expiresIn: this.parseExpirationTime(expiresIn),
     };
   } catch (error) {
