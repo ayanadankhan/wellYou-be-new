@@ -38,9 +38,9 @@ export class LeaveRequestService {
       status: { $ne: 'rejected' },
     });
 
-    if (overlappingRequest) {
-      throw new ConflictException('Employee already has a leave request for this period');
-    }
+    // if (overlappingRequest) {
+    //   throw new ConflictException('Employee already has a leave request for this period');
+    // }
 
     const leaveRequest = new this.leaveRequestModel({
       ...createLeaveRequestDto,
