@@ -192,7 +192,7 @@ export class EmployeesController {
     }
   }
 
-  @Get('emp/:userId')
+@Get('emp/:userId')
 @ApiOperation({ summary: 'Retrieve employee ID by userId' })
 @ApiParam({
   name: 'userId',

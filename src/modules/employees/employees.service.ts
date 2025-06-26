@@ -158,23 +158,52 @@ if (user?.email && user?.password) {
       );
     }
   }
-  async findEmployeeIdByUserId(userId: string): Promise<string | null> {
+async findEmployeeIdByUserId(userId: string): Promise<string | null> {
   try {
     this.logger.log(`Searching for employee ID with userId: ${userId}`);
+    this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
     
-    // Assuming you're using a repository pattern
-    const employee = await this.employeeModel.findOne({
-      where: { userId },
-      select: ['id'] // Only select the employee ID field
-    });
+    // Convert string userId to ObjectId for MongoDB comparison
+    const mongoose = require('mongoose');
     
-    if (!employee) {
-      this.logger.warn(`No employee found with userId: ${userId}`);
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      this.logger.warn(`Invalid ObjectId format: ${userId}`);
       return null;
     }
     
-    this.logger.log(`Employee ID found for userId ${userId}: ${employee.id}`);
-    return employee.id;
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
+    
+    // Query using Mongoose syntax (since you're using MongoDB with Mongoose)
+    const employee = await this.employeeModel.findOne({ 
+      userId: userObjectId 
+    }).select('_id userId');
+    
+    if (!employee) {
+      this.logger.warn(`No employee found with userId: ${userId}`);
+      
+      // Debug: Let's check what employees exist
+      const totalEmployees = await this.employeeModel.countDocuments();
+      this.logger.log(`Total employees in collection: ${totalEmployees}`);
+      
+      if (totalEmployees > 0) {
+        // Get a sample employee to see the data structure
+        const sampleEmployee = await this.employeeModel.findOne().select('_id userId');
+        
+        // Check if any employee has this userId (even with different types)
+        const employeeWithStringUserId = await this.employeeModel.findOne({ 
+          userId: userId // Try as string
+        }).select('_id userId');
+        
+        this.logger.log(`Employee found with string userId: ${employeeWithStringUserId ? 'Yes' : 'No'}`);
+      }
+      
+      return null;
+    }
+    
+    this.logger.log(`Employee found - _id: ${employee._id}, userId: ${employee.userId}`);
+    return employee._id.toString();
+    
   } catch (error) {
     this.logger.error(`Error finding employee ID for userId ${userId}: ${error.message}`, error.stack);
     throw error;
