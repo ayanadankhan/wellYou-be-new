@@ -47,27 +47,26 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   return this.userService.create(createUserDto);
 }
 
-@Public()
   @Get()
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get all users' })
   @ApiResponse({ status: 200, description: 'Return all users.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  findAll(@Req() req: AuthenticatedRequest) {
+  findAll(@CurrentUser() user: User) {
     // Validate user authentication
     // if (!req.user) {
     //   throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     // }
 
     // For MVP, simplify tenant-based filtering
-    // if (req.user.role === UserRole.SUPER_ADMIN) {
+    if (user.role === UserRole.SUPER_ADMIN) {
       return this.userService.findAll(); // Super Admin sees all users
-    // } else if (req.user.tenantId || req.user._id) { // Use tenantId if available, fallback to _id for simplicity
-    //   const tenantId = req.user.tenantId || req.user._id;
-    //   return this.userService.findAllByTenant(tenantId); // Tenant-specific users
-    // }
-    // return []; // Should not reach here if user is authenticated
+    } else if (user.tenantId) { // Use tenantId if available, fallback to _id for simplicity
+      const tenantId = user.tenantId.toString();
+      return this.userService.findAllByTenant(tenantId); // Tenant-specific users
+    }
+    return []; // Should not reach here if user is authenticated
   }
 
   @Get(':id')
