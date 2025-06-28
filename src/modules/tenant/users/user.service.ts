@@ -20,7 +20,6 @@ async create(createUserDto: CreateUserDto): Promise<User> {
     createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
   }
   const originalPassword = createUserDto.password; 
-  createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
   const user = await this.userModel.create(createUserDto);
   if (user.email) {
     const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'User';
@@ -76,18 +75,22 @@ async create(createUserDto: CreateUserDto): Promise<User> {
     return this.userModel.findOne({ email }).exec();
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const existingUser = await this.userModel.findByIdAndUpdate(
-      id,
-      { $set: updateUserDto },
-      { new: true }
-    ).exec();
-
-    if (!existingUser) {
-      throw new NotFoundException(`User with ID "${id}" not found`);
-    }
-    return existingUser;
+async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  if (updateUserDto.password) {
+    updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
   }
+  const existingUser = await this.userModel.findByIdAndUpdate(
+    id,
+    { $set: updateUserDto },
+    { new: true }
+  ).exec();
+
+  if (!existingUser) {
+    throw new NotFoundException(`User with ID "${id}" not found`);
+  }
+  return existingUser;
+}
+
 
   async updateByTenant(id: string, tenantId: string, updateUserDto: UpdateUserDto): Promise<User> { // tenantId is string for MVP
     if (updateUserDto.password) {
