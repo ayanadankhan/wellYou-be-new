@@ -34,7 +34,6 @@ export class UserController {constructor(private readonly userService: UserServi
 
 @Post()
 async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
-  console.log("=================", user);
   
   if (!user) {
     throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
