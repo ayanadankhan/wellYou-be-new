@@ -141,9 +141,6 @@ class DependentMember {
   @Prop({ type: String })
   relation: string;
 
-  @Prop({ type: Number })
-  age: number;
-
   @Prop({ type: Date })
   dateOfBirth: Date;
 }

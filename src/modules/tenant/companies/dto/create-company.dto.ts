@@ -40,7 +40,7 @@ export class CreateCompanyDto {
 
   @ApiProperty({ description: 'Number Of Employees of the company' })
   @IsNotEmpty()
-  numberOfEmployees: number;
+  numberOfEmployees: string;
 
   @ApiProperty({ 
     description: 'Status of the company',
