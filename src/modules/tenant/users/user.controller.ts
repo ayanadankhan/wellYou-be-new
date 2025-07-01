@@ -133,7 +133,7 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
       return this.userService.remove(id);
   }
 
-  @Get('profile')
+@Get('profile')
 @Public()
 getCurrentUser(@Req() req: AuthenticatedRequest) {
   console.log('Current user from JWT:', req.user);
