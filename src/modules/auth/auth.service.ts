@@ -117,10 +117,7 @@ export class AuthService {
       if (employee && employee._id) {
         try {
           // Trigger auto check-in for the employee
-          await this.attendanceService.checkin(employee._id.toString(), {
-            loginTime: new Date(),
-            source: 'auto-login'
-          });
+          await this.attendanceService.checkin(employee._id.toString());
           this.logger.log(`Auto check-in successful for employee: ${employee._id}`);
         } catch (checkinError) {
           // Log the error but don't fail the login process
