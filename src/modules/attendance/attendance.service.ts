@@ -16,7 +16,7 @@ export class AttendanceService {
   ) {}
 
   // Check-in (Auto-called on login)
-  async checkin(employeeId: string, p0: { loginTime: Date; source: string; }): Promise<Attendance> {
+  async checkin(employeeId: string): Promise<Attendance> {
     try {
       this.logger.log(`Processing check-in for employee: ${employeeId}`);
 
@@ -323,10 +323,3 @@ export class AttendanceService {
     }
   }
 }
-
-
-
-
-
-
-
