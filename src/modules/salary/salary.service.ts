@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateSalaryDto } from './dto/create-salary.dto';
 import { UpdateSalaryDto } from './dto/update-salary.dto';
 import { Salary } from './entities/salary.entity';
@@ -12,8 +12,22 @@ export class SalaryService {
     
   ) {}
 
-  async create(createSalaryDto: CreateSalaryDto): Promise<Salary> {   
-    const createdSalary = new this.salaryModel(createSalaryDto);
+  async create(createSalaryDto: CreateSalaryDto): Promise<Salary> {
+    const employeesId = new Types.ObjectId(createSalaryDto.employeesId);
+
+    const existingSalary = await this.salaryModel.findOne({
+      employeesId: employeesId,
+    });
+
+    if (existingSalary) {
+      throw new ConflictException('Salary for this employee already exists.');
+    }
+
+    const createdSalary = new this.salaryModel({
+      ...createSalaryDto,
+      employeesId,
+    });
+
     return createdSalary.save();
   }
 

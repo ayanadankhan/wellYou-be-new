@@ -7,7 +7,7 @@ import { UpdateEmployeeDto } from './dto/update-Employee.dto';
 import { GetEmployeeDto } from './dto/get-Employee.dto';
 import { isValidObjectId } from 'mongoose';
 import { plainToClass } from 'class-transformer';
-import { MailService } from '../mail/mail.service'; // 👈 Import MailService
+// import { MailService } from '../mail/mail.service';
 import { InjectModel as InjectUserModel } from '@nestjs/mongoose';
 import { User } from '../tenant/users/schemas/user.schema'; // 👈 Import User schema
 
@@ -18,49 +18,48 @@ export class EmployeesService {
   constructor(
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(User.name) private readonly userModel: Model<any>, // For fetching email/password
-    private readonly mailService: MailService, // 👈 Inject MailService
+    // private readonly mailService: MailService,
   ) {}
 
-async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
-  try {
-    this.logger.log(`Creating employee with userId: ${createEmployeeDto.userId}`);
-    
-    // Save employee first
-const employee = new this.employeeModel(createEmployeeDto);
-const savedEmployee = await employee.save();
+  async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
+    try {
+      this.logger.log(`Creating employee with userId: ${createEmployeeDto.userId}`);
+      
+      // Save employee first
+      const employee = new this.employeeModel(createEmployeeDto);
+      const savedEmployee = await employee.save();
 
-// ✅ Fetch user by userId
-const user = await this.userModel.findById(createEmployeeDto.userId).lean<User>();
+      // send email logic temprorary disable.
+      
+      // const user = await this.userModel.findById(createEmployeeDto.userId).lean<User>();
 
-if (user?.email && user?.password) {
-  console.log("boom");
-  
-  const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-  await this.mailService.sendWelcomeEmail(
-    user.email,
-    fullName,
-    user.email,
-    user.password // ✅ hashed password (temporary)
-  );
-      this.logger.log(`📧 Welcome email sent to ${user.email}`);
-    } else {
-      this.logger.warn(`⚠️ Could not send email — user not found or missing info`);
+      // if (user?.email && user?.password) {
+        
+      //   const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      //   await this.mailService.sendWelcomeEmail(
+      //     user.email,
+      //     fullName,
+      //     user.email,
+      //     user.password // ✅ hashed password (temporary)
+      //   );
+      //       this.logger.log(`📧 Welcome email sent to ${user.email}`);
+      //     } else {
+      //       this.logger.warn(`⚠️ Could not send email — user not found or missing info`);
+      //     }
+
+          return plainToClass(GetEmployeeDto, savedEmployee.toObject());
+    } catch (error) {
+      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Failed to create employee',
+          message: error.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     }
-
-    return plainToClass(GetEmployeeDto, savedEmployee.toObject());
-  } catch (error) {
-    this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-    throw new HttpException(
-      {
-        status: HttpStatus.BAD_REQUEST,
-        error: 'Failed to create employee',
-        message: error.message,
-      },
-      HttpStatus.BAD_REQUEST,
-    );
   }
-}
-
 
   async findAll(query: {
     userId?: string;
@@ -259,7 +258,7 @@ async findEmployeeIdByUserId(userId: string): Promise<string | null> {
             from: 'users',
             localField: 'managerId',
             foreignField: '_id',
-            as: 'user',
+            as: 'manager',
           },
         },
         { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },

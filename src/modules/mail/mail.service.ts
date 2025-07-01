@@ -82,7 +82,7 @@ async sendOtpEmail(to: string, otp: number) {
               <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <h3 style="margin-top: 0; color: #2c3e50;">Your Login Credentials:</h3>
                 <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Temporary Password:</strong> ${originalPassword}</p>
+                <p><strong>Password:</strong> ${originalPassword}</p>
               </div>
               
               <p>For security reasons, please change your password after first login.</p>
