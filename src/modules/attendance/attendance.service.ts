@@ -6,6 +6,19 @@ import { Attendance, AttendanceDocument } from './schemas/Attendance.schema';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
 
+// Assuming you have an Employee model - adjust import path as needed
+import { Employee, EmployeeSchema, EmployeeDocument } from '../employees/schemas/Employee.schema';
+
+interface AttendanceResponse {
+  success: boolean;
+  message: string;
+  data: any;
+  monthlyStats?: any;
+  count: number;
+  teamAttendance?: any[];
+  allEmployeesAttendance?: any[];
+}
+
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
@@ -13,7 +26,207 @@ export class AttendanceService {
   constructor(
     @InjectModel(Attendance.name)
     private attendanceModel: Model<AttendanceDocument>,
+    @InjectModel(Employee.name)
+    private employeeModel: Model<EmployeeDocument>,
   ) {}
+
+  // Enhanced method to get attendance based on user role
+  async getAttendanceByRole(
+    userId: string,
+    userRole: string,
+    employeeId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AttendanceResponse> {
+    try {
+      this.logger.log(`Fetching attendance for user: ${userId}, role: ${userRole}, target employee: ${employeeId}`);
+
+      let response: AttendanceResponse;
+
+      switch (userRole.toLowerCase()) {
+        case 'employee':
+          response = await this.getEmployeeAttendance(employeeId, startDate, endDate);
+          break;
+        
+        case 'manager':
+          response = await this.getManagerAttendance(userId, employeeId, startDate, endDate);
+          break;
+        
+        case 'admin':
+          response = await this.getAdminAttendance(userId, employeeId, startDate, endDate);
+          break;
+        
+        default:
+          throw new BadRequestException('Invalid user role');
+      }
+
+      return response;
+    } catch (error) {
+      this.logger.error(`Get attendance by role failed:`, error.message);
+      throw error;
+    }
+  }
+
+  // Employee attendance (unchanged)
+  private async getEmployeeAttendance(
+    employeeId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AttendanceResponse> {
+    const attendance = await this.getAttendanceByEmployee(employeeId, startDate, endDate);
+    const formattedData = this.formatAttendanceData(attendance);
+    const monthlyStats = this.calculateMonthlyStats(attendance);
+
+    return {
+      success: true,
+      message: 'Employee attendance records retrieved successfully',
+      data: formattedData,
+      monthlyStats,
+      count: attendance.length,
+    };
+  }
+
+  // Manager attendance (own + team)
+  private async getManagerAttendance(
+    managerId: string,
+    employeeId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AttendanceResponse> {
+    // Get manager's own attendance
+    const managerAttendance = await this.getAttendanceByEmployee(managerId, startDate, endDate);
+    const managerFormattedData = this.formatAttendanceData(managerAttendance);
+    const managerMonthlyStats = this.calculateMonthlyStats(managerAttendance);
+
+    // Get team members under this manager
+    const teamMembers = await this.employeeModel.find({
+      managerId: new Types.ObjectId(managerId),
+    }).select('_id name email position');
+
+    this.logger.log(`Found ${teamMembers.length} team members for manager: ${managerId}`);
+
+    // Get attendance for all team members
+    const teamAttendance = [];
+    for (const member of teamMembers) {
+      const memberAttendance = await this.getAttendanceByEmployee(
+        member._id.toString(),
+        startDate,
+        endDate,
+      );
+      
+      const memberObj = member.toObject();
+      teamAttendance.push({
+        employee: {
+          id: memberObj._id,
+          name: memberObj.name,
+          // email: memberObj.email,
+          // position: memberObj.position,
+        },
+        attendance: this.formatAttendanceData(memberAttendance),
+        monthlyStats: this.calculateMonthlyStats(memberAttendance),
+        count: memberAttendance.length,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Manager and team attendance records retrieved successfully',
+      data: managerFormattedData,
+      monthlyStats: managerMonthlyStats,
+      count: managerAttendance.length,
+      teamAttendance,
+    };
+  }
+
+  // Admin attendance (own + all employees)
+  private async getAdminAttendance(
+    adminId: string,
+    employeeId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AttendanceResponse> {
+    // Get admin's own attendance
+    const adminAttendance = await this.getAttendanceByEmployee(adminId, startDate, endDate);
+    const adminFormattedData = this.formatAttendanceData(adminAttendance);
+    const adminMonthlyStats = this.calculateMonthlyStats(adminAttendance);
+
+    // Get all employees
+    const allEmployees = await this.employeeModel.find({
+      _id: { $ne: new Types.ObjectId(adminId) }, // Exclude admin from the list
+    }).select('_id name email position managerId');
+
+    this.logger.log(`Found ${allEmployees.length} employees for admin view`);
+
+    // Get attendance for all employees
+    const allEmployeesAttendance = [];
+    for (const employee of allEmployees) {
+      const employeeAttendance = await this.getAttendanceByEmployee(
+        employee._id.toString(),
+        startDate,
+        endDate,
+      );
+      
+      // Get manager info if exists
+      let managerInfo = null;
+      if (employee.managerId) {
+        const manager = await this.employeeModel.findById(employee.managerId).select('name email');
+        managerInfo = manager ? { name: manager.name } : null;
+      }
+      
+      allEmployeesAttendance.push({
+        employee: {
+          id: employee._id,
+          name: employee.name,
+          // email: employee.email,
+          // position: employee.position,
+          manager: managerInfo,
+        },
+        attendance: this.formatAttendanceData(employeeAttendance),
+        monthlyStats: this.calculateMonthlyStats(employeeAttendance),
+        count: employeeAttendance.length,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Admin and all employees attendance records retrieved successfully',
+      data: adminFormattedData,
+      monthlyStats: adminMonthlyStats,
+      count: adminAttendance.length,
+      allEmployeesAttendance,
+    };
+  }
+
+  // Format attendance data for frontend
+  private formatAttendanceData(attendance: Attendance[]): any[] {
+    return attendance.map(record => ({
+      // id: record._id,
+      date: record.date,
+      checkInTime: record.checkInTime,
+      checkOutTime: record.checkOutTime,
+      totalHours: record.totalHours || 0,
+      status: record.status,
+      isAutoCheckout: record.isAutoCheckout || false,
+    }));
+  }
+
+  // Calculate monthly statistics
+  private calculateMonthlyStats(attendance: Attendance[]): any {
+    const totalDays = attendance.length;
+    const presentDays = attendance.filter(record => record.status === 'Present').length;
+    const absentDays = attendance.filter(record => record.status === 'Absent').length;
+    const totalHours = attendance.reduce((sum, record) => sum + (record.totalHours || 0), 0);
+    const avgHoursPerDay = totalDays > 0 ? totalHours / presentDays : 0;
+
+    return {
+      totalDays,
+      presentDays,
+      absentDays,
+      totalHours: Math.round(totalHours * 100) / 100,
+      avgHoursPerDay: Math.round(avgHoursPerDay * 100) / 100,
+      attendancePercentage: totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0,
+    };
+  }
 
   // Check-in (Auto-called on login)
   async checkin(employeeId: string): Promise<Attendance> {
@@ -190,7 +403,7 @@ export class AttendanceService {
     }
   }
 
-  // Get attendance by employee and date range
+  // Get attendance by employee and date range (kept for backward compatibility)
   async getAttendanceByEmployee(
     employeeId: string,
     startDate?: string,
@@ -323,10 +536,3 @@ export class AttendanceService {
     }
   }
 }
-
-
-
-
-
-
-

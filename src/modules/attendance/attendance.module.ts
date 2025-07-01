@@ -9,11 +9,13 @@ import { UserModule } from '../tenant/users/user.module';
 import { EmployeesModule } from '../employees/employees.module';
 import { JwtStrategy } from '../auth/strategies/jwt.strategy';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
+import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Attendance.name, schema: AttendanceSchema },
+      { name: Employee.name, schema: EmployeeSchema },
     ]),
     forwardRef(() => UserModule),
     forwardRef(() => EmployeesModule),
