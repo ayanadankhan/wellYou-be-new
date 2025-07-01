@@ -16,5 +16,8 @@ import { MailModule } from '../mail/mail.module'; // ✅ import mail module
   ],
   controllers: [EmployeesController],
   providers: [EmployeesService],
+  exports: [EmployeesService], // ✅ Export EmployeesService for use in other modules
 })
-export class EmployeesModule {}
+export class EmployeesModule {
+  
+}

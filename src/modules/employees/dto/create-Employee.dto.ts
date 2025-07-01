@@ -422,15 +422,6 @@ export class DependentMemberDto {
   relation: string;
 
   @ApiProperty({ 
-    description: 'Age of the dependent member', 
-    example: 12,
-    required: true
-  })
-  @IsNumber()
-  @IsOptional()
-  age: number;
-
-  @ApiProperty({ 
     description: 'Date of birth of dependent member (YYYY-MM-DD)', 
     example: '2012-05-15',
     required: true
