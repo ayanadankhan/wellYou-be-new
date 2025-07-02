@@ -578,13 +578,13 @@ export class CreateEmployeeDto {
   departmentId: Types.ObjectId;
 
   @ApiProperty({ 
-    description: 'Manager ID', 
+    description: 'Reporting To ID', 
     example: '609e129d8e3a2c1a7890abcd',
     required: false
   })
   @IsString()
   @IsOptional()
-  managerId?: Types.ObjectId;
+  reportingTo?: Types.ObjectId;
 
   @ApiProperty({ 
     description: 'Employment status of employee', 
@@ -795,13 +795,13 @@ export class UpdateEmployeeDto {
   departmentId?: string;
 
   @ApiProperty({ 
-    description: 'Manager ID', 
+    description: 'Reporting To ID', 
     example: '609e129d8e3a2c1a7890abcd', 
     required: false 
   })
   @IsString()
   @IsOptional()
-  managerId?: string;
+  reportingTo?: string;
 
   @ApiProperty({ 
     description: 'Employment status of employee', 
