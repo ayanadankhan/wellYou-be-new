@@ -89,7 +89,6 @@ class EducationDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
   institution: string;
 
   @ApiProperty({ 
@@ -98,7 +97,6 @@ class EducationDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
   degree: string;
 
   @ApiProperty({ 
@@ -107,7 +105,6 @@ class EducationDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
   fieldOfStudy: string;
 
   @ApiProperty({ 
@@ -116,7 +113,6 @@ class EducationDto {
     required: true
   })
   @IsDateString()
-  @IsNotEmpty()
   startDate: string;
 
   @ApiProperty({ 
@@ -154,7 +150,6 @@ class EducationDto {
     required: true
   })
   @IsBoolean()
-  @IsNotEmpty()
   isEnrolled: boolean;
 
   @ApiProperty({ 
