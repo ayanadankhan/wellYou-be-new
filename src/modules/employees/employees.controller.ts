@@ -74,10 +74,10 @@ export class EmployeesController {
     description: 'Filter by position ID' 
   })
   @ApiQuery({ 
-    name: 'managerId', 
+    name: 'reportingTo', 
     required: false, 
     type: String, 
-    description: 'Filter by manager ID' 
+    description: 'Filter by Reporting To ID' 
   })
   @ApiQuery({ 
     name: 'employmentStatus', 
@@ -104,7 +104,7 @@ export class EmployeesController {
     @Query('userId') userId?: string,
     @Query('departmentId') departmentId?: string,
     @Query('positionId') positionId?: string,
-    @Query('managerId') managerId?: string,
+    @Query('reportingTo') reportingTo?: string,
     @Query('employmentStatus') employmentStatus?: EmploymentStatus,
     @Query('tenantId') tenantId?: string,
   ): Promise<GetEmployeeDto[]> {
@@ -113,7 +113,7 @@ export class EmployeesController {
         userId,
         departmentId,
         positionId,
-        managerId,
+        reportingTo,
         employmentStatus,
         tenantId
       })}`);
@@ -122,7 +122,7 @@ export class EmployeesController {
         ...(userId && { userId }),
         ...(departmentId && { departmentId }),
         ...(positionId && { positionId }),
-        ...(managerId && { managerId }),
+        ...(reportingTo && { reportingTo }),
         ...(employmentStatus && { employmentStatus }),
         ...(tenantId && { tenantId }),
       };

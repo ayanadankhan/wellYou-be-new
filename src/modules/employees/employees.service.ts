@@ -65,7 +65,7 @@ export class EmployeesService {
     userId?: string;
     departmentId?: string;
     positionId?: string;
-    managerId?: string;
+    reportingTo?: string;
     employmentStatus?: string;
     tenantId?: string;
   } = {}): Promise<GetEmployeeDto[]> {
@@ -86,8 +86,8 @@ export class EmployeesService {
         matchStage.positionId = new Types.ObjectId(query.positionId);
       }
 
-      if (query.managerId) {
-        matchStage.managerId = new Types.ObjectId(query.managerId);
+      if (query.reportingTo) {
+        matchStage.reportingTo = new Types.ObjectId(query.reportingTo);
       }
 
       if (query.employmentStatus) {
@@ -130,9 +130,9 @@ export class EmployeesService {
                 {
           $lookup: {
             from: 'users',
-            localField: 'managerId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'manager',
+            as: 'reportingTo',
           },
         },
         { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
@@ -256,9 +256,9 @@ async findEmployeeIdByUserId(userId: string): Promise<string | null> {
         {
           $lookup: {
             from: 'users',
-            localField: 'managerId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'manager',
+            as: 'reportingTo',
           },
         },
         { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
@@ -331,9 +331,9 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
         {
           $lookup: {
             from: 'users',
-            localField: 'managerId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'manager',
+            as: 'reportingTo',
           },
         },
         { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
