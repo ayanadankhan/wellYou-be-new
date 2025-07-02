@@ -654,7 +654,7 @@ export class CreateEmployeeDto {
   })
   @IsString()
   @IsNotEmpty()
-  tenantId: string;
+  tenantId: Types.ObjectId;
 }
 
 export class UpdateEmployeeDto {
@@ -872,5 +872,5 @@ export class UpdateEmployeeDto {
   })
   @IsString()
   @IsOptional()
-  tenantId?: string;
+  tenantId?: Types.ObjectId;
 }
