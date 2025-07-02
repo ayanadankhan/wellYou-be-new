@@ -176,7 +176,7 @@ export class AuthController {
    */
   @Get('users')
   @HttpCode(HttpStatus.OK)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) // Assuming you have role-based access
+  @Roles(UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN) // Assuming you have role-based access
   async findUsers(@Query() getUserDto: GetUserDto) {
     return this.authService.findUsers(getUserDto);
   }

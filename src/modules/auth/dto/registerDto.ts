@@ -3,9 +3,9 @@ import { IsEmail, IsString, MinLength, IsNotEmpty, IsEnum, IsOptional, Matches }
 import { Transform } from 'class-transformer';
 
 export enum UserRole {
-  ADMIN = 'admin',
+  SUPER_ADMIN = 'super_admin',
+  COMPANY_ADMIN = 'company_admin',
   EMPLOYEE = 'employee',
-  MANAGER = 'manager'
 }
 
 export class RegisterDto {

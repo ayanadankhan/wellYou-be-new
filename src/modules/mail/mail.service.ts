@@ -8,8 +8,8 @@ export class MailService {
     port: 587,
     secure: false,
     auth: {
-      user: 'akhtarsaharan336@gmail.com',
-      pass: 'cexe znrw yubv gzrs',
+      user: 'teambitsbuffer@gmail.com',
+      pass: 'kyco uixt ntee qupu',
     },
   });
 
@@ -17,7 +17,7 @@ export class MailService {
 async sendOtpEmail(to: string, otp: number) {
   try {
     const mailOptions = {
-      from: '"BitsBuffer" <akhtarsaharan336@gmail.com>',
+      from: '"BitsBuffer" <teambitsbuffer@gmail.com>',
       to,
       subject: 'Your Password Reset OTP',
       html: `
