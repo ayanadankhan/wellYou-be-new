@@ -216,8 +216,8 @@ export class Employee {
   @Prop({ required: true, type: String })
   ssnTaxId: string;
 
-  @Prop({ required: false, type: String })
-  tenantId: string;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'companies', default: null })
+  tenantId?: MongooseSchema.Types.ObjectId;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

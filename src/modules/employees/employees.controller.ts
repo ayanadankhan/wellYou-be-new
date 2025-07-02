@@ -5,7 +5,9 @@ import { UpdateEmployeeDto } from './dto/update-Employee.dto';
 import { GetEmployeeDto } from './dto/get-Employee.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { EmploymentStatus } from './dto/create-Employee.dto';
-
+import { Types } from 'mongoose';
+import { CurrentUser} from '@/common/decorators/user.decorator';
+import { User, UserRole, UserSchema } from '../tenant/users/schemas/user.schema';
 @ApiTags('employees')
 @Controller('employees')
 export class EmployeesController {
@@ -29,26 +31,35 @@ export class EmployeesController {
     status: 409, 
     description: 'Employee with userId already exists.' 
   })
-  async create(@Body() createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
+  async create(
+    @Body() createEmployeeDto: CreateEmployeeDto,
+    @CurrentUser() user: User
+  ): Promise<any> {
     try {
-      this.logger.log(`Creating employee with userId: ${createEmployeeDto.userId}`);
-      const result = await this.employeesService.create(createEmployeeDto);
-      this.logger.log(`Employee created successfully with ID: ${result._id}`);
-      return result;
+      if (!user.tenantId) {
+        throw new HttpException(
+          'Your account has no tenant association',
+          HttpStatus.FORBIDDEN
+        );
+      }
+
+      const employeeData = {
+        ...createEmployeeDto,
+        tenantId: new Types.ObjectId(user.tenantId),
+      };
+
+      return await this.employeesService.create(employeeData);
+      
     } catch (error) {
-      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-      const status = error.message.includes('duplicate') 
-        ? HttpStatus.CONFLICT 
-        : HttpStatus.BAD_REQUEST;
       throw new HttpException(
         {
-          status,
-          error: status === HttpStatus.CONFLICT 
-            ? 'Employee with userId already exists' 
-            : 'Failed to create employee',
+          status: error.status || HttpStatus.BAD_REQUEST,
+          error: error.message.includes('duplicate') 
+            ? 'Employee already exists' 
+            : 'Creation failed',
           message: error.message,
         },
-        status,
+        error.status || HttpStatus.BAD_REQUEST
       );
     }
   }
@@ -101,37 +112,35 @@ export class EmployeesController {
     description: 'Internal server error.' 
   })
   async findAll(
+    @CurrentUser() user: User,
     @Query('userId') userId?: string,
     @Query('departmentId') departmentId?: string,
     @Query('positionId') positionId?: string,
     @Query('reportingTo') reportingTo?: string,
-    @Query('employmentStatus') employmentStatus?: EmploymentStatus,
-    @Query('tenantId') tenantId?: string,
+    @Query('employmentStatus') employmentStatus?: string,
   ): Promise<GetEmployeeDto[]> {
     try {
-      this.logger.log(`Fetching employees with filters: ${JSON.stringify({
-        userId,
-        departmentId,
-        positionId,
-        reportingTo,
-        employmentStatus,
-        tenantId
-      })}`);
-      
-      const query = {
-        ...(userId && { userId }),
-        ...(departmentId && { departmentId }),
-        ...(positionId && { positionId }),
-        ...(reportingTo && { reportingTo }),
+      // Build base query
+      const query: any = {
+        ...(userId && { userId: new Types.ObjectId(userId) }),
+        ...(departmentId && { departmentId: new Types.ObjectId(departmentId) }),
+        ...(positionId && { positionId: new Types.ObjectId(positionId) }),
+        ...(reportingTo && { reportingTo: new Types.ObjectId(reportingTo) }),
         ...(employmentStatus && { employmentStatus }),
-        ...(tenantId && { tenantId }),
       };
 
-      const employees = await this.employeesService.findAll(query);
-      this.logger.log(`Retrieved ${employees.length} employees`);
-      return employees;
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        if (!user.tenantId) {
+          throw new HttpException(
+            'User does not have tenant access',
+            HttpStatus.FORBIDDEN
+          );
+        }
+        query.tenantId = new Types.ObjectId(user.tenantId);
+      }
+
+      return this.employeesService.findAll(query);
     } catch (error) {
-      this.logger.error(`Failed to fetch employees: ${error.message}`, error.stack);
       throw new HttpException(
         {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
