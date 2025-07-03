@@ -16,39 +16,18 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new employee' })
-  @ApiBody({ type: CreateEmployeeDto })
-  @ApiResponse({ 
-    status: 201, 
-    description: 'Employee created successfully.', 
-    type: GetEmployeeDto 
-  })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Invalid input data.' 
-  })
-  @ApiResponse({ 
-    status: 409, 
-    description: 'Employee with userId already exists.' 
-  })
-  async create(
-    @Body() createEmployeeDto: CreateEmployeeDto,
-    @CurrentUser() user: User
-  ): Promise<any> {
+  async create( @Body() createEmployeeDto: CreateEmployeeDto, @CurrentUser() user: User): Promise<any> {
     try {
       if (!user.tenantId) {
-        throw new HttpException(
-          'Your account has no tenant association',
+        throw new HttpException( 'Your account has no tenant association',
           HttpStatus.FORBIDDEN
         );
       }
-
-      const employeeData = {
-        ...createEmployeeDto,
-        tenantId: new Types.ObjectId(user.tenantId),
+      if (user && user.tenantId) {
+        createEmployeeDto.tenantId = new Types.ObjectId(user.tenantId)
       };
 
-      return await this.employeesService.create(employeeData);
+      return await this.employeesService.create(createEmployeeDto);
       
     } catch (error) {
       throw new HttpException(
@@ -65,70 +44,8 @@ export class EmployeesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Retrieve all employees with optional filtering' })
-  @ApiQuery({ 
-    name: 'userId', 
-    required: false, 
-    type: String, 
-    description: 'Filter by userId (exact match)' 
-  })
-  @ApiQuery({ 
-    name: 'departmentId', 
-    required: false, 
-    type: String, 
-    description: 'Filter by department ID' 
-  })
-  @ApiQuery({ 
-    name: 'positionId', 
-    required: false, 
-    type: String, 
-    description: 'Filter by position ID' 
-  })
-  @ApiQuery({ 
-    name: 'reportingTo', 
-    required: false, 
-    type: String, 
-    description: 'Filter by Reporting To ID' 
-  })
-  @ApiQuery({ 
-    name: 'employmentStatus', 
-    required: false, 
-    enum: EmploymentStatus,
-    description: 'Filter by employment status' 
-  })
-  @ApiQuery({ 
-    name: 'tenantId', 
-    required: false, 
-    type: String, 
-    description: 'Filter by tenant ID' 
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'List of employees.', 
-    type: [GetEmployeeDto] 
-  })
-  @ApiResponse({ 
-    status: 500, 
-    description: 'Internal server error.' 
-  })
-  async findAll(
-    @CurrentUser() user: User,
-    @Query('userId') userId?: string,
-    @Query('departmentId') departmentId?: string,
-    @Query('positionId') positionId?: string,
-    @Query('reportingTo') reportingTo?: string,
-    @Query('employmentStatus') employmentStatus?: string,
-  ): Promise<GetEmployeeDto[]> {
+  async findAll(@CurrentUser() user: User, @Query() getDto: GetEmployeeDto){
     try {
-      // Build base query
-      const query: any = {
-        ...(userId && { userId: new Types.ObjectId(userId) }),
-        ...(departmentId && { departmentId: new Types.ObjectId(departmentId) }),
-        ...(positionId && { positionId: new Types.ObjectId(positionId) }),
-        ...(reportingTo && { reportingTo: new Types.ObjectId(reportingTo) }),
-        ...(employmentStatus && { employmentStatus }),
-      };
-
       if (user.role !== UserRole.SUPER_ADMIN) {
         if (!user.tenantId) {
           throw new HttpException(
@@ -136,10 +53,10 @@ export class EmployeesController {
             HttpStatus.FORBIDDEN
           );
         }
-        query.tenantId = new Types.ObjectId(user.tenantId);
+        getDto.tenantId = new Types.ObjectId(user.tenantId);
       }
 
-      return this.employeesService.findAll(query);
+      return this.employeesService.findAll(getDto);
     } catch (error) {
       throw new HttpException(
         {
@@ -154,20 +71,7 @@ export class EmployeesController {
 
   @Get('user/:userId')
   @ApiOperation({ summary: 'Retrieve an employee by userId' })
-  @ApiParam({ 
-    name: 'userId', 
-    description: 'User ID of the employee',
-    example: 'user123'
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Employee found.', 
-    type: GetEmployeeDto 
-  })
-  @ApiResponse({ 
-    status: 404, 
-    description: 'Employee not found.' 
-  })
+  @ApiParam({ name: 'userId', description: 'User ID of the employee', example: 'user123' })
   async findByUserId(@Param('userId') userId: string): Promise<GetEmployeeDto> {
     try {
       this.logger.log(`Fetching employee with userId: ${userId}`);
@@ -208,23 +112,6 @@ export class EmployeesController {
   description: 'User ID of the employee',
   example: 'user123'
 })
-@ApiResponse({
-  status: 200,
-  description: 'Employee ID found.',
-  schema: {
-    type: 'object',
-    properties: {
-      employeeId: {
-        type: 'string',
-        example: 'emp456'
-      }
-    }
-  }
-})
-@ApiResponse({
-  status: 404,
-  description: 'Employee not found.'
-})
 async findEmployeeIdByUserId(@Param('userId') userId: string): Promise<{ employeeId: string }> {
   try {
     this.logger.log(`Fetching employee ID with userId: ${userId}`);
@@ -264,15 +151,6 @@ async findEmployeeIdByUserId(@Param('userId') userId: string): Promise<{ employe
     name: 'id', 
     description: 'MongoDB ObjectID of the employee',
     example: '507f1f77bcf86cd799439011'
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Employee found.', 
-    type: GetEmployeeDto 
-  })
-  @ApiResponse({ 
-    status: 404, 
-    description: 'Employee not found.' 
   })
   async findOne(@Param('id') id: string): Promise<GetEmployeeDto> {
     try {
