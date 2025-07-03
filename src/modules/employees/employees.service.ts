@@ -61,41 +61,34 @@ export class EmployeesService {
     }
   }
 
-  async findAll(query: {
-    userId?: string;
-    departmentId?: string;
-    positionId?: string;
-    reportingTo?: string;
-    employmentStatus?: string;
-    tenantId?: string;
-  } = {}): Promise<GetEmployeeDto[]> {
+  async findAll (getDto: GetEmployeeDto): Promise<GetEmployeeDto[]> {
     try {
-      this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(query)}`);
+      this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(getDto)}`);
 
       const matchStage: any = {};
 
-      if (query.userId) {
-        matchStage.userId = new Types.ObjectId(query.userId);
+      if (getDto.userId) {
+        matchStage.userId = new Types.ObjectId(getDto.userId);
       }
 
-      if (query.departmentId) {
-        matchStage.departmentId = new Types.ObjectId(query.departmentId);
+      if (getDto.departmentId) {
+        matchStage.departmentId = new Types.ObjectId(getDto.departmentId);
       }
 
-      if (query.positionId) {
-        matchStage.positionId = new Types.ObjectId(query.positionId);
+      if (getDto.positionId) {
+        matchStage.positionId = new Types.ObjectId(getDto.positionId);
       }
 
-      if (query.reportingTo) {
-        matchStage.reportingTo = new Types.ObjectId(query.reportingTo);
+      if (getDto.reportingTo) {
+        matchStage.reportingTo = new Types.ObjectId(getDto.reportingTo);
       }
 
-      if (query.employmentStatus) {
-        matchStage.employmentStatus = query.employmentStatus;
+      if (getDto.employmentStatus) {
+        matchStage.employmentStatus = getDto.employmentStatus;
       }
 
-      if (query.tenantId) {
-        matchStage.tenantId = new Types.ObjectId(query.tenantId);
+      if (getDto.tenantId) {
+        matchStage.tenantId = new Types.ObjectId(getDto.tenantId);
       }
 
       const employees = await this.employeeModel.aggregate([
@@ -135,7 +128,7 @@ export class EmployeesService {
             as: 'reportingTo',
           },
         },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         {
           $project: {
             'user.password': 0,
@@ -261,7 +254,7 @@ async findEmployeeIdByUserId(userId: string): Promise<string | null> {
             as: 'reportingTo',
           },
         },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         { $project: { 'user.password': 0 } },
         { $limit: 1 }
       ]);
@@ -336,7 +329,7 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
             as: 'reportingTo',
           },
         },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: 'salaries',

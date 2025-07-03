@@ -30,16 +30,16 @@ class Education {
   @Prop({ required: true, type: String })
   id: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   institution: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   degree: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   fieldOfStudy: string;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ required: false, type: Date })
   startDate: Date;
 
   @Prop({ type: Date })
@@ -164,6 +164,9 @@ export class Employee {
 
   @Prop({ required: true, type: String, enum: Gender })
   gender: Gender;
+
+  @Prop({ type: String, enum: EmploymentType })
+  employmentType?: EmploymentType;
 
   @Prop({ required: true, type: String, enum: MaritalStatus })
   maritalStatus: MaritalStatus;
