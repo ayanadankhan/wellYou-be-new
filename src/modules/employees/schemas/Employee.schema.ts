@@ -30,16 +30,16 @@ class Education {
   @Prop({ required: true, type: String })
   id: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   institution: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   degree: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   fieldOfStudy: string;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ required: false, type: Date })
   startDate: Date;
 
   @Prop({ type: Date })
@@ -165,6 +165,9 @@ export class Employee {
   @Prop({ required: true, type: String, enum: Gender })
   gender: Gender;
 
+  @Prop({ type: String, enum: EmploymentType })
+  employmentType?: EmploymentType;
+
   @Prop({ required: true, type: String, enum: MaritalStatus })
   maritalStatus: MaritalStatus;
 
@@ -193,7 +196,7 @@ export class Employee {
   departmentId?: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'users', default: null })
-  managerId?: MongooseSchema.Types.ObjectId;
+  reportingTo?: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, type: String, enum: EmploymentStatus })
   employmentStatus: EmploymentStatus;
@@ -216,8 +219,8 @@ export class Employee {
   @Prop({ required: true, type: String })
   ssnTaxId: string;
 
-  @Prop({ required: false, type: String })
-  tenantId: string;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'companies', default: null })
+  tenantId?: MongooseSchema.Types.ObjectId;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

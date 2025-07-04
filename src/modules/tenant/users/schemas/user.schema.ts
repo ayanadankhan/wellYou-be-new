@@ -8,8 +8,7 @@ export type UserDocument = User & Document;
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
-  ADMIN = 'admin', // Tenant Admin
-  MANAGER = 'manager',
+  COMPANY_ADMIN = 'company_admin',
   EMPLOYEE = 'employee',
 }
 
@@ -33,7 +32,6 @@ export class User extends BaseDto {
   @Prop({ type: String, enum: UserRole, default: UserRole.EMPLOYEE })
   role: UserRole;
 
-  // Tenant ID will be null for SUPER_ADMIN, required for other roles
   @Prop({ type: Types.ObjectId, ref: 'Company', required: false, default: null })
   tenantId?: Types.ObjectId;
 
@@ -49,7 +47,6 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.pre('save', async function (next) {
   const user = this as UserDocument;
 
-  // Only hash if the password is new or modified
   if (!user.isModified('password')) return next();
 
   try {

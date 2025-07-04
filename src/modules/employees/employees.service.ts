@@ -61,41 +61,34 @@ export class EmployeesService {
     }
   }
 
-  async findAll(query: {
-    userId?: string;
-    departmentId?: string;
-    positionId?: string;
-    managerId?: string;
-    employmentStatus?: string;
-    tenantId?: string;
-  } = {}): Promise<GetEmployeeDto[]> {
+  async findAll (getDto: GetEmployeeDto): Promise<GetEmployeeDto[]> {
     try {
-      this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(query)}`);
+      this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(getDto)}`);
 
       const matchStage: any = {};
 
-      if (query.userId) {
-        matchStage.userId = new Types.ObjectId(query.userId);
+      if (getDto.userId) {
+        matchStage.userId = new Types.ObjectId(getDto.userId);
       }
 
-      if (query.departmentId) {
-        matchStage.departmentId = new Types.ObjectId(query.departmentId);
+      if (getDto.departmentId) {
+        matchStage.departmentId = new Types.ObjectId(getDto.departmentId);
       }
 
-      if (query.positionId) {
-        matchStage.positionId = new Types.ObjectId(query.positionId);
+      if (getDto.positionId) {
+        matchStage.positionId = new Types.ObjectId(getDto.positionId);
       }
 
-      if (query.managerId) {
-        matchStage.managerId = new Types.ObjectId(query.managerId);
+      if (getDto.reportingTo) {
+        matchStage.reportingTo = new Types.ObjectId(getDto.reportingTo);
       }
 
-      if (query.employmentStatus) {
-        matchStage.employmentStatus = query.employmentStatus;
+      if (getDto.employmentStatus) {
+        matchStage.employmentStatus = getDto.employmentStatus;
       }
 
-      if (query.tenantId) {
-        matchStage.tenantId = new Types.ObjectId(query.tenantId);
+      if (getDto.tenantId) {
+        matchStage.tenantId = new Types.ObjectId(getDto.tenantId);
       }
 
       const employees = await this.employeeModel.aggregate([
@@ -130,12 +123,12 @@ export class EmployeesService {
                 {
           $lookup: {
             from: 'users',
-            localField: 'managerId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'manager',
+            as: 'reportingTo',
           },
         },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         {
           $project: {
             'user.password': 0,
@@ -157,24 +150,23 @@ export class EmployeesService {
       );
     }
   }
-async findEmployeeIdByUserId(userId: string): Promise<string | null> {
-  try {
-    this.logger.log(`Searching for employee ID with userId: ${userId}`);
-    this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
+
+  async findEmployeeIdByUserId(userId: string): Promise<string | null> {
+    try {
+      this.logger.log(`Searching for employee ID with userId: ${userId}`);
+      this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
+
+      const mongoose = require('mongoose');
     
-    // Convert string userId to ObjectId for MongoDB comparison
-    const mongoose = require('mongoose');
-    
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
       this.logger.warn(`Invalid ObjectId format: ${userId}`);
       return null;
-    }
+      }
     
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
-    
-    // Query using Mongoose syntax (since you're using MongoDB with Mongoose)
-    const employee = await this.employeeModel.findOne({ 
+      const userObjectId = new mongoose.Types.ObjectId(userId);
+      this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
+
+      const employee = await this.employeeModel.findOne({ 
       userId: userObjectId 
     }).select('_id userId');
     
@@ -256,12 +248,12 @@ async findEmployeeIdByUserId(userId: string): Promise<string | null> {
         {
           $lookup: {
             from: 'users',
-            localField: 'managerId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'manager',
+            as: 'reportingTo',
           },
         },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         { $project: { 'user.password': 0 } },
         { $limit: 1 }
       ]);
@@ -331,12 +323,12 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
         {
           $lookup: {
             from: 'users',
-            localField: 'managerId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'manager',
+            as: 'reportingTo',
           },
         },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: 'salaries',

@@ -1,8 +1,10 @@
 // src/modules/auth/dto/change-password.dto.ts
-import { IsString, MinLength, IsNotEmpty, Matches } from 'class-validator';
+import {  IsNotEmpty, IsEmail } from 'class-validator';
 
 export class ForgotPasswordDto {
-  @IsString({ message: 'email must be a email' })
+ @IsEmail({}, { message: 'email must be a valid email' })
   @IsNotEmpty({ message: 'email is required' })
   email: string;
+
+  
 }

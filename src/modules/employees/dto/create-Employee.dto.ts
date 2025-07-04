@@ -89,7 +89,7 @@ class EducationDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   institution: string;
 
   @ApiProperty({ 
@@ -98,7 +98,7 @@ class EducationDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   degree: string;
 
   @ApiProperty({ 
@@ -107,7 +107,7 @@ class EducationDto {
     required: true
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   fieldOfStudy: string;
 
   @ApiProperty({ 
@@ -116,7 +116,7 @@ class EducationDto {
     required: true
   })
   @IsDateString()
-  @IsNotEmpty()
+  @IsOptional()
   startDate: string;
 
   @ApiProperty({ 
@@ -154,7 +154,6 @@ class EducationDto {
     required: true
   })
   @IsBoolean()
-  @IsNotEmpty()
   isEnrolled: boolean;
 
   @ApiProperty({ 
@@ -469,6 +468,16 @@ export class CreateEmployeeDto {
   coverPicture?: string;
 
   @ApiProperty({ 
+    description: 'Type of employment', 
+    example: EmploymentType.FULL_TIME,
+    enum: EmploymentType,
+    required: false 
+  })
+  @IsEnum(EmploymentType)
+  @IsOptional()
+  employmentType?: EmploymentType;
+
+  @ApiProperty({ 
     description: 'Gender of employee', 
     example: Gender.FEMALE,
     enum: Gender,
@@ -578,13 +587,13 @@ export class CreateEmployeeDto {
   departmentId: Types.ObjectId;
 
   @ApiProperty({ 
-    description: 'Manager ID', 
+    description: 'Reporting To ID', 
     example: '609e129d8e3a2c1a7890abcd',
     required: false
   })
   @IsString()
   @IsOptional()
-  managerId?: Types.ObjectId;
+  reportingTo?: Types.ObjectId;
 
   @ApiProperty({ 
     description: 'Employment status of employee', 
@@ -652,9 +661,8 @@ export class CreateEmployeeDto {
     example: '684936da00d419b8ac546d00',
     required: false
   })
-  @IsString()
-  @IsNotEmpty()
-  tenantId: string;
+  @IsOptional()
+  tenantId: Types.ObjectId;
 }
 
 export class UpdateEmployeeDto {
@@ -684,6 +692,16 @@ export class UpdateEmployeeDto {
   @IsString()
   @IsOptional()
   coverPicture?: string;
+
+  @ApiProperty({ 
+    description: 'Type of employment', 
+    example: EmploymentType.FULL_TIME,
+    enum: EmploymentType,
+    required: false 
+  })
+  @IsEnum(EmploymentType)
+  @IsOptional()
+  employmentType?: EmploymentType;
 
   @ApiProperty({ 
     description: 'Gender of employee', 
@@ -795,13 +813,13 @@ export class UpdateEmployeeDto {
   departmentId?: string;
 
   @ApiProperty({ 
-    description: 'Manager ID', 
+    description: 'Reporting To ID', 
     example: '609e129d8e3a2c1a7890abcd', 
     required: false 
   })
   @IsString()
   @IsOptional()
-  managerId?: string;
+  reportingTo?: string;
 
   @ApiProperty({ 
     description: 'Employment status of employee', 
@@ -864,13 +882,11 @@ export class UpdateEmployeeDto {
   @IsOptional()
   ssnTaxId?: string;
 
-
   @ApiProperty({ 
     description: 'Tenant ID', 
     example: '684936da00d419b8ac546d00', 
     required: false 
   })
-  @IsString()
   @IsOptional()
-  tenantId?: string;
+  tenantId?: Types.ObjectId;
 }

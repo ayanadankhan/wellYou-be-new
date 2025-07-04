@@ -34,25 +34,18 @@ export class UserController {constructor(private readonly userService: UserServi
 
 @Post()
 async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
-  
   if (!user) {
     throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
   }
-
-  // Only set tenantId from token if admin/super_admin is creating the user
   if (user.role !== UserRole.SUPER_ADMIN) {
     createUserDto.tenantId = user.tenantId?.toString();
   }
-  
   return this.userService.create(createUserDto);
 }
 
   @Get()
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get all users' })
-  @ApiResponse({ status: 200, description: 'Return all users.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
   findAll(@CurrentUser() user: User) {
     // Validate user authentication
     // if (!req.user) {
@@ -72,10 +65,6 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   @Get(':id')
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get user by ID' })
-  @ApiResponse({ status: 200, description: 'Return the user.' })
-  @ApiResponse({ status: 404, description: 'User not found.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
   findOne(@Param('id', ParseObjectIdPipe) id: string, @Req() req: AuthenticatedRequest) {
     // Validate user authentication
     if (!req.user) {
@@ -95,10 +84,6 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   @Patch(':id')
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Super Admin or Tenant Admin can update users
   @ApiOperation({ summary: 'Update user by ID' })
-  @ApiResponse({ status: 200, description: 'The user has been successfully updated.' })
-  @ApiResponse({ status: 404, description: 'User not found.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
   update(
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
@@ -117,10 +102,6 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Super Admin or Tenant Admin can delete users
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete user by ID' })
-  @ApiResponse({ status: 204, description: 'The user has been successfully deleted.' })
-  @ApiResponse({ status: 404, description: 'User not found.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
   remove(@Param('id', ParseObjectIdPipe) id: string, @Req() req: AuthenticatedRequest) {
     // Validate user authentication
     if (!req.user) {
