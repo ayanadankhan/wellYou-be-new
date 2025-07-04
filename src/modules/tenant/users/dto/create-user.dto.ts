@@ -1,6 +1,6 @@
 
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsEmail, MinLength, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, MinLength, IsEnum, IsOptional, IsArray } from 'class-validator';
 import { UserRole } from '../schemas/user.schema';
 // import { Types } from 'mongoose'; // Removed for MVP simplicity
 
@@ -33,6 +33,18 @@ export class CreateUserDto {
 
   @ApiProperty({ example: '654321098765432109876543', description: 'ID of the tenant/company the user belongs to', required: false })
   @IsOptional()
-  @IsString() // Validate as string, ParseObjectIdPipe will convert
-  tenantId?: string; // Super Admin can assign a tenantId
+  @IsString()
+  tenantId?: string;
+
+  @ApiProperty({
+    example: ['create_user', 'delete_user'],
+    description: 'Array of permissions assigned to the user',
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true, message: 'Each permission must be a string' })
+  permissions?: string[];
+
 }
