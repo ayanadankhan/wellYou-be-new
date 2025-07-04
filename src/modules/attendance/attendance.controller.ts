@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
 import { EmployeesService } from '../employees/employees.service';
+import { UserAccessLoggingSettings } from 'aws-sdk/clients/workspacesweb';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -73,75 +74,40 @@ export class AttendanceController {
     }
   }
 
-  // attendance.controller.ts - Updated method with data formatting
+ @Get('employee') // Consider renaming this endpoint to something more general like '/my-team' or '/records'
+  async getEmployeeAttendance(
+    @CurrentUser() user: User, // This decorator provides the user object
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    console.log("CurrentUser object:", user); // Log the full user object to verify _id and role
 
-  @Get('employee')
-  @ApiOperation({ summary: 'Get attendance records for an employee' })
-  @ApiParam({ name: 'employeeId', description: 'Employee ID' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Start date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'End date (YYYY-MM-DD)' })
-  @ApiResponse({ status: 200, description: 'Attendance records retrieved successfully' })
- async getEmployeeAttendance(
-  @CurrentUser() user: User, // Assuming User is an interface/type that includes role
-  @Query('startDate') startDate?: string,
-  @Query('endDate') endDate?: string,
-) {
-  let employeeId: string;
-  let userRole: string = 'unknown'; // Initialize with a default
+    try {
+      // Call the new service method that handles role-based logic
+      const rawData = await this.attendanceService.getRoleBasedAttendance(
+        { ...(user as any), _id: (user as any)._id },
+        startDate,
+        endDate,
+      );
 
-  try {
-    // Attempt to extract employeeId and userRole safely
-    if (user && (user as any)._id) {
-      employeeId = (user as any)._id;
-    } else {
-      // Handle cases where _id might be missing or user is undefined
-      this.logger.warn('User object or _id is missing from the token. Cannot determine employeeId.');
-      throw new Error('User information incomplete.'); // Or handle as appropriate for your application
+      // Assuming these methods are part of the controller or another service
+      // For now, keep them here as you had them.
+      const formattedData = this.formatAttendanceData(rawData); // Implement or move this
+      const monthlyStats = this.calculateMonthlyStats(rawData); // Implement or move this
+
+      return {
+        success: true,
+        message: 'Attendance records retrieved successfully',
+        data: formattedData,
+        monthlyStats,
+        count: rawData.length,
+      };
+    } catch (error) {
+    
+      // Re-throw BadRequestException for client-side errors, generic error for others
+      throw error;
     }
-
-    // Assuming the user object directly contains a 'role' property
-    if (user && (user as any).role) {
-      userRole = (user as any).role;
-    } else {
-      this.logger.warn('User role not found in token.');
-    }
-
-    this.logger.log(`Fetching attendance for user ID: ${employeeId}, Role: ${userRole}`); // Log both ID and role
-
-  } catch (error) {
-    this.logger.error(`Error extracting user or role from token: ${error.message}`);
-    // Depending on your application's security requirements, you might want to:
-    // 1. Re-throw the error to stop further execution if user identification is critical.
-    // 2. Return an error response to the client.
-    throw new Error('Authentication information is incomplete or invalid.');
   }
-
-  try {
-    this.logger.log(`Fetching attendance for employee: ${employeeId}`);
-    const rawData = await this.attendanceService.getAttendanceByEmployee(
-      employeeId,
-      startDate,
-      endDate,
-    );
-
-    // Transform raw data to frontend-compatible format
-    const formattedData = this.formatAttendanceData(rawData);
-
-    // Calculate monthly statistics
-    const monthlyStats = this.calculateMonthlyStats(rawData);
-
-    return {
-      success: true,
-      message: 'Attendance records retrieved successfully',
-      data: formattedData,
-      monthlyStats,
-      count: rawData.length,
-    };
-  } catch (error) {
-    this.logger.error('Get employee attendance failed:', error.message);
-    throw error;
-  }
-}
 
 
   /**

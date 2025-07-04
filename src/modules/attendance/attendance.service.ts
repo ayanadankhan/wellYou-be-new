@@ -8,6 +8,7 @@ import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
 
 // Assuming you have an Employee model - adjust import path as needed
 import { Employee, EmployeeSchema, EmployeeDocument } from '../employees/schemas/Employee.schema';
+import { User } from '../tenant/users/schemas/user.schema';
 
 interface AttendanceResponse {
   success: boolean;
@@ -404,39 +405,219 @@ export class AttendanceService {
   }
 
   // Get attendance by employee and date range (kept for backward compatibility)
-  async getAttendanceByEmployee(
-    employeeId: string,
+ async getAttendanceByEmployee( // Renaming this method to be clearer about what ID it expects is a good idea
+                                  // but for now, let's keep the name as you provided it and adjust logic.
+    incomingIdFromController: string, // Changed parameter name to avoid confusion with the actual employeeId
     startDate?: string,
     endDate?: string,
   ): Promise<Attendance[]> {
     try {
-      this.logger.log(`Fetching attendance for employee: ${employeeId}`);
+      this.logger.log(`Received ID from controller: ${incomingIdFromController}`);
 
-      if (!Types.ObjectId.isValid(employeeId)) {
-        throw new BadRequestException('Invalid employee ID format');
+      // 1. Determine if the incomingId is a userId or an employeeId (based on your context, it's a userId)
+      //    We need to fetch the actual employeeId from the Employee collection using this userId.
+
+      if (!Types.ObjectId.isValid(incomingIdFromController)) {
+        this.logger.warn(`Invalid ID format received: ${incomingIdFromController}`);
+        throw new BadRequestException('Invalid ID format');
       }
 
-      const query: any = { employeeId: new Types.ObjectId(employeeId) };
+      let actualEmployeeId: Types.ObjectId;
+
+      // Find the employee using the incoming ID as a userId
+      const employee = await this.employeeModel.findOne({ userId: new Types.ObjectId(incomingIdFromController) }).exec();
+
+      if (!employee) {
+        this.logger.warn(`No employee found for userId: ${incomingIdFromController}. Cannot fetch attendance.`);
+        // If no employee is found for the given userId, there are no attendance records to fetch.
+        return [];
+      }
+
+      actualEmployeeId = employee._id; // This is the correct employeeId!
+
+      // --- You wanted to fetch and log the employeeId, here it is: ---
+      this.logger.log(`Fetched employeeId: ${actualEmployeeId.toHexString()} from userId: ${incomingIdFromController}`);
+      // <<<<<<<<<<<<< This is the log you were asking for
+
+      // 2. Now use the actualEmployeeId to query the attendance model
+      const query: any = { employeeId: actualEmployeeId }; // Use the correctly obtained employeeId
+
+      this.logger.log(`Querying attendance for employee: ${actualEmployeeId.toHexString()} with date range: ${startDate || 'undefined'} to ${endDate || 'undefined'}`);
 
       // Add date range filter if provided
       if (startDate || endDate) {
         query.date = {};
-        if (startDate) query.date.$gte = new Date(startDate);
-        if (endDate) query.date.$lte = new Date(endDate);
+        if (startDate) {
+          const start = new Date(startDate);
+          if (isNaN(start.getTime())) {
+            this.logger.warn(`Invalid startDate format: ${startDate}`);
+            throw new BadRequestException('Invalid start date format');
+          }
+          query.date.$gte = start;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          if (isNaN(end.getTime())) {
+            this.logger.warn(`Invalid endDate format: ${endDate}`);
+            throw new BadRequestException('Invalid end date format');
+          }
+          end.setHours(23, 59, 59, 999); // Include the entire end day
+          query.date.$lte = end;
+        }
       }
+      
+      this.logger.log(`MongoDB Attendance Query: ${JSON.stringify(query)}`);
 
-      const attendance = await this.attendanceModel
-        .find(query)
-        .sort({ date: -1 })
-        .exec();
-
-      this.logger.log(`Found ${attendance.length} attendance records`);
+      const attendance = await this.attendanceModel.find(query).sort({ date: -1 }).exec();
+      
+      this.logger.log(`Found ${attendance.length} attendance records for employee ${actualEmployeeId.toHexString()}`);
       return attendance;
+
     } catch (error) {
-      this.logger.error(`Get attendance failed for employee ${employeeId}:`, error.message);
-      throw error;
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Get attendance failed for ID ${incomingIdFromController}:`, error.message, error.stack);
+      throw new Error('Internal server error while fetching attendance.');
     }
   }
+
+async getRoleBasedAttendance(
+    user: any,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<Attendance[]> {
+    const userId = user._id; // This is the userId of the logged-in user
+    const userRole = user.role;
+
+    this.logger.log(`Initiating role-based attendance fetch for userId: ${userId}, role: ${userRole}`);
+
+    if (!Types.ObjectId.isValid(userId)) {
+      this.logger.warn(`Invalid user ID format received: ${userId}`);
+      throw new BadRequestException('Invalid user ID format');
+    }
+
+    let employeeIdsToQuery: Types.ObjectId[] = [];
+    let currentEmployeeId: Types.ObjectId | null = null; // The employeeId corresponding to the current userId
+
+    // --- Step 1: Find the current user's corresponding Employee ID ---
+    // Every user, regardless of role, should ideally have an associated employee record.
+    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId) }).exec();
+
+    if (!currentUserEmployee) {
+      this.logger.warn(`No employee record found for userId: ${userId}. User may not be an employee or record is missing.`);
+      return [];
+    }
+    currentEmployeeId = currentUserEmployee._id; // This is the employee ID of the logged-in user
+
+    this.logger.log(`Mapped userId: ${userId} to current user's employeeId: ${currentEmployeeId.toHexString()}`);
+
+    // --- Step 2: Determine which employee IDs to query based on role ---
+    switch (userRole) {
+      case 'employee':
+        // Scenario 1: Employee Role - Fetch only their own record
+        this.logger.log(`Role: 'employee'. Fetching attendance for own employeeId: ${currentEmployeeId.toHexString()}`);
+        employeeIdsToQuery.push(currentEmployeeId);
+        break;
+
+      case 'manager':
+        // Scenario 2: Manager Role - Fetch own record + team members' records
+        this.logger.log(`Role: 'manager'. Fetching attendance for manager's own employeeId: ${currentEmployeeId.toHexString()}`);
+        employeeIdsToQuery.push(currentEmployeeId); // Add manager's own employee ID
+
+        // CORRECTED LINE: Find team members where managerId matches the manager's userId
+        // Based on your instruction: "use this Mapped userId: 685cd556506fd3148c46e0db to current user's to find its team members"
+        this.logger.log(`Searching for team members where their 'managerId' field matches the manager's userId: ${userId}`);
+        const teamMembers = await this.employeeModel.find({ managerId: new Types.ObjectId(userId) }).select('_id').exec();
+        
+        if (teamMembers.length > 0) {
+          const teamMemberIds = teamMembers.map(member => member._id);
+          employeeIdsToQuery.push(...teamMemberIds); // Add all team members' employee IDs
+          this.logger.log(`Found ${teamMemberIds.length} team members whose managerId is manager's userId: ${userId}. Team member IDs: [${teamMemberIds.map(id => id.toHexString()).join(', ')}]`);
+        } else {
+          this.logger.log(`No team members found for manager's userId: ${userId}`);
+        }
+        break;
+
+      case 'admin':
+        // Scenario 3: Admin Role - Fetch all employees' records
+        this.logger.log(`Role: 'admin'. Fetching attendance for ALL employees.`);
+        const allEmployees = await this.employeeModel.find({}).select('_id').exec();
+        employeeIdsToQuery = allEmployees.map(employee => employee._id);
+        this.logger.log(`Found ${employeeIdsToQuery.length} total employees.`);
+        break;
+
+      default:
+        this.logger.warn(`Unsupported user role: ${userRole} for userId: ${userId}. Returning empty attendance.`);
+        return []; // Or throw a specific error
+    }
+
+    // Ensure unique employee IDs in case of duplicates
+    employeeIdsToQuery = [...new Set(employeeIdsToQuery.map(id => id.toHexString()))].map(id => new Types.ObjectId(id));
+    this.logger.log(`Final unique employee IDs to query for attendance: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`);
+
+    if (employeeIdsToQuery.length === 0) {
+      this.logger.log('No employee IDs to query after role-based determination. Returning empty attendance.');
+      return [];
+    }
+
+    // --- Step 3: Determine effective date range (default to current month) ---
+    let effectiveStartDate: Date;
+    let effectiveEndDate: Date;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      if (isNaN(start.getTime())) {
+        this.logger.warn(`Invalid startDate format: ${startDate}`);
+        throw new BadRequestException('Invalid start date format');
+      }
+      if (isNaN(end.getTime())) {
+        this.logger.warn(`Invalid endDate format: ${endDate}`);
+        throw new BadRequestException('Invalid end date format');
+      }
+
+      effectiveStartDate = start;
+      end.setHours(23, 59, 59, 999); // Include the entire end day
+      effectiveEndDate = end;
+
+      this.logger.log(`Using provided date range: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
+
+    } else {
+      const now = new Date();
+      effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      effectiveStartDate.setHours(0, 0, 0, 0);
+
+      effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      effectiveEndDate.setHours(23, 59, 59, 999);
+
+      this.logger.log(`Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
+    }
+
+    // --- Step 4: Construct and execute the MongoDB query ---
+    try {
+      const query: any = {
+        employeeId: { $in: employeeIdsToQuery }, // Use $in operator for multiple employee IDs
+        date: {
+          $gte: effectiveStartDate,
+          $lte: effectiveEndDate,
+        },
+      };
+
+      this.logger.log(`MongoDB Attendance Query: ${JSON.stringify(query)}`);
+
+      const attendance = await this.attendanceModel.find(query).sort({ date: -1 }).exec();
+      
+      this.logger.log(`Found ${attendance.length} attendance records.`);
+      return attendance;
+
+    } catch (error) {
+      this.logger.error(`Error querying attendance records for employeeIds: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`, error.message, error.stack);
+      throw new Error('Internal server error while fetching attendance records.');
+    }
+  }
+
 
   // Get today's attendance for an employee
   async getTodayAttendance(employeeId: string): Promise<Attendance | null> {
