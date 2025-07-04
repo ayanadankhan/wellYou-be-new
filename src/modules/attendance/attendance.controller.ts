@@ -13,6 +13,7 @@ import {
   HttpStatus,
   HttpCode,
   Req,
+  Patch,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -368,7 +369,7 @@ async getTodayAttendance(
     }
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update attendance record (Admin only)' })
   @ApiParam({ name: 'id', description: 'Attendance record ID' })
   @ApiResponse({ status: 200, description: 'Attendance record updated successfully' })

@@ -150,24 +150,23 @@ export class EmployeesService {
       );
     }
   }
-async findEmployeeIdByUserId(userId: string): Promise<string | null> {
-  try {
-    this.logger.log(`Searching for employee ID with userId: ${userId}`);
-    this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
+
+  async findEmployeeIdByUserId(userId: string): Promise<string | null> {
+    try {
+      this.logger.log(`Searching for employee ID with userId: ${userId}`);
+      this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
+
+      const mongoose = require('mongoose');
     
-    // Convert string userId to ObjectId for MongoDB comparison
-    const mongoose = require('mongoose');
-    
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
       this.logger.warn(`Invalid ObjectId format: ${userId}`);
       return null;
-    }
+      }
     
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
-    
-    // Query using Mongoose syntax (since you're using MongoDB with Mongoose)
-    const employee = await this.employeeModel.findOne({ 
+      const userObjectId = new mongoose.Types.ObjectId(userId);
+      this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
+
+      const employee = await this.employeeModel.findOne({ 
       userId: userObjectId 
     }).select('_id userId');
     
