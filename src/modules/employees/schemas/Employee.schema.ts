@@ -14,6 +14,9 @@ class Document {
 
   @Prop({ required: true, type: String })
   url: string;
+
+  @Prop({ required: true, type: String })
+  managerId: string;
 }
 
 @Schema({ _id: false })
@@ -173,6 +176,9 @@ export class Employee {
 
   @Prop({ required: true, type: String })
   phoneNumber: string;
+
+  @Prop({ required: true, type: Number })
+  progress: number;
 
   @Prop({ required: true, type: String })
   location: string;

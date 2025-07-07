@@ -507,6 +507,14 @@ export class CreateEmployeeDto {
   phoneNumber: string;
 
   @ApiProperty({ 
+    description: 'Progress of employee', 
+    example: 100,
+    required: true
+  })
+  @IsNotEmpty()
+  progress: number;
+
+  @ApiProperty({ 
     description: 'Location of employee', 
     example: 'Punjab, Pakistan',
     required: true
@@ -731,6 +739,14 @@ export class UpdateEmployeeDto {
   @IsString()
   @IsOptional()
   phoneNumber?: string;
+
+  @ApiProperty({ 
+    description: 'Progress of employee', 
+    example: 100,
+    required: true
+  })
+  @IsNotEmpty()
+  progress: number;
 
   @ApiProperty({ 
     description: 'Location of employee', 
