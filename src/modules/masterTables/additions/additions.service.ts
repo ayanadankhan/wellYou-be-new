@@ -1,10 +1,11 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Addition, AdditionSchema } from './entities/addition.entity';
 import { CreateAdditionDto } from './dto/create-addition.dto';
 import { UpdateAdditionDto } from './dto/update-addition.dto';
 import { isValidObjectId } from 'mongoose';
+import { GetAdditionDto } from './dto/get-addition.dto';
 
 @Injectable()
 export class AdditionsService {
@@ -34,29 +35,36 @@ export class AdditionsService {
     }
   }
 
-  async findAll(query: { title?: string; isDefault?: boolean } = {}): Promise<Addition[]> {
+  async findAll(getDto: GetAdditionDto) {
     try {
-      this.logger.log(`Fetching additions with query: ${JSON.stringify(query)}`);
-      const filter: any = {};
-      if (query.title) {
-        filter.title = { $regex: query.title, $options: 'i' }; // Case-insensitive partial match
+      const pipeline: any[] = [];
+
+      if (getDto.title) {
+        pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
       }
-      if (query.isDefault !== undefined) {
-        filter.isDefault = query.isDefault;
+
+      if (getDto.isDefault !== undefined) {
+        pipeline.push({ $match: { isDefault: getDto.isDefault } });
       }
-      const additions = await this.additionModel.find(filter).exec();
-      this.logger.log(`Retrieved ${additions.length} additions`);
-      return additions;
+
+      const offset = getDto.o || 0;
+      const limit = getDto.l || 5;
+
+      const [list, countQuery] = await Promise.all([
+        this.additionModel.aggregate([
+          ...pipeline,
+          { $skip: offset },
+          { $limit: limit },
+        ]),
+        this.additionModel.aggregate([...pipeline, { $count: 'total' }]),
+      ]);
+
+      return {
+        count: countQuery[0] ? countQuery[0].total : 0,
+        list,
+      };
     } catch (error) {
-      this.logger.error(`Failed to fetch additions: ${error.message}`, error.stack);
-      throw new HttpException(
-        {
-          status: HttpStatus.INTERNAL_SERVER_ERROR,
-          error: 'Failed to fetch additions',
-          message: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new BadRequestException('Failed to retrieve additions');
     }
   }
 
