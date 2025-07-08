@@ -75,211 +75,134 @@ export class AttendanceController {
     }
   }
 
- @Get('employee') // Consider renaming this endpoint to something more general like '/my-team' or '/records'
+@Get('employee') // Consider renaming this endpoint for clarity if it returns more than just 'employee's own attendance
   async getEmployeeAttendance(
     @CurrentUser() user: User, // This decorator provides the user object
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    console.log("CurrentUser object:", user); // Log the full user object to verify _id and role
+    console.log("CurrentUser object:", user);
 
     try {
-      // Call the new service method that handles role-based logic
-      const rawData = await this.attendanceService.getRoleBasedAttendance(
-        { ...(user as any), _id: (user as any)._id },
+      const groupedData: any[] = await this.attendanceService.getRoleBasedAttendance(
+        { ...(user as any), _id: (user as any)._id }, // Ensure _id is a string or ObjectId as expected by service
         startDate,
         endDate,
       );
 
-      // Assuming these methods are part of the controller or another service
-      // For now, keep them here as you had them.
-      const formattedData = this.formatAttendanceData(rawData); // Implement or move this
-      const monthlyStats = this.calculateMonthlyStats(rawData); // Implement or move this
+      // Separate myAttendance and teamAttendance
+      const myAttendance = groupedData.find(group => group.isCurrentUser);
+      const teamAttendance = groupedData.filter(group => !group.isCurrentUser);
+
+      // Format the attendance array within each group
+      const formattedMyAttendance = myAttendance ? {
+        ...myAttendance,
+        attendance: this.formatRawAttendanceRecords(myAttendance.attendance)
+      } : null;
+
+      const formattedTeamAttendance = teamAttendance.map(group => ({
+        ...group,
+        attendance: this.formatRawAttendanceRecords(group.attendance)
+      }));
+
+      // Calculate overall monthly stats from ALL records (both mine and team's)
+      const allAttendanceRecords = groupedData.flatMap((group: any) => group.attendance);
+
+      // Example: Calculate monthlyStats (customize as needed)
+      const monthlyStats = {
+        totalDays: allAttendanceRecords.length,
+        presentDays: allAttendanceRecords.filter((rec: any) => rec.status === 'Present').length,
+        absentDays: allAttendanceRecords.filter((rec: any) => rec.status === 'Absent').length,
+      };
 
       return {
         success: true,
         message: 'Attendance records retrieved successfully',
-        data: formattedData,
-        monthlyStats,
-        count: rawData.length,
+        data: {
+          myAttendance: formattedMyAttendance,
+          teamAttendance: formattedTeamAttendance,
+        },
+        monthlyStats: monthlyStats,
+        count: groupedData.length,
       };
     } catch (error) {
-    
       // Re-throw BadRequestException for client-side errors, generic error for others
       throw error;
     }
   }
 
-
   /**
-   * Format raw attendance data for frontend components
+   * Helper method to format raw attendance records for a single employee group.
+   * This logic was previously in `formatGroupedAttendanceData` but is now extracted
+   * to apply to individual attendance arrays.
    */
-  private formatAttendanceData(rawData: any[]): any[] {
-    return rawData
-      .filter(record => record.status !== 'Absent') // Filter out absent days
-      .map(record => {
+  private formatRawAttendanceRecords(rawData: any[]): any[] {
+    interface AttendanceRecord {
+      _id: string;
+      employeeId: any; // Can be ObjectId or populated object
+      date: string | Date;
+      checkInTime?: string | Date | null;
+      checkOutTime?: string | Date | null;
+      isAutoCheckout?: boolean;
+      createdAt?: string | Date;
+      updatedAt?: string | Date;
+      status?: string;
+      totalHours?: number;
+      remarks?: string;
+    }
+
+    interface FormattedAttendance {
+      date: number;
+      day: string;
+      checkIn: string;
+      checkOut: string;
+      status: string;
+      totalHours: number;
+      remarks: string;
+      originalData: {
+        _id: string;
+        employeeId: string;
+        date: string | Date;
+        checkInTime?: string | Date | null;
+        checkOutTime?: string | Date | null;
+        isAutoCheckout?: boolean;
+        createdAt?: string | Date;
+        updatedAt?: string | Date;
+      };
+    }
+
+    return (rawData as AttendanceRecord[])
+      .filter((record: AttendanceRecord) => record.checkInTime) // Filter out records that conceptually represent 'absent' (no check-in)
+      .map((record: AttendanceRecord): FormattedAttendance => {
         const date = new Date(record.date);
         const checkInTime = record.checkInTime ? new Date(record.checkInTime) : null;
         const checkOutTime = record.checkOutTime ? new Date(record.checkOutTime) : null;
 
-        return {
-          date: date.getDate(),
-          day: this.getDayName(date.getDay()),
-          checkIn: checkInTime ? this.formatTime(checkInTime) : '--:--',
-          checkOut: checkOutTime ? this.formatTime(checkOutTime) : '--:--',
-          status: this.determineStatus(record, checkInTime, checkOutTime),
-          totalHours: record.totalHours || 0,
-          remarks: record.remarks || '',
-          originalData: {
-            _id: record._id,
-            employeeId: record.employeeId,
-            date: record.date,
-            checkInTime: record.checkInTime,
-            checkOutTime: record.checkOutTime,
-            isAutoCheckout: record.isAutoCheckout,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt
-          }
-        };
+      return {
+        date: date.getDate(),
+        day: date.toLocaleDateString('en-US', { weekday: 'long' }),
+        checkIn: checkInTime ? checkInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        checkOut: checkOutTime ? checkOutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        status: record.status || '',
+        totalHours: record.totalHours || 0,
+        remarks: record.remarks || '',
+        originalData: {
+          _id: record._id,
+          employeeId: record.employeeId._id.toHexString(), // Ensure it's the string ID
+          date: record.date,
+          checkInTime: record.checkInTime,
+          checkOutTime: record.checkOutTime,
+          isAutoCheckout: record.isAutoCheckout,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt
+        }
+      };
       })
       .sort((a, b) => a.date - b.date); // Sort by date
   }
 
-  /**
-   * Determine attendance status based on check-in/out times and remarks
-   */
-  private determineStatus(record: any, checkInTime: Date | null, checkOutTime: Date | null): string {
-    if (!checkInTime) return 'absent';
 
-    const checkInHour = checkInTime.getHours();
-    const checkInMinute = checkInTime.getMinutes();
-    const checkOutHour = checkOutTime?.getHours() || 17;
-    const checkOutMinute = checkOutTime?.getMinutes() || 30;
-
-    // Check if late (after 9:30 AM)
-    const isLate = checkInHour > 9 || (checkInHour === 9 && checkInMinute > 30);
-
-    // Check if overtime (after 5:30 PM)
-    const isOvertime = checkOutHour > 17 || (checkOutHour === 17 && checkOutMinute > 30);
-
-    // Check remarks for additional context
-    const remarks = record.remarks?.toLowerCase() || '';
-    const hasOvertimeRemark = remarks.includes('overtime') || remarks.includes('extended');
-    const hasLateRemark = remarks.includes('late') || remarks.includes('very late');
-
-    // Determine status
-    if ((isLate || hasLateRemark) && (isOvertime || hasOvertimeRemark)) {
-      return 'late-overtime';
-    } else if (isLate || hasLateRemark) {
-      return 'late';
-    } else if (isOvertime || hasOvertimeRemark) {
-      return 'present-overtime';
-    } else {
-      return 'present';
-    }
-  }
-
-  /**
-   * Calculate monthly statistics
-   */
-  private calculateMonthlyStats(rawData: any[]): any {
-    const presentRecords = rawData.filter(record => record.status === 'Present');
-    const absentRecords = rawData.filter(record => record.status === 'Absent');
-
-    const totalDays = rawData.length;
-    const presentDays = presentRecords.length;
-    const absentDays = absentRecords.length;
-
-    // Count late arrivals
-    const lateDays = presentRecords.filter(record => {
-      if (!record.checkInTime) return false;
-      const checkIn = new Date(record.checkInTime);
-      const isLate = checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 30);
-      return isLate || record.remarks?.toLowerCase().includes('late');
-    }).length;
-
-    // Count overtime days
-    const overtimeDays = presentRecords.filter(record => {
-      if (!record.checkOutTime) return false;
-      const checkOut = new Date(record.checkOutTime);
-      const isOvertime = checkOut.getHours() > 17 || (checkOut.getHours() === 17 && checkOut.getMinutes() > 30);
-      return isOvertime || record.remarks?.toLowerCase().includes('overtime');
-    }).length;
-
-    // Calculate total hours
-    const totalHours = presentRecords.reduce((sum, record) => sum + (record.totalHours || 0), 0);
-
-    // Calculate average check-in and check-out times
-    const validCheckIns = presentRecords.filter(r => r.checkInTime);
-    const validCheckOuts = presentRecords.filter(r => r.checkOutTime);
-
-    const avgCheckIn = validCheckIns.length > 0
-      ? this.calculateAverageTime(validCheckIns.map(r => new Date(r.checkInTime)))
-      : '--:--';
-
-    const avgCheckOut = validCheckOuts.length > 0
-      ? this.calculateAverageTime(validCheckOuts.map(r => new Date(r.checkOutTime)))
-      : '--:--';
-
-    // Calculate attendance rate
-    const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
-
-    return {
-      totalDays,
-      presentDays,
-      absentDays,
-      lateDays,
-      overtimeDays,
-      totalHours: Math.round(totalHours * 100) / 100, // Round to 2 decimal places
-      avgCheckIn,
-      avgCheckOut,
-      attendanceRate,
-      // Additional stats that might be useful
-      averageHoursPerDay: presentDays > 0 ? Math.round((totalHours / presentDays) * 100) / 100 : 0,
-      onTimeDays: presentDays - lateDays,
-      regularDays: presentDays - overtimeDays,
-    };
-  }
-
-  /**
-   * Format time to HH:MM format
-   */
-  private formatTime(date: Date): string {
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  /**
-   * Get day name from day number
-   */
-  private getDayName(dayNumber: number): string {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return days[dayNumber];
-  }
-
-  /**
-   * Calculate average time from array of dates
-   */
-  private calculateAverageTime(dates: Date[]): string {
-    if (dates.length === 0) return '--:--';
-
-    const totalMinutes = dates.reduce((sum, date) => {
-      return sum + (date.getHours() * 60 + date.getMinutes());
-    }, 0);
-
-    const avgMinutes = Math.round(totalMinutes / dates.length);
-    const hours = Math.floor(avgMinutes / 60);
-    const minutes = avgMinutes % 60;
-
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  }
-  // Import Request from express at the top of the file:
-  // import { Request } from 'express';
-
-  @UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Get('today/:employeeId')
 @ApiOperation({ summary: 'Get today\'s attendance for an employee' })
 @ApiParam({ name: 'employeeId', description: 'Employee ID' })

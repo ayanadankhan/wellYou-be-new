@@ -14,6 +14,8 @@ class Document {
 
   @Prop({ required: true, type: String })
   url: string;
+  @Prop({ required: true, type: String })
+  managerId: string;
 }
 
 @Schema({ _id: false })

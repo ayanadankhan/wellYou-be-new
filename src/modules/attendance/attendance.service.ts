@@ -211,23 +211,6 @@ export class AttendanceService {
     }));
   }
 
-  // Calculate monthly statistics
-  private calculateMonthlyStats(attendance: Attendance[]): any {
-    const totalDays = attendance.length;
-    const presentDays = attendance.filter(record => record.status === 'Present').length;
-    const absentDays = attendance.filter(record => record.status === 'Absent').length;
-    const totalHours = attendance.reduce((sum, record) => sum + (record.totalHours || 0), 0);
-    const avgHoursPerDay = totalDays > 0 ? totalHours / presentDays : 0;
-
-    return {
-      totalDays,
-      presentDays,
-      absentDays,
-      totalHours: Math.round(totalHours * 100) / 100,
-      avgHoursPerDay: Math.round(avgHoursPerDay * 100) / 100,
-      attendancePercentage: totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0,
-    };
-  }
 
   // Check-in (Auto-called on login)
   async checkin(employeeId: string): Promise<Attendance> {
@@ -483,25 +466,42 @@ export class AttendanceService {
   }
 
 async getRoleBasedAttendance(
-    user: any,
-    startDate?: string,
-    endDate?: string,
-  ): Promise<Attendance[]> {
-    const userId = user._id; // This is the userId of the logged-in user
-    const userRole = user.role;
+  user: any,
+  startDate?: string,
+  endDate?: string,
+): Promise<any[]> {
+  const userId = user._id;
+  const userRole = user.role;
+  const tenantId = user.tenantId;
 
-    this.logger.log(`Initiating role-based attendance fetch for userId: ${userId}, role: ${userRole}`);
+  this.logger.log(`Initiating role-based attendance fetch for userId: ${userId}, role: ${userRole}`);
 
-    if (!Types.ObjectId.isValid(userId)) {
-      this.logger.warn(`Invalid user ID format received: ${userId}`);
-      throw new BadRequestException('Invalid user ID format');
+  if (!Types.ObjectId.isValid(userId)) {
+    this.logger.warn(`Invalid user ID format received: ${userId}`);
+    throw new BadRequestException('Invalid user ID format');
+  }
+
+  let employeeIdsToQuery: Types.ObjectId[] = [];
+  let currentEmployeeId: Types.ObjectId | null = null; // The employeeId corresponding to the current userId
+
+  // --- Handle Admin Role First ---
+  if (userRole === 'admin') {
+    this.logger.log(`User is an admin. Fetching attendance for all employees within tenant: ${tenantId}`);
+    if (!tenantId) {
+      this.logger.error(`Admin user ${userId} does not have a tenantId. Cannot fetch tenant-specific attendance.`);
+      throw new BadRequestException('Admin user is missing tenant information.');
     }
+    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) }).select('_id').exec();
+    employeeIdsToQuery = allTenantEmployees.map(employee => employee._id);
+    this.logger.log(`Found ${employeeIdsToQuery.length} employees for tenantId: ${tenantId}.`);
 
-    let employeeIdsToQuery: Types.ObjectId[] = [];
-    let currentEmployeeId: Types.ObjectId | null = null; // The employeeId corresponding to the current userId
-
-    // --- Step 1: Find the current user's corresponding Employee ID ---
-    // Every user, regardless of role, should ideally have an associated employee record.
+    // No need to find currentEmployeeId if they are just an admin viewing all records
+    // However, if an admin also needs to see their own "employee" specific attendance,
+    // you might still want to try to find their employeeId here, but for broad admin view, it's not strictly necessary.
+    // For this refactor, we assume admin just needs tenant-wide view.
+  } else {
+    // --- For Non-Admin Roles (e.g., employee) ---
+    // Step 1: Find the current user's corresponding Employee ID
     const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId) }).exec();
 
     if (!currentUserEmployee) {
@@ -512,111 +512,353 @@ async getRoleBasedAttendance(
 
     this.logger.log(`Mapped userId: ${userId} to current user's employeeId: ${currentEmployeeId.toHexString()}`);
 
-    // --- Step 2: Determine which employee IDs to query based on role ---
+    // Step 2: Determine which employee IDs to query based on role (now only 'employee' is expected here)
     switch (userRole) {
       case 'employee':
-        // Scenario 1: Employee Role - Fetch only their own record
-        this.logger.log(`Role: 'employee'. Fetching attendance for own employeeId: ${currentEmployeeId.toHexString()}`);
-        employeeIdsToQuery.push(currentEmployeeId);
-        break;
+        this.logger.log(`Role: 'employee'. Checking if any employees have reportingTo field matching userId: ${userId}`);
 
-      case 'manager':
-        // Scenario 2: Manager Role - Fetch own record + team members' records
-        this.logger.log(`Role: 'manager'. Fetching attendance for manager's own employeeId: ${currentEmployeeId.toHexString()}`);
-        employeeIdsToQuery.push(currentEmployeeId); // Add manager's own employee ID
+        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId) }).select('_id').exec();
 
-        // CORRECTED LINE: Find team members where managerId matches the manager's userId
-        // Based on your instruction: "use this Mapped userId: 685cd556506fd3148c46e0db to current user's to find its team members"
-        this.logger.log(`Searching for team members where their 'managerId' field matches the manager's userId: ${userId}`);
-        const teamMembers = await this.employeeModel.find({ managerId: new Types.ObjectId(userId) }).select('_id').exec();
-        
         if (teamMembers.length > 0) {
+          this.logger.log(`Found ${teamMembers.length} team members reporting to userId: ${userId}`);
+          employeeIdsToQuery.push(currentEmployeeId);
           const teamMemberIds = teamMembers.map(member => member._id);
-          employeeIdsToQuery.push(...teamMemberIds); // Add all team members' employee IDs
-          this.logger.log(`Found ${teamMemberIds.length} team members whose managerId is manager's userId: ${userId}. Team member IDs: [${teamMemberIds.map(id => id.toHexString()).join(', ')}]`);
+          employeeIdsToQuery.push(...teamMemberIds);
+          this.logger.log(`Including own employeeId: ${currentEmployeeId.toHexString()} and team member IDs: [${teamMemberIds.map(id => id.toHexString()).join(', ')}]`);
         } else {
-          this.logger.log(`No team members found for manager's userId: ${userId}`);
+          this.logger.log(`No team members found reporting to userId: ${userId}. Fetching only own attendance for employeeId: ${currentEmployeeId.toHexString()}`);
+          employeeIdsToQuery.push(currentEmployeeId);
         }
-        break;
-
-      case 'admin':
-        // Scenario 3: Admin Role - Fetch all employees' records
-        this.logger.log(`Role: 'admin'. Fetching attendance for ALL employees.`);
-        const allEmployees = await this.employeeModel.find({}).select('_id').exec();
-        employeeIdsToQuery = allEmployees.map(employee => employee._id);
-        this.logger.log(`Found ${employeeIdsToQuery.length} total employees.`);
         break;
 
       default:
         this.logger.warn(`Unsupported user role: ${userRole} for userId: ${userId}. Returning empty attendance.`);
-        return []; // Or throw a specific error
-    }
-
-    // Ensure unique employee IDs in case of duplicates
-    employeeIdsToQuery = [...new Set(employeeIdsToQuery.map(id => id.toHexString()))].map(id => new Types.ObjectId(id));
-    this.logger.log(`Final unique employee IDs to query for attendance: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`);
-
-    if (employeeIdsToQuery.length === 0) {
-      this.logger.log('No employee IDs to query after role-based determination. Returning empty attendance.');
-      return [];
-    }
-
-    // --- Step 3: Determine effective date range (default to current month) ---
-    let effectiveStartDate: Date;
-    let effectiveEndDate: Date;
-
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-
-      if (isNaN(start.getTime())) {
-        this.logger.warn(`Invalid startDate format: ${startDate}`);
-        throw new BadRequestException('Invalid start date format');
-      }
-      if (isNaN(end.getTime())) {
-        this.logger.warn(`Invalid endDate format: ${endDate}`);
-        throw new BadRequestException('Invalid end date format');
-      }
-
-      effectiveStartDate = start;
-      end.setHours(23, 59, 59, 999); // Include the entire end day
-      effectiveEndDate = end;
-
-      this.logger.log(`Using provided date range: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
-
-    } else {
-      const now = new Date();
-      effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      effectiveStartDate.setHours(0, 0, 0, 0);
-
-      effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      effectiveEndDate.setHours(23, 59, 59, 999);
-
-      this.logger.log(`Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
-    }
-
-    // --- Step 4: Construct and execute the MongoDB query ---
-    try {
-      const query: any = {
-        employeeId: { $in: employeeIdsToQuery }, // Use $in operator for multiple employee IDs
-        date: {
-          $gte: effectiveStartDate,
-          $lte: effectiveEndDate,
-        },
-      };
-
-      this.logger.log(`MongoDB Attendance Query: ${JSON.stringify(query)}`);
-
-      const attendance = await this.attendanceModel.find(query).sort({ date: -1 }).exec();
-      
-      this.logger.log(`Found ${attendance.length} attendance records.`);
-      return attendance;
-
-    } catch (error) {
-      this.logger.error(`Error querying attendance records for employeeIds: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`, error.message, error.stack);
-      throw new Error('Internal server error while fetching attendance records.');
+        return [];
     }
   }
+
+  // Deduplicate and ensure all IDs are ObjectId
+  employeeIdsToQuery = [...new Set(employeeIdsToQuery.map(id => id.toHexString()))].map(id => new Types.ObjectId(id));
+  this.logger.log(`Final unique employee IDs to query for attendance: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`);
+
+  if (employeeIdsToQuery.length === 0) {
+    this.logger.log('No employee IDs to query after role-based determination. Returning empty attendance.');
+    return [];
+  }
+
+  let effectiveStartDate: Date;
+  let effectiveEndDate: Date;
+
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime())) {
+      this.logger.warn(`Invalid startDate format: ${startDate}`);
+      throw new BadRequestException('Invalid start date format');
+    }
+    if (isNaN(end.getTime())) {
+      this.logger.warn(`Invalid endDate format: ${endDate}`);
+      throw new BadRequestException('Invalid end date format');
+    }
+
+    effectiveStartDate = start;
+    end.setHours(23, 59, 59, 999);
+    effectiveEndDate = end;
+
+    this.logger.log(`Using provided date range: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
+
+  } else {
+    const now = new Date();
+    effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    effectiveStartDate.setHours(0, 0, 0, 0);
+
+    effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    effectiveEndDate.setHours(23, 59, 59, 999);
+
+    this.logger.log(`Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
+  }
+
+  try {
+    const query: any = {
+      employeeId: { $in: employeeIdsToQuery },
+      date: {
+        $gte: effectiveStartDate,
+        $lte: effectiveEndDate,
+      },
+    };
+
+    this.logger.log(`MongoDB Attendance Query: ${JSON.stringify(query)}`);
+
+    const attendance = await this.attendanceModel.find(query)
+      .populate({
+        path: 'employeeId',
+        model: 'Employee',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'firstName lastName',
+        },
+        select: 'userId'
+      })
+      .sort({ date: -1 })
+      .exec();
+
+    this.logger.log(`Found ${attendance.length} attendance records.`);
+
+    const groupedAttendance = this.groupAttendanceByEmployee(
+      attendance,
+      employeeIdsToQuery,
+      currentEmployeeId ?? employeeIdsToQuery[0] // fallback to first employeeId if null
+    );
+
+    for (const group of groupedAttendance) {
+      if (group.employeeInfo && group.employeeInfo.userId) {
+        const userDoc = group.employeeInfo.userId;
+        group.employeeInfo.name = `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim();
+      } else {
+        group.employeeInfo.name = 'N/A';
+      }
+    }
+
+    this.logger.log(`Grouped attendance into ${groupedAttendance.length} employee groups.`);
+    return groupedAttendance;
+
+  } catch (error) {
+    this.logger.error(`Error querying attendance records for employeeIds: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`, error.message, error.stack);
+    throw new Error('Internal server error while fetching attendance records.');
+  }
+}
+
+  // ... (rest of your service methods: groupAttendanceByEmployee, determineStatus, calculateMonthlyStats, formatTime, getDayName, calculateAverageTime)
+
+  /**
+   * Helper to group attendance records by employeeId and identify the current user's attendance
+   */
+  private groupAttendanceByEmployee(
+    attendanceRecords: any[], // Use 'any' because of populated fields
+    employeeIdsToQuery: Types.ObjectId[],
+    currentEmployeeId: Types.ObjectId,
+  ): any[] {
+    const groupedMap = new Map<string, any>();
+
+    // Initialize map with all queried employee IDs to ensure all are present, even if no attendance
+    for (const empId of employeeIdsToQuery) {
+      groupedMap.set(empId.toHexString(), {
+        employeeId: empId.toHexString(),
+        employeeInfo: { _id: empId.toHexString() }, // Placeholder, will be populated
+        isCurrentUser: empId.equals(currentEmployeeId),
+        attendanceType: empId.equals(currentEmployeeId) ? 'myAttendance' : 'teamMemberAttendance',
+        attendance: [],
+        monthlyStats: {}, // Placeholder for stats
+      });
+    }
+
+    attendanceRecords.forEach(record => {
+      const empId = record.employeeId._id.toHexString(); // Access employeeId from populated field
+      if (groupedMap.has(empId)) {
+        const group = groupedMap.get(empId);
+        group.attendance.push(record);
+        // Populate employeeInfo from the first record found for that employee
+        if (!group.employeeInfo.userId && record.employeeId.userId) {
+            group.employeeInfo = {
+                _id: record.employeeId._id.toHexString(),
+                userId: record.employeeId.userId, // This will be the populated user object
+                // name will be added later in the service method
+            };
+        }
+      }
+    });
+
+    const groupedData = Array.from(groupedMap.values());
+
+    // Calculate monthly stats for each employee group
+    groupedData.forEach(group => {
+      group.monthlyStats = this.calculateMonthlyStats(group.attendance);
+    });
+
+    return groupedData;
+  }
+
+
+  /**
+   * Determine attendance status based on check-in/out times and remarks
+   */
+  private determineStatus(record: any, checkInTime: Date | null, checkOutTime: Date | null): string {
+    if (!checkInTime) return 'absent'; // Explicitly set absent if no check-in
+
+    // Define standard work hours (e.g., 9:00 AM to 5:30 PM)
+    const standardCheckInHour = 9;
+    const standardCheckInMinute = 0; // Assuming 9:00 AM is on-time start
+    const standardGracePeriodMinutes = 30; // 30 minutes grace period, so late after 9:30 AM
+    
+    const standardCheckOutHour = 17;
+    const standardCheckOutMinute = 30; // Assuming 5:30 PM is standard end
+
+    const checkInHour = checkInTime.getHours();
+    const checkInMinute = checkInTime.getMinutes();
+    const checkOutHour = checkOutTime?.getHours() || standardCheckOutHour; // Default to standard if no checkout
+    const checkOutMinute = checkOutTime?.getMinutes() || standardCheckOutMinute; // Default to standard if no checkout
+
+    // Calculate effective check-in threshold (e.g., 9:30 AM)
+    const lateCheckInThresholdHour = standardCheckInHour;
+    const lateCheckInThresholdMinute = standardCheckInMinute + standardGracePeriodMinutes;
+
+    // Check if late
+    const isLate = checkInHour > lateCheckInThresholdHour || 
+                   (checkInHour === lateCheckInThresholdHour && checkInMinute > lateCheckInThresholdMinute);
+
+    // Check if overtime
+    const isOvertime = checkOutTime && (checkOutHour > standardCheckOutHour || 
+                                       (checkOutHour === standardCheckOutHour && checkOutMinute > standardCheckOutMinute));
+
+    // Check remarks for additional context (case-insensitive)
+    const remarks = record.remarks?.toLowerCase() || '';
+    const hasOvertimeRemark = remarks.includes('overtime') || remarks.includes('extended');
+    const hasLateRemark = remarks.includes('late') || remarks.includes('very late');
+
+    // Determine status hierarchy: Late-Overtime > Late > Present-Overtime > Present > Absent
+    if ((isLate || hasLateRemark) && (isOvertime || hasOvertimeRemark)) {
+      return 'late-overtime';
+    } else if (isLate || hasLateRemark) {
+      return 'late';
+    } else if (isOvertime || hasOvertimeRemark) {
+      return 'present-overtime';
+    } else {
+      // If checked in and not late, not overtime, it's a regular present day
+      return 'present';
+    }
+  }
+
+
+  /**
+   * Calculate monthly statistics
+   */
+  private calculateMonthlyStats(rawData: any[]): any {
+    // Ensure rawData only contains actual attendance records, not 'absent' placeholders
+    const presentRecords = rawData.filter(record => record.checkInTime); // Filter for records with a check-in time
+
+    const totalDays = rawData.length; // Total days in the period (including calculated absent)
+    const presentDays = presentRecords.length;
+    const absentDays = totalDays - presentDays; // Absent days are total days minus present days
+
+    const lateDays = presentRecords.filter(record => {
+      // Re-evaluate status based on the determineStatus logic or direct time comparison
+      const checkIn = record.checkInTime ? new Date(record.checkInTime) : null;
+      if (!checkIn) return false;
+
+      const standardCheckInHour = 9;
+      const standardCheckInMinute = 0;
+      const standardGracePeriodMinutes = 30;
+
+      const lateCheckInThresholdHour = standardCheckInHour;
+      const lateCheckInThresholdMinute = standardCheckInMinute + standardGracePeriodMinutes;
+
+      const isLate = checkIn.getHours() > lateCheckInThresholdHour || 
+                     (checkIn.getHours() === lateCheckInThresholdHour && checkIn.getMinutes() > lateCheckInThresholdMinute);
+      
+      const remarks = record.remarks?.toLowerCase() || '';
+      const hasLateRemark = remarks.includes('late') || remarks.includes('very late');
+      
+      return isLate || hasLateRemark;
+    }).length;
+
+    const overtimeDays = presentRecords.filter(record => {
+      const checkOut = record.checkOutTime ? new Date(record.checkOutTime) : null;
+      if (!checkOut) return false;
+
+      const standardCheckOutHour = 17;
+      const standardCheckOutMinute = 30;
+
+      const isOvertime = checkOut.getHours() > standardCheckOutHour || 
+                         (checkOut.getHours() === standardCheckOutHour && checkOut.getMinutes() > standardCheckOutMinute);
+      
+      const remarks = record.remarks?.toLowerCase() || '';
+      const hasOvertimeRemark = remarks.includes('overtime') || remarks.includes('extended');
+
+      return isOvertime || hasOvertimeRemark;
+    }).length;
+
+    // Calculate total hours - sum `totalHours` from records if available, otherwise calculate from check-in/out
+    const totalHours = presentRecords.reduce((sum, record) => {
+      if (record.totalHours !== undefined && record.totalHours !== null) {
+        return sum + record.totalHours;
+      }
+      // If totalHours is not pre-calculated, calculate from checkIn/Out
+      if (record.checkInTime && record.checkOutTime) {
+        const checkIn = new Date(record.checkInTime);
+        const checkOut = new Date(record.checkOutTime);
+        const diffMs = checkOut.getTime() - checkIn.getTime();
+        return sum + (diffMs / (1000 * 60 * 60)); // Convert milliseconds to hours
+      }
+      return sum;
+    }, 0);
+
+    const validCheckIns = presentRecords.filter(r => r.checkInTime);
+    const validCheckOuts = presentRecords.filter(r => r.checkOutTime);
+
+    const avgCheckIn = validCheckIns.length > 0
+      ? this.calculateAverageTime(validCheckIns.map(r => new Date(r.checkInTime)))
+      : '--:--';
+
+    const avgCheckOut = validCheckOuts.length > 0
+      ? this.calculateAverageTime(validCheckOuts.map(r => new Date(r.checkOutTime)))
+      : '--:--';
+
+    const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+
+    return {
+      totalDays,
+      presentDays,
+      absentDays,
+      lateDays,
+      overtimeDays,
+      totalHours: Math.round(totalHours * 100) / 100, // Round to 2 decimal places
+      avgCheckIn,
+      avgCheckOut,
+      attendanceRate,
+      averageHoursPerDay: presentDays > 0 ? Math.round((totalHours / presentDays) * 100) / 100 : 0,
+      onTimeDays: presentDays - lateDays,
+      regularDays: presentDays - overtimeDays, // Days that are present and not overtime
+    };
+  }
+
+  /**
+   * Format time to HH:MM format
+   */
+  private formatTime(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  /**
+   * Get day name from day number
+   */
+  private getDayName(dayNumber: number): string {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return days[dayNumber];
+  }
+
+  /**
+   * Calculate average time from array of dates
+   */
+  private calculateAverageTime(dates: Date[]): string {
+    if (dates.length === 0) return '--:--';
+
+    const totalMinutes = dates.reduce((sum, date) => {
+      return sum + (date.getHours() * 60 + date.getMinutes());
+    }, 0);
+
+    const avgMinutes = Math.round(totalMinutes / dates.length);
+    const hours = Math.floor(avgMinutes / 60);
+    const minutes = avgMinutes % 60;
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  }
+
 
 
   // Get today's attendance for an employee
