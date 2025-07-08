@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, Logger, Query } from '@nestjs/common';
 import { AdditionsService } from './additions.service';
 import { CreateAdditionDto } from './dto/create-addition.dto';
 import { UpdateAdditionDto } from './dto/update-addition.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { Public } from '@/common/decorators/public.decorator';
+import { GetAdditionDto } from './dto/get-addition.dto';
 
 @ApiTags('additions')
 @Controller('additions')
@@ -34,28 +36,13 @@ export class AdditionsController {
       );
     }
   }
+
   @Get()
-  @ApiOperation({ summary: 'Retrieve all additions' })
-  @ApiResponse({ status: 200, description: 'List of all additions.' })
-  @ApiResponse({ status: 500, description: 'Internal server error.' })
-  async findAll() {
-    try {
-      this.logger.log('Fetching all additions');
-      const additions = await this.additionsService.findAll();
-      this.logger.log(`Retrieved ${additions.length} additions`);
-      return additions;
-    } catch (error) {
-      this.logger.error(`Failed to fetch additions: ${error.message}`, error.stack);
-      throw new HttpException(
-        {
-          status: HttpStatus.INTERNAL_SERVER_ERROR,
-          error: 'Failed to fetch additions',
-          message: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  @Public()
+  findAll(@Query() getDto: GetAdditionDto) {
+    return this.additionsService.findAll(getDto);
   }
+
 
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a single addition by ID' })
