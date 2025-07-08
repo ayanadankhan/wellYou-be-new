@@ -27,8 +27,6 @@ export class SalaryController {
 
   @Get()
   findAll(@CurrentUser() user: User) {
-    console.log("ertyu",user);
-    
     return this.salaryService.findAll();
   }
 

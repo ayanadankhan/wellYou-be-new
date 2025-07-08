@@ -61,26 +61,89 @@ export class PayrollService {
   }
 
   async update(id: string, updatePayrollDto: UpdatePayrollDto): Promise<Payroll> {
-    if (updatePayrollDto.payrollMonth) {
-      const existingPayroll = await this.payrollModel.findOne({
+    const existingPayroll = await this.payrollModel.findById(id).exec();
+
+    if (!existingPayroll) {
+      throw new NotFoundException(`Payroll with ID ${id} not found`);
+    }
+
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    const [existingMonthName, existingYearStr] = existingPayroll.payrollMonth.split(' ');
+    const existingYear = parseInt(existingYearStr);
+    
+    const existingMonth = new Date(`${existingMonthName} 1, ${existingYear}`).getMonth();
+
+    if (existingMonth !== currentMonth || existingYear !== currentYear) {
+      const currentMonthName = currentDate.toLocaleString('default', { month: 'long' });
+      const currentPayrollMonth = `${currentMonthName} ${currentYear}`;
+      
+      throw new ConflictException(
+        `You can only update payroll for the current month (${currentPayrollMonth}). ` +
+        `This payroll is for ${existingPayroll.payrollMonth}.`
+      );
+    }
+
+    if (updatePayrollDto.payrollMonth && updatePayrollDto.payrollMonth !== existingPayroll.payrollMonth) {
+      const conflict = await this.payrollModel.findOne({
         payrollMonth: updatePayrollDto.payrollMonth,
         _id: { $ne: id }
       }).exec();
 
-      if (existingPayroll) {
+      if (conflict) {
         throw new ConflictException(`Payroll for month ${updatePayrollDto.payrollMonth} already exists`);
       }
     }
 
-    const updatedPayroll = await this.payrollModel
-      .findByIdAndUpdate(id, updatePayrollDto, { new: true })
-      .exec();
-    
-    if (!updatedPayroll) {
-      throw new NotFoundException(`Payroll with ID ${id} not found`);
+    const updatedSelectedEmployees = [...existingPayroll.selectedEmployees];
+
+    for (const newEmp of updatePayrollDto.selectedEmployees || []) {
+      const index = updatedSelectedEmployees.findIndex(emp =>
+        emp.employeesId.toString() === newEmp.employeesId.toString()
+      );
+
+      if (index !== -1) {
+        updatedSelectedEmployees[index] = newEmp;
+      } else {
+        updatedSelectedEmployees.push(newEmp);
+      }
     }
-    return updatedPayroll;
+
+    let totalAddition = 0;
+    let totalDeduction = 0;
+
+    for (const emp of updatedSelectedEmployees) {
+      for (const add of emp.additions || []) {
+        totalAddition += add.amount || 0;
+      }
+      for (const ded of emp.deductions || []) {
+        totalDeduction += ded.amount || 0;
+      }
+    }
+
+    const totalGross = totalAddition + totalDeduction;
+    const netPay = totalAddition;
+
+    const finalUpdate = {
+      ...updatePayrollDto,
+      selectedEmployees: updatedSelectedEmployees,
+      totalAddition,
+      totalDeduction,
+      totalGross,
+      netPay,
+    };
+
+  const updatedPayroll = await this.payrollModel.findByIdAndUpdate(id, finalUpdate, { new: true }).exec();
+
+  if (!updatedPayroll) {
+    throw new NotFoundException(`Payroll with ID ${id} not found`);
   }
+
+  return updatedPayroll;
+  }
+
 
   async remove(id: string): Promise<void> {
     const result = await this.payrollModel.findByIdAndDelete(id).exec();
