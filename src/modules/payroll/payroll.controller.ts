@@ -28,6 +28,14 @@ export class PayrollController {
     return this.payrollService.update(id, updatePayrollDto);
   }
 
+  @Patch('status/:id')
+  async updateEmployeeStatuses(
+    @Param('id') id: string,
+    @Body() updatedEmployees: { selectedEmployees: { employeesId: string, status: string }[] }
+  ) {
+    return this.payrollService.updateEmployeeStatuses(id, updatedEmployees.selectedEmployees);
+  }
+
   @Get('employee/:employeeId') 
   async findByEmployeeId(@Param('employeeId') employeeId: string) {
     return this.payrollService.findByEmployeeId(employeeId);

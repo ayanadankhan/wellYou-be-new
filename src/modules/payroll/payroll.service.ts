@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
-import { Payroll } from './entities/payroll.entity';
+import { Payroll, PayrollStatus } from './entities/payroll.entity';
 
 @Injectable()
 export class PayrollService {
@@ -341,4 +341,26 @@ export class PayrollService {
       );
     }
   }
+
+  async updateEmployeeStatuses(payrollId: string, updatedEmployees: { employeesId: string, status: string }[]) {
+    const payroll = await this.payrollModel.findById(payrollId);
+    if (!payroll) throw new Error('Payroll not found');
+      payroll.selectedEmployees = payroll.selectedEmployees.map((employee: any) => {
+        const updated = updatedEmployees.find(e => e.employeesId === employee.employeesId.toString());
+        if (updated) {
+          return {
+            ...employee,
+            status: updated.status
+          };
+        }
+        return employee;
+      });
+    const allPaid = payroll.selectedEmployees.every((emp: any) => emp.status === 'PAID');
+    if (allPaid) {
+      payroll.status = PayrollStatus.PAID;
+    }
+    await payroll.save();
+    return payroll;
+  }
+
 }
