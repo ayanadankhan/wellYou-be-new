@@ -19,6 +19,7 @@ import { LeaveRequestModule } from './modules/leave-request/leave-request.module
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { SkillsModule } from './modules/masterTables/skills/skills.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 // ... other imports
 
 @Module({
@@ -47,6 +48,7 @@ import { SkillsModule } from './modules/masterTables/skills/skills.module';
     LeaveTypeModule,
     AttendanceModule, // Importing the AttendanceModule
     AuditModule,
-    SkillsModule
+    SkillsModule,
+    FeedbackModule
   ]
 })export class AppModule { }

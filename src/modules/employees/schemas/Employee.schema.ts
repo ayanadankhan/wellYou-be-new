@@ -152,7 +152,7 @@ class DependentMember {
   collection: 'employees',
 })
 export class Employee {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'users', default: null })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', default: null })
   userId?: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, type: Date })
@@ -200,7 +200,7 @@ export class Employee {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'departments', default: null })
   departmentId?: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'users', default: null })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', default: null })
   reportingTo?: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, type: String, enum: EmploymentStatus })

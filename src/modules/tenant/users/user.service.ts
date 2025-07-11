@@ -95,7 +95,7 @@ console.log('Audit log called: creating log...');
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    if (updateUserDto.password) {
+    if (updateUserDto.password && !updateUserDto.password.startsWith('$2b$')) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
     const existingUser = await this.userModel.findByIdAndUpdate(
