@@ -1,21 +1,21 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { LeaveRequestService } from './leave-request.service';
 import { LeaveRequestController } from './leave-request.controller';
-import { LeaveRequest, LeaveRequestSchema } from './entities/leave-type.entity'; // Adjust import path as needed
-import { EmployeesModule } from '../employees/employees.module';
-import { LeaveTypeModule } from '../leave-type/leave-type.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { LeaveRequest, LeaveRequestSchema } from './entities/leave-type.entity';
+import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
+import { User, UserSchema } from '../tenant/users/schemas/user.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: LeaveRequest.name, schema: LeaveRequestSchema }
+      { name: LeaveRequest.name, schema: LeaveRequestSchema },
+      { name: Employee.name, schema: EmployeeSchema },
+      { name: User.name, schema: UserSchema }
     ]),
-     EmployeesModule, 
-     LeaveTypeModule,
   ],
   controllers: [LeaveRequestController],
   providers: [LeaveRequestService],
-  exports: [LeaveRequestService], // Export service for use in other modules
+  exports: [LeaveRequestService],
 })
 export class LeaveRequestModule {}

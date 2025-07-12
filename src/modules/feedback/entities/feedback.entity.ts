@@ -7,6 +7,9 @@ export class Feedback extends Document {
   employeeId: Types.ObjectId;
 
   @Prop({ required: true })
+  status: string;
+
+  @Prop({ required: true })
   reviewPeriod: string;
 
   @Prop({

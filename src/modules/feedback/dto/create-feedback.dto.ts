@@ -104,6 +104,10 @@ export class CreateFeedbackDto {
 
   @ApiProperty()
   @IsString()
+  status: string;
+
+  @ApiProperty()
+  @IsString()
   @IsNotEmpty()
   reviewPeriod: string;
 
