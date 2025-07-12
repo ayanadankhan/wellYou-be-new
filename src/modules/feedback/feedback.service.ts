@@ -16,8 +16,110 @@ export class FeedbackService {
     return createdFeedback.save();
   }
 
-  async findAll(): Promise<Feedback[]> {
-    return this.feedbackModel.find().populate('employeeId').exec();
+  async findAll(): Promise<any[]> {
+    return this.feedbackModel.aggregate([
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employee'
+        }
+      },
+      { $unwind: '$employee' },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'employee.userId',
+          foreignField: '_id',
+          as: 'employee.user'
+        }
+      },
+      { $unwind: { path: '$employee.user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'employee.departmentId',
+          foreignField: '_id',
+          as: 'employee.department'
+        }
+      },
+      { $unwind: { path: '$employee.department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'designations',
+          localField: 'employee.positionId',
+          foreignField: '_id',
+          as: 'employee.position'
+        }
+      },
+      { $unwind: { path: '$employee.position', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          'employeeId': '$employee'
+        }
+      },
+      
+      {
+        $group: {
+          _id: '$employeeId._id',
+          employee: { $first: '$employeeId' },
+          latestFeedback: { 
+            $last: {
+              _id: '$_id',
+              reviewPeriod: '$reviewPeriod',
+              ratings: '$ratings',
+              comments: '$comments',
+              overallComment: '$overallComment',
+              developmentAreas: '$developmentAreas',
+              strengths: '$strengths',
+              goals: '$goals',
+              createdAt: '$createdAt',
+              updatedAt: '$updatedAt'
+            }
+          },
+          history: {
+            $push: {
+              _id: '$_id',
+              reviewPeriod: '$reviewPeriod',
+              ratings: '$ratings',
+              comments: '$comments',
+              overallComment: '$overallComment',
+              developmentAreas: '$developmentAreas',
+              strengths: '$strengths',
+              goals: '$goals',
+              createdAt: '$createdAt',
+              updatedAt: '$updatedAt'
+            }
+          }
+        }
+      },
+      
+      {
+        $addFields: {
+          history: {
+            $filter: {
+              input: '$history',
+              as: 'item',
+              cond: { $ne: ['$$item._id', '$latestFeedback._id'] }
+            }
+          }
+        }
+      },
+      
+      {
+        $project: {
+          _id: 0,
+          employee: 1,
+          latestFeedback: 1,
+          history: 1
+        }
+      },
+      
+      {
+        $sort: { 'employee.user.firstName': 1 }
+      }
+    ]);
   }
 
   async findOne(id: string): Promise<Feedback> {
