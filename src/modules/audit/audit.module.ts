@@ -7,6 +7,6 @@ import { Audit, AuditSchema } from '../audit/schemas/audit.schema';
 @Module({
   imports: [MongooseModule.forFeature([{ name: Audit.name, schema: AuditSchema }])],
   providers: [AuditService],
-  exports: [AuditService], // export for use in other modules
+  exports: [AuditService],
 })
 export class AuditModule {}

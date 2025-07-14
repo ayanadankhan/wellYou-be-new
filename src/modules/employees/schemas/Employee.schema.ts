@@ -6,30 +6,29 @@ export type EmployeeDocument = Employee & Document;
 
 @Schema({ _id: false })
 class Document {
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   type: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   name: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   url: string;
-  @Prop({ required: true, type: String })
-  managerId: string;
+
 }
 
 @Schema({ _id: false })
 class Skill {
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   name: string;
 
-  @Prop({ required: true, type: String, enum: SkillLevel })
+  @Prop({ required: false, type: String, enum: SkillLevel })
   level: SkillLevel;
 }
 
 @Schema({ _id: false })
 class Education {
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   id: string;
 
   @Prop({ required: false, type: String })
@@ -53,7 +52,7 @@ class Education {
   @Prop({ type: String })
   honors?: string;
 
-  @Prop({ required: true, type: Boolean })
+  @Prop({ required: false, type: Boolean })
   isEnrolled: boolean;
 
   @Prop({ type: String })
@@ -62,16 +61,16 @@ class Education {
 
 @Schema({ _id: false })
 class Certification {
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   id: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   name: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   issuingOrganization: string;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ required: false, type: Date })
   issueDate: Date;
 
   @Prop({ type: Date })
@@ -92,22 +91,22 @@ class Certification {
 
 @Schema({ _id: false })
 class Experience {
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   id: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   companyName: string;
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   position: string;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ required: false, type: Date })
   startDate: Date;
 
   @Prop({ type: Date })
   endDate?: Date;
 
-  @Prop({ required: true, type: Boolean })
+  @Prop({ required: false, type: Boolean })
   isCurrentRole: boolean;
 
   @Prop({ type: String })
