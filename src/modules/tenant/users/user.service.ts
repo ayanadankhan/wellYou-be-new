@@ -35,14 +35,13 @@ export class UserService {
           originalPassword
         );
       }
-console.log('Audit log called: creating log...');
-      // ✅ ADD THIS: Audit log after user creation
+      
       await this.auditService.log(
-        'users',           // module
-        'create',          // action
-        user._id.toString(), // performedBy (created user)
-        user,              // newValue
-        null               // oldValue
+        'users',
+        'create',
+        user._id.toString(),
+        user,
+        null 
       );
 
       return user;
@@ -94,50 +93,127 @@ console.log('Audit log called: creating log...');
     return this.userModel.findOne({ email }).exec();
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto, performedBy?: string): Promise<User> {
+    const existingUser = await this.userModel.findById(id).exec();
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+
     if (updateUserDto.password && !updateUserDto.password.startsWith('$2b$')) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
-    const existingUser = await this.userModel.findByIdAndUpdate(
+    const updatedUser = await this.userModel.findByIdAndUpdate(
       id,
       { $set: updateUserDto },
       { new: true }
     ).exec();
 
-    if (!existingUser) {
-      throw new NotFoundException(`User with ID "${id}" not found`);
+    if (!updatedUser) {
+      throw new NotFoundException(`User with ID "${id}" not found after update`);
     }
-    return existingUser;
+
+    await this.auditService.log(
+      'users',
+      'update',
+      updatedUser._id.toString(),
+      {
+        newState: updatedUser.toObject(),
+        oldState: existingUser.toObject(),
+        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
+      }
+    );
+
+    return updatedUser;
   }
 
-  async updateByTenant(id: string, tenantId: string, updateUserDto: UpdateUserDto): Promise<User> { // tenantId is string for MVP
+  async updateByTenant(id: string, tenantId: string, updateUserDto: UpdateUserDto, performedBy?: string): Promise<User> {
+    const existingUser = await this.userModel.findOne({ 
+      _id: id, 
+      tenantId: new Types.ObjectId(tenantId) 
+    }).exec();
+    
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID "${id}" not found for this tenant`);
+    }
+
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
-    const existingUser = await this.userModel.findOneAndUpdate(
+    const updatedUser = await this.userModel.findOneAndUpdate(
       { _id: id, tenantId: new Types.ObjectId(tenantId) },
       { $set: updateUserDto },
       { new: true }
     ).exec();
 
-    if (!existingUser) {
-      throw new NotFoundException(`User with ID "${id}" not found for this tenant`);
+    if (!updatedUser) {
+      throw new NotFoundException(`User with ID "${id}" not found for this tenant after update`);
     }
-    return existingUser;
+
+    await this.auditService.log(
+      'users',
+      'update',
+      updatedUser._id.toString(),
+      {
+        newState: updatedUser.toObject(),
+        oldState: existingUser.toObject(),
+        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
+      }
+    );
+
+    return updatedUser;
   }
 
-  async remove(id: string) {
+  async remove(id: string, performedBy?: string) {
+    const existingUser = await this.userModel.findById(id).exec();
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+
     const result = await this.userModel.deleteOne({ _id: new Types.ObjectId(id) }).exec();
     if (result.deletedCount === 0) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
-    return result
+
+    await this.auditService.log(
+      'users',
+      'delete',
+      existingUser._id.toString(),
+      {
+        oldState: existingUser.toObject(),
+        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
+      }
+    );
+
+    return result;
   }
 
-  async removeByTenant(id: string, tenantId: string): Promise<void> { // tenantId is string for MVP
-    const result = await this.userModel.deleteOne({ _id: new Types.ObjectId(id), tenantId: new Types.ObjectId(tenantId) }).exec();
+  async removeByTenant(id: string, tenantId: string, performedBy?: string): Promise<void> {
+    const existingUser = await this.userModel.findOne({ 
+      _id: new Types.ObjectId(id), 
+      tenantId: new Types.ObjectId(tenantId) 
+    }).exec();
+    
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID "${id}" not found for this tenant`);
+    }
+
+    const result = await this.userModel.deleteOne({ 
+      _id: new Types.ObjectId(id), 
+      tenantId: new Types.ObjectId(tenantId) 
+    }).exec();
+
     if (result.deletedCount === 0) {
       throw new NotFoundException(`User with ID "${id}" not found for this tenant`);
     }
+
+    await this.auditService.log(
+      'users',
+      'delete',
+      existingUser._id.toString(),
+      {
+        oldState: existingUser.toObject(),
+        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
+      }
+    );
   }
 }

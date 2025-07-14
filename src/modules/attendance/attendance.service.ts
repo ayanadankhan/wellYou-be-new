@@ -89,22 +89,22 @@ export class AttendanceService {
 
   // Manager attendance (own + team)
   private async getManagerAttendance(
-    managerId: string,
+    reportingTo: string,
     employeeId: string,
     startDate?: string,
     endDate?: string,
   ): Promise<AttendanceResponse> {
     // Get manager's own attendance
-    const managerAttendance = await this.getAttendanceByEmployee(managerId, startDate, endDate);
+    const managerAttendance = await this.getAttendanceByEmployee(reportingTo, startDate, endDate);
     const managerFormattedData = this.formatAttendanceData(managerAttendance);
     const managerMonthlyStats = this.calculateMonthlyStats(managerAttendance);
 
     // Get team members under this manager
     const teamMembers = await this.employeeModel.find({
-      managerId: new Types.ObjectId(managerId),
+      reportingTo: new Types.ObjectId(reportingTo),
     }).select('_id name email position');
 
-    this.logger.log(`Found ${teamMembers.length} team members for manager: ${managerId}`);
+    this.logger.log(`Found ${teamMembers.length} team members for manager: ${reportingTo}`);
 
     // Get attendance for all team members
     const teamAttendance = [];
@@ -154,7 +154,7 @@ export class AttendanceService {
     // Get all employees
     const allEmployees = await this.employeeModel.find({
       _id: { $ne: new Types.ObjectId(adminId) }, // Exclude admin from the list
-    }).select('_id name email position managerId');
+    }).select('_id name email position reportingTo');
 
     this.logger.log(`Found ${allEmployees.length} employees for admin view`);
 
@@ -169,8 +169,8 @@ export class AttendanceService {
       
       // Get manager info if exists
       let managerInfo = null;
-      if (employee.managerId) {
-        const manager = await this.employeeModel.findById(employee.managerId).select('name email');
+      if (employee.reportingTo) {
+        const manager = await this.employeeModel.findById(employee.reportingTo).select('name email');
         managerInfo = manager ? { name: manager.name } : null;
       }
       

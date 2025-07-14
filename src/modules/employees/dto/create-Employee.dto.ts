@@ -56,20 +56,20 @@ class SkillDto {
   @ApiProperty({ 
     description: 'Name of the skill', 
     example: 'React',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
   @ApiProperty({ 
     description: 'Proficiency level of the skill', 
     example: SkillLevel.EXPERT,
     enum: SkillLevel,
-    required: true
+    required: false
   })
   @IsEnum(SkillLevel)
-  @IsNotEmpty()
+  @IsOptional()
   level: SkillLevel;
 }
 
@@ -77,16 +77,16 @@ class EducationDto {
   @ApiProperty({ 
     description: 'Unique ID for the education record', 
     example: 'edu-1',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   id: string;
 
   @ApiProperty({ 
     description: 'Name of the institution', 
     example: 'Stanford University',
-    required: true
+    required: false
   })
   @IsString()
   @IsOptional()
@@ -95,7 +95,7 @@ class EducationDto {
   @ApiProperty({ 
     description: 'Degree obtained', 
     example: 'Master of Science',
-    required: true
+    required: false
   })
   @IsString()
   @IsOptional()
@@ -104,7 +104,7 @@ class EducationDto {
   @ApiProperty({ 
     description: 'Field of study', 
     example: 'Computer Science',
-    required: true
+    required: false
   })
   @IsString()
   @IsOptional()
@@ -113,7 +113,7 @@ class EducationDto {
   @ApiProperty({ 
     description: 'Start date of education (YYYY-MM-DD)', 
     example: '2018-09-01',
-    required: true
+    required: false
   })
   @IsDateString()
   @IsOptional()
@@ -151,7 +151,7 @@ class EducationDto {
   @ApiProperty({ 
     description: 'Whether currently enrolled in this education', 
     example: false,
-    required: true
+    required: false
   })
   @IsBoolean()
   isEnrolled: boolean;
@@ -170,37 +170,37 @@ class CertificationDto {
   @ApiProperty({ 
     description: 'Unique ID for the certification', 
     example: 'cert-1',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   id: string;
 
   @ApiProperty({ 
     description: 'Name of the certification', 
     example: 'AWS Solutions Architect Associate',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
   @ApiProperty({ 
     description: 'Issuing organization', 
     example: 'Amazon Web Services',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   issuingOrganization: string;
 
   @ApiProperty({ 
     description: 'Issue date of the certification (YYYY-MM-DD)', 
     example: '2023-04-10',
-    required: true
+    required: false
   })
   @IsDateString()
-  @IsNotEmpty()
+  @IsOptional()
   issueDate: string;
 
   @ApiProperty({ 
@@ -253,37 +253,37 @@ class ExperienceDto {
   @ApiProperty({ 
     description: 'Unique ID for the experience', 
     example: 'exp-1',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   id: string;
 
   @ApiProperty({ 
     description: 'Name of the company', 
     example: 'TechCorp Solutions',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   companyName: string;
 
   @ApiProperty({ 
     description: 'Position held', 
     example: 'Senior Software Engineer',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   position: string;
 
   @ApiProperty({ 
     description: 'Start date of employment (ISO 8601 format)', 
     example: '2021-01-01T00:00:00.000Z',
-    required: true
+    required: false
   })
   @IsDateString()
-  @IsNotEmpty()
+  @IsOptional()
   startDate: string;
 
   @ApiProperty({ 
@@ -298,10 +298,10 @@ class ExperienceDto {
   @ApiProperty({ 
     description: 'Whether this is the current role', 
     example: false,
-    required: true
+    required: false
   })
   @IsBoolean()
-  @IsNotEmpty()
+  @IsOptional()
   isCurrentRole: boolean;
 
   @ApiProperty({ 
@@ -376,28 +376,28 @@ class DocumentDto {
   @ApiProperty({ 
     description: 'Type of document', 
     example: 'RESUME',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   type: string;
 
   @ApiProperty({ 
     description: 'Name of the document', 
     example: 'John_Doe_Resume.pdf',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
   @ApiProperty({ 
     description: 'URL to access the document', 
     example: 'https://example.com/documents/john_doe_resume.pdf',
-    required: true
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   url: string;
 }
 
