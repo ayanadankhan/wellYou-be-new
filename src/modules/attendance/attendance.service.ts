@@ -53,7 +53,7 @@ export class AttendanceService {
           response = await this.getManagerAttendance(userId, employeeId, startDate, endDate);
           break;
         
-        case 'admin':
+        case 'company_admin':
           response = await this.getAdminAttendance(userId, employeeId, startDate, endDate);
           break;
         
@@ -485,7 +485,7 @@ async getRoleBasedAttendance(
   let currentEmployeeId: Types.ObjectId | null = null; // The employeeId corresponding to the current userId
 
   // --- Handle Admin Role First ---
-  if (userRole === 'admin') {
+  if (userRole === 'company_admin') {
     this.logger.log(`User is an admin. Fetching attendance for all employees within tenant: ${tenantId}`);
     if (!tenantId) {
       this.logger.error(`Admin user ${userId} does not have a tenantId. Cannot fetch tenant-specific attendance.`);
