@@ -130,6 +130,27 @@ export class EmployeesService {
         },
         { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
         {
+          $addFields: {
+            'progress.totalProgress': {
+              $round: [
+                {
+                  $avg: [
+                    '$progress.basicInfo',
+                    '$progress.personalInfo',
+                    '$progress.education',
+                    '$progress.certification',
+                    '$progress.employment',
+                    '$progress.experience',
+                    '$progress.skills',
+                    '$progress.documents'
+                  ]
+                },
+                0
+              ]
+            }
+          }
+        },
+        {
           $project: {
             'user.password': 0,
           },
@@ -287,92 +308,93 @@ export class EmployeesService {
     }
   }
 
-async findByUserId(userId: string): Promise<GetEmployeeDto> {
-    try {
-      this.logger.log(`Fetching employee with userId: ${userId}`);
-      
-      const employee = await this.employeeModel.aggregate([
-        { $match: { userId: new Types.ObjectId(userId) } },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'userId',
-            foreignField: '_id',
-            as: 'user',
+  async findByUserId(userId: string): Promise<GetEmployeeDto> {
+      try {
+        this.logger.log(`Fetching employee with userId: ${userId}`);
+        
+        const employee = await this.employeeModel.aggregate([
+          { $match: { userId: new Types.ObjectId(userId) } },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'userId',
+              foreignField: '_id',
+              as: 'user',
+            },
           },
-        },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: 'departments',
-            localField: 'departmentId',
-            foreignField: '_id',
-            as: 'department',
+          { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: 'departments',
+              localField: 'departmentId',
+              foreignField: '_id',
+              as: 'department',
+            },
           },
-        },
-        { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: 'designations',
-            localField: 'positionId',
-            foreignField: '_id',
-            as: 'position',
+          { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: 'designations',
+              localField: 'positionId',
+              foreignField: '_id',
+              as: 'position',
+            },
           },
-        },
-        { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'reportingTo',
-            foreignField: '_id',
-            as: 'reportingTo',
+          { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'reportingTo',
+              foreignField: '_id',
+              as: 'reportingTo',
+            },
           },
-        },
-        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: 'salaries',
-            localField: '_id',
-            foreignField: 'employeesId',
-            as: 'salary',
+          { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: 'salaries',
+              localField: '_id',
+              foreignField: 'employeesId',
+              as: 'salary',
+            },
           },
-        },
-        { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
-        { $project: { 'user.password': 0 } },
-        { $limit: 1 }
-      ]);
+          { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
+          { $project: { 'user.password': 0 } },
+          { $limit: 1 }
+        ]);
 
-      if (!employee || employee.length === 0) {
-        this.logger.warn(`Employee with userId ${userId} not found`);
+        if (!employee || employee.length === 0) {
+          this.logger.warn(`Employee with userId ${userId} not found`);
+          throw new HttpException(
+            {
+              status: HttpStatus.NOT_FOUND,
+              error: 'Employee not found',
+              message: `Employee with userId ${userId} does not exist`,
+            },
+            HttpStatus.NOT_FOUND,
+          );
+        }
+        this.logger.log(`Employee with userId ${userId} retrieved successfully`);
+        return plainToClass(GetEmployeeDto, employee[0]);
+      } catch (error) {
+        this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
+        if (error instanceof HttpException) {
+          throw error;
+        }
         throw new HttpException(
           {
-            status: HttpStatus.NOT_FOUND,
-            error: 'Employee not found',
-            message: `Employee with userId ${userId} does not exist`,
+            status: HttpStatus.INTERNAL_SERVER_ERROR,
+            error: 'Failed to fetch employee',
+            message: error.message,
           },
-          HttpStatus.NOT_FOUND,
+          HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
-      this.logger.log(`Employee with userId ${userId} retrieved successfully`);
-      return plainToClass(GetEmployeeDto, employee[0]);
-    } catch (error) {
-      this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          status: HttpStatus.INTERNAL_SERVER_ERROR,
-          error: 'Failed to fetch employee',
-          message: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
     }
-  }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<GetEmployeeDto> {
     try {
+      // ✅ Validate ID
       if (!isValidObjectId(id)) {
         this.logger.warn(`Invalid MongoDB ObjectID: ${id}`);
         throw new HttpException(
@@ -384,7 +406,10 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
           HttpStatus.BAD_REQUEST,
         );
       }
+
       this.logger.log(`Updating employee with ID: ${id}`);
+
+      // ✅ Validate & cleanup reportingTo
       if (
         'reportingTo' in updateEmployeeDto &&
         (!updateEmployeeDto.reportingTo || !isValidObjectId(updateEmployeeDto.reportingTo))
@@ -392,10 +417,10 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
         delete updateEmployeeDto.reportingTo;
       }
 
-      const updatedEmployee = await this.employeeModel
-        .findByIdAndUpdate(id, { $set: updateEmployeeDto }, { new: true })
-        .exec();
-      if (!updatedEmployee) {
+      // ✅ Fetch existing employee to safely merge progress
+      const existingEmployee = await this.employeeModel.findById(id).exec();
+
+      if (!existingEmployee) {
         this.logger.warn(`Employee with ID ${id} not found`);
         throw new HttpException(
           {
@@ -406,13 +431,30 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
           HttpStatus.NOT_FOUND,
         );
       }
+
+      // ✅ Merge progress object safely
+      if (updateEmployeeDto.progress && existingEmployee.progress) {
+        updateEmployeeDto.progress = {
+          ...existingEmployee.progress,
+          ...updateEmployeeDto.progress,
+        };
+      }
+
+      // ✅ Update employee
+      const updatedEmployee = await this.employeeModel
+        .findByIdAndUpdate(id, { $set: updateEmployeeDto }, { new: true })
+        .exec();
+
       this.logger.log(`Employee with ID ${id} updated successfully`);
-      return plainToClass(GetEmployeeDto, updatedEmployee.toObject());
+
+      return plainToClass(GetEmployeeDto, updatedEmployee?.toObject());
     } catch (error) {
       this.logger.error(`Failed to update employee with ID ${id}: ${error.message}`, error.stack);
+
       if (error instanceof HttpException) {
         throw error;
       }
+
       throw new HttpException(
         {
           status: HttpStatus.BAD_REQUEST,
