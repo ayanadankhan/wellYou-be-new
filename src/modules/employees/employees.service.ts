@@ -385,6 +385,13 @@ async findByUserId(userId: string): Promise<GetEmployeeDto> {
         );
       }
       this.logger.log(`Updating employee with ID: ${id}`);
+      if (
+        'reportingTo' in updateEmployeeDto &&
+        (!updateEmployeeDto.reportingTo || !isValidObjectId(updateEmployeeDto.reportingTo))
+      ) {
+        delete updateEmployeeDto.reportingTo;
+      }
+
       const updatedEmployee = await this.employeeModel
         .findByIdAndUpdate(id, { $set: updateEmployeeDto }, { new: true })
         .exec();
