@@ -491,7 +491,15 @@ async getRoleBasedAttendance(
       this.logger.error(`Admin user ${userId} does not have a tenantId. Cannot fetch tenant-specific attendance.`);
       throw new BadRequestException('Admin user is missing tenant information.');
     }
-    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) }).select('_id').exec();
+  const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) })
+    .select('_id userId') // SELECT userId for population
+    .populate({
+      path: 'userId',
+      model: 'User',
+      select: 'firstName lastName'
+    })
+    .exec();
+
     employeeIdsToQuery = allTenantEmployees.map(employee => employee._id);
     this.logger.log(`Found ${employeeIdsToQuery.length} employees for tenantId: ${tenantId}.`);
 
@@ -609,8 +617,9 @@ async getRoleBasedAttendance(
     const groupedAttendance = this.groupAttendanceByEmployee(
       attendance,
       employeeIdsToQuery,
-      currentEmployeeId ?? employeeIdsToQuery[0] // fallback to first employeeId if null
+      userRole !== 'company_admin' ? currentEmployeeId : null
     );
+
 
     for (const group of groupedAttendance) {
       if (group.employeeInfo && group.employeeInfo.userId) {
@@ -635,50 +644,50 @@ async getRoleBasedAttendance(
   /**
    * Helper to group attendance records by employeeId and identify the current user's attendance
    */
-  private groupAttendanceByEmployee(
-    attendanceRecords: any[], // Use 'any' because of populated fields
-    employeeIdsToQuery: Types.ObjectId[],
-    currentEmployeeId: Types.ObjectId,
-  ): any[] {
-    const groupedMap = new Map<string, any>();
+private groupAttendanceByEmployee(
+  attendanceRecords: any[], // populated
+  employeeIdsToQuery: Types.ObjectId[],
+  currentEmployeeId?: Types.ObjectId | null // now optional
+): any[] {
+  const groupedMap = new Map<string, any>();
 
-    // Initialize map with all queried employee IDs to ensure all are present, even if no attendance
-    for (const empId of employeeIdsToQuery) {
-      groupedMap.set(empId.toHexString(), {
-        employeeId: empId.toHexString(),
-        employeeInfo: { _id: empId.toHexString() }, // Placeholder, will be populated
-        isCurrentUser: empId.equals(currentEmployeeId),
-        attendanceType: empId.equals(currentEmployeeId) ? 'myAttendance' : 'teamMemberAttendance',
-        attendance: [],
-        monthlyStats: {}, // Placeholder for stats
-      });
-    }
-
-    attendanceRecords.forEach(record => {
-      const empId = record.employeeId._id.toHexString(); // Access employeeId from populated field
-      if (groupedMap.has(empId)) {
-        const group = groupedMap.get(empId);
-        group.attendance.push(record);
-        // Populate employeeInfo from the first record found for that employee
-        if (!group.employeeInfo.userId && record.employeeId.userId) {
-            group.employeeInfo = {
-                _id: record.employeeId._id.toHexString(),
-                userId: record.employeeId.userId, // This will be the populated user object
-                // name will be added later in the service method
-            };
-        }
-      }
+  for (const empId of employeeIdsToQuery) {
+    const isCurrentUser = currentEmployeeId ? empId.equals(currentEmployeeId) : false;
+    
+    groupedMap.set(empId.toHexString(), {
+      employeeId: empId.toHexString(),
+      employeeInfo: { _id: empId.toHexString() },
+      isCurrentUser,
+      attendanceType: isCurrentUser ? 'myAttendance' : 'teamMemberAttendance',
+      attendance: [],
+      monthlyStats: {},
     });
-
-    const groupedData = Array.from(groupedMap.values());
-
-    // Calculate monthly stats for each employee group
-    groupedData.forEach(group => {
-      group.monthlyStats = this.calculateMonthlyStats(group.attendance);
-    });
-
-    return groupedData;
   }
+
+  attendanceRecords.forEach(record => {
+    const empId = record.employeeId._id.toHexString();
+    if (groupedMap.has(empId)) {
+      const group = groupedMap.get(empId);
+      group.attendance.push(record);
+
+      if (!group.employeeInfo.userId && record.employeeId.userId) {
+        group.employeeInfo = {
+          _id: record.employeeId._id.toHexString(),
+          userId: record.employeeId.userId,
+        };
+      }
+    }
+  });
+
+  const groupedData = Array.from(groupedMap.values());
+
+  groupedData.forEach(group => {
+    group.monthlyStats = this.calculateMonthlyStats(group.attendance);
+  });
+
+  return groupedData;
+}
+
 
 
   /**

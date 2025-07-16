@@ -199,7 +199,6 @@ class CertificationDto {
     example: '2023-04-10',
     required: false
   })
-  @IsDateString()
   @IsOptional()
   issueDate: string;
 
@@ -208,7 +207,6 @@ class CertificationDto {
     example: '2026-04-10', 
     required: false 
   })
-  @IsDateString()
   @IsOptional()
   expirationDate?: string;
 
