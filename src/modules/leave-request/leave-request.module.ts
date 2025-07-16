@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { LeaveRequestService } from './leave-request.service';
 import { LeaveRequestController } from './leave-request.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { LeaveRequest, LeaveRequestSchema } from './entities/leave-type.entity';
+import { LeaveRequest, LeaveRequestSchema } from './entities/leave-request.entity';
 import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
 import { User, UserSchema } from '../tenant/users/schemas/user.schema';
 

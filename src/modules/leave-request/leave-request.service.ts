@@ -9,7 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
-import { LeaveRequest, LeaveRequestDocument } from './entities/leave-type.entity';
+import { LeaveRequest, LeaveRequestDocument } from './entities/leave-request.entity';
 import { Employee } from '../employees/schemas/Employee.schema';
 
 
