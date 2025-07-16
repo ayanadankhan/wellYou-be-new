@@ -175,8 +175,8 @@ export class Employee {
   @Prop({ required: true, type: String })
   phoneNumber: string;
 
-  @Prop({ required: true, type: Number })
-  progress: number;
+  @Prop({ type: Object, required: true })
+  progress: Record<string, any>;
 
   @Prop({ required: true, type: String })
   location: string;

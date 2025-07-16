@@ -9,7 +9,8 @@ import {
   IsArray, 
   IsBoolean, 
   ValidateNested,
-  IsEnum 
+  IsEnum, 
+  IsObject
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
@@ -504,13 +505,16 @@ export class CreateEmployeeDto {
   @IsNotEmpty()
   phoneNumber: string;
 
-  @ApiProperty({ 
-    description: 'Progress of employee', 
-    example: 100,
-    required: true
+  @ApiProperty({
+    description: 'Progress of employee',
+    example: { task1: 50, task2: 75 },
+    required: true,
+    type: Object,
   })
   @IsNotEmpty()
-  progress: number;
+  @IsObject()
+  progress: Record<string, any>;
+
 
   @ApiProperty({ 
     description: 'Location of employee', 
