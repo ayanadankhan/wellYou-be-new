@@ -12,7 +12,6 @@ import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
 import { LeaveRequest, LeaveRequestDocument } from './entities/leave-request.entity';
 import { Employee } from '../employees/schemas/Employee.schema';
 
-
 @Injectable()
 export class LeaveRequestService {
   private readonly logger = new Logger(LeaveRequestService.name);
@@ -44,27 +43,100 @@ export class LeaveRequestService {
       );
     }
 
-    // Validate dates
-    const startDate = new Date(createLeaveRequestDto.startDate);
-    const endDate = new Date(createLeaveRequestDto.endDate);
+    // Validate based on type
+    await this.validateRequestByType(createLeaveRequestDto);
 
-    if (endDate < startDate) {
-      throw new BadRequestException('End date cannot be before start date');
+    // Check for overlapping requests (only for leave type)
+    if (createLeaveRequestDto.type === 'leave') {
+      await this.checkOverlappingLeaveRequests(createLeaveRequestDto);
     }
 
-    // Check for overlapping leave requests
+    const leaveRequest = new this.leaveRequestModel({
+      ...createLeaveRequestDto,
+      employeeId: new Types.ObjectId(createLeaveRequestDto.employeeId),
+      appliedDate: new Date(), // Auto-generate applied date
+      workflow: {
+        status: 'pending',
+        ...createLeaveRequestDto.workflow,
+      },
+    });
+
+    return await leaveRequest.save();
+  }
+
+  private async validateRequestByType(dto: CreateLeaveRequestDto): Promise<void> {
+    switch (dto.type) {
+      case 'leave':
+        if (!dto.leaveDetails) {
+          throw new BadRequestException('Leave details are required for leave type');
+        }
+        if (!dto.leaveDetails.from || !dto.leaveDetails.to) {
+          throw new BadRequestException('From and to dates are required for leave');
+        }
+        if (new Date(dto.leaveDetails.to) < new Date(dto.leaveDetails.from)) {
+          throw new BadRequestException('To date cannot be before from date');
+        }
+        break;
+
+      case 'timeOff':
+        if (!dto.timeOffDetails) {
+          throw new BadRequestException('Time off details are required for timeOff type');
+        }
+        if (!dto.timeOffDetails.fromHour || !dto.timeOffDetails.toHour) {
+          throw new BadRequestException('From and to hours are required for time off');
+        }
+        this.validateTimeFormat(dto.timeOffDetails.fromHour, dto.timeOffDetails.toHour);
+        break;
+
+      case 'overtime':
+        if (!dto.overtimeDetails) {
+          throw new BadRequestException('Overtime details are required for overtime type');
+        }
+        if (!dto.overtimeDetails.fromHour || !dto.overtimeDetails.toHour) {
+          throw new BadRequestException('From and to hours are required for overtime');
+        }
+        this.validateTimeFormat(dto.overtimeDetails.fromHour, dto.overtimeDetails.toHour);
+        break;
+
+      default:
+        throw new BadRequestException('Invalid request type');
+    }
+  }
+
+  private validateTimeFormat(fromHour: string, toHour: string): void {
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    
+    if (!timeRegex.test(fromHour) || !timeRegex.test(toHour)) {
+      throw new BadRequestException('Invalid time format. Use HH:MM format (e.g., 14:00)');
+    }
+
+    const fromTime = new Date(`1970-01-01T${fromHour}:00`);
+    const toTime = new Date(`1970-01-01T${toHour}:00`);
+
+    if (toTime <= fromTime) {
+      throw new BadRequestException('To hour must be after from hour');
+    }
+  }
+
+  private async checkOverlappingLeaveRequests(dto: CreateLeaveRequestDto): Promise<void> {
+    if (!dto.leaveDetails?.from || !dto.leaveDetails?.to) return;
+
+    const startDate = new Date(dto.leaveDetails.from);
+    const endDate = new Date(dto.leaveDetails.to);
+
     const overlappingRequest = await this.leaveRequestModel.findOne({
-      employeeId: createLeaveRequestDto.employeeId,
+      employeeId: dto.employeeId,
+      type: 'leave',
       $or: [
         {
-          startDate: { $lte: endDate },
-          endDate: { $gte: startDate },
+          'leaveDetails.from': { $lte: endDate },
+          'leaveDetails.to': { $gte: startDate },
         },
         {
-          startDate: { $gte: startDate, $lte: endDate },
+          'leaveDetails.from': { $gte: startDate, $lte: endDate },
         },
       ],
-      status: { $nin: ['rejected', 'cancelled'] },
+      'workflow.status': { $nin: ['rejected'] },
     });
 
     if (overlappingRequest) {
@@ -72,123 +144,137 @@ export class LeaveRequestService {
         'Employee already has a leave request for this period',
       );
     }
+  }
 
-    const leaveRequest = new this.leaveRequestModel({
-      ...createLeaveRequestDto,
-      employeeId: new Types.ObjectId(createLeaveRequestDto.employeeId),
-      status: 'pending',
+  private groupLeaveRequestsByEmployee(
+    leaveRequests: any[],
+    employeeIds: Types.ObjectId[],
+    currentEmployeeId: Types.ObjectId | null
+  ) {
+    const grouped = employeeIds.map(empId => {
+      const empRequests = leaveRequests.filter(lr => lr.employeeId._id.equals(empId));
+      return {
+        employeeId: empId,
+        isCurrentUser: currentEmployeeId ? empId.equals(currentEmployeeId) : false,
+        Requests: empRequests,
+        count: empRequests.length
+      };
     });
 
-    return await leaveRequest.save();
+    const filtered = grouped.filter(group => group.count > 0);
+
+    return filtered;
   }
 
-private groupLeaveRequestsByEmployee(
-  leaveRequests: any[],
-  employeeIds: Types.ObjectId[],
-  currentEmployeeId: Types.ObjectId | null
-) {
-  const grouped = employeeIds.map(empId => {
-    const empRequests = leaveRequests.filter(lr => lr.employeeId._id.equals(empId));
-    return {
-      employeeId: empId,
-      isCurrentUser: currentEmployeeId ? empId.equals(currentEmployeeId) : false,
-      leaveRequests: empRequests,
-      count: empRequests.length
+  async getRoleBasedLeaveRequests(
+    user: any,
+    status?: string,
+    type?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any[]> {
+    const userId = user._id;
+    const userRole = user.role;
+    const tenantId = user.tenantId;
+
+    this.logger.log(`Fetching leave requests for user ${userId}, role ${userRole}`);
+
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
+    let employeeIdsToQuery: Types.ObjectId[] = [];
+    let currentEmployeeId: Types.ObjectId | null = null;
+
+    if (userRole === 'company_admin') {
+      if (!tenantId) {
+        throw new BadRequestException('Admin missing tenant information');
+      }
+
+      const employees = await this.employeeModel.find({ tenantId }).select('_id').exec();
+      employeeIdsToQuery = employees.map(e => e._id);
+    } else {
+      const currentEmployee = await this.employeeModel.findOne({ userId }).exec();
+      if (!currentEmployee) {
+        this.logger.warn(`No employee record found for user ${userId}`);
+        return [];
+      }
+
+      currentEmployeeId = currentEmployee._id;
+      employeeIdsToQuery.push(currentEmployeeId);
+
+      const teamMembers = await this.employeeModel
+        .find({ reportingTo: userId })
+        .select('_id')
+        .exec();
+      if (teamMembers.length > 0) {
+        employeeIdsToQuery.push(...teamMembers.map(m => m._id));
+      }
+    }
+
+    // Build the query
+    const query: any = {
+      employeeId: { $in: employeeIdsToQuery },
+      ...(status && { 'workflow.status': status }),
+      ...(type && { type }),
     };
-  });
 
-  const filtered = grouped.filter(group => group.count > 0);
+    // Date filtering for leave type
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
 
-  return filtered;
-}
-
-
-async getRoleBasedLeaveRequests(
-  user: any,
-  status?: string,
-  startDate?: string,
-  endDate?: string,
-): Promise<any[]> {
-  const userId = user._id;
-  const userRole = user.role;
-  const tenantId = user.tenantId;
-
-  this.logger.log(`Fetching leave requests for user ${userId}, role ${userRole}`);
-
-  if (!Types.ObjectId.isValid(userId)) {
-    throw new BadRequestException('Invalid user ID format');
-  }
-
-  let employeeIdsToQuery: Types.ObjectId[] = [];
-  let currentEmployeeId: Types.ObjectId | null = null;
-
-  if (userRole === 'company_admin') {
-    if (!tenantId) {
-      throw new BadRequestException('Admin missing tenant information');
+      query.$or = [
+        // For leave type - check leaveDetails dates
+        {
+          type: 'leave',
+          'leaveDetails.from': { $lte: end },
+          'leaveDetails.to': { $gte: start }
+        },
+        // For other types - check appliedDate
+        {
+          type: { $in: ['timeOff', 'overtime'] },
+          appliedDate: { $gte: start, $lte: end }
+        }
+      ];
     }
 
-    const employees = await this.employeeModel.find({ tenantId }).select('_id').exec();
-    employeeIdsToQuery = employees.map(e => e._id);
-  } else {
-    const currentEmployee = await this.employeeModel.findOne({ userId }).exec();
-    if (!currentEmployee) {
-      this.logger.warn(`No employee record found for user ${userId}`);
-      return [];
-    }
+    this.logger.log(`Leave request query: ${JSON.stringify(query)}`);
 
-    currentEmployeeId = currentEmployee._id;
-    employeeIdsToQuery.push(currentEmployeeId);
-
-    const teamMembers = await this.employeeModel
-      .find({ reportingTo: userId })
-      .select('_id')
-      .exec();
-    if (teamMembers.length > 0) {
-      employeeIdsToQuery.push(...teamMembers.map(m => m._id));
-    }
-  }
-
-  // Build the query
-  const query: any = {
-    employeeId: { $in: employeeIdsToQuery },
-    ...(status && { status }),
-  };
-
-  // Date filtering if provided
-  if (startDate && endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    query.$or = [
-      { startDate: { $lte: end }, endDate: { $gte: start } }, // Overlapping
-      { startDate: { $gte: start, $lte: end } }, // Starts in range
-      { endDate: { $gte: start, $lte: end } }, // Ends in range
-    ];
-  }
-
-  this.logger.log(`Leave request query: ${JSON.stringify(query)}`);
-
-  // Fetch leave requests with related employee + user info
+    // Fetch leave requests with related employee + user info
   const leaveRequests = await this.leaveRequestModel.find(query)
     .populate({
       path: 'employeeId',
       model: 'Employee',
-      populate: {
-        path: 'userId',
-        model: 'User',
-        select: 'firstName lastName',
-      },
+      select: 'userId positionId departmentId profilePicture', // Only select these fields
+      populate: [
+        {
+          path: 'userId',
+          model: 'User',
+          select: 'firstName lastName',
+        },
+        {
+          path: 'positionId',
+          model: 'Designation',
+          select: 'title', // Only position name
+        },
+        {
+          path: 'departmentId',
+          model: 'Department',
+          select: 'departmentName', // Only department name
+        }
+      ]
     })
+    .sort({ appliedDate: -1 })
     .exec();
 
-  // Group data by employee
-  return this.groupLeaveRequestsByEmployee(
-    leaveRequests,
-    employeeIdsToQuery,
-    currentEmployeeId
-  );
-}
-
+    // Group data by employee
+    return this.groupLeaveRequestsByEmployee(
+      leaveRequests,
+      employeeIdsToQuery,
+      currentEmployeeId
+    );
+  }
 
   async findOne(id: string): Promise<LeaveRequestDocument> {
     if (!Types.ObjectId.isValid(id)) {
@@ -222,23 +308,16 @@ async getRoleBasedLeaveRequests(
       throw new BadRequestException('Invalid leave request ID format');
     }
 
-    // Validate dates if they're being updated
-    if (updateLeaveRequestDto.startDate || updateLeaveRequestDto.endDate) {
-      const existing = await this.leaveRequestModel.findById(id).exec();
-      if (!existing) {
-        throw new NotFoundException(`Leave request with ID ${id} not found`);
-      }
+    const existing = await this.leaveRequestModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException(`Leave request with ID ${id} not found`);
+    }
 
-      const startDate = updateLeaveRequestDto.startDate
-        ? new Date(updateLeaveRequestDto.startDate)
-        : existing.startDate;
-      const endDate = updateLeaveRequestDto.endDate
-        ? new Date(updateLeaveRequestDto.endDate)
-        : existing.endDate;
-
-      if (endDate < startDate) {
-        throw new BadRequestException('End date cannot be before start date');
-      }
+    // Validate updated data by type
+    if (updateLeaveRequestDto.type || updateLeaveRequestDto.leaveDetails || 
+        updateLeaveRequestDto.timeOffDetails || updateLeaveRequestDto.overtimeDetails) {
+      const mergedDto = { ...existing.toObject(), ...updateLeaveRequestDto };
+      await this.validateRequestByType(mergedDto as any);
     }
 
     const updated = await this.leaveRequestModel
@@ -255,24 +334,36 @@ async getRoleBasedLeaveRequests(
   async changeStatus(
     id: string,
     status: string,
-    comment?: string,
+    actionBy?: string,
+    rejectionReason?: string,
   ): Promise<LeaveRequestDocument> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid leave request ID format');
     }
 
-    const validStatuses = ['pending', 'approved', 'rejected', 'cancelled'];
+    const validStatuses = ['pending', 'approved', 'rejected'];
     if (!validStatuses.includes(status)) {
       throw new BadRequestException('Invalid status');
     }
 
-    const update: any = { status };
-    if (comment) {
-      update.comment = comment;
+    const updateData: any = {
+      'workflow.status': status,
+    };
+
+    if (actionBy) {
+      updateData['workflow.actionBy'] = actionBy;
+    }
+
+    if (status === 'approved') {
+      updateData['workflow.approvalDate'] = new Date();
+    }
+
+    if (status === 'rejected' && rejectionReason) {
+      updateData['workflow.rejectionReason'] = rejectionReason;
     }
 
     const updated = await this.leaveRequestModel
-      .findByIdAndUpdate(id, update, { new: true })
+      .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
 
     if (!updated) {

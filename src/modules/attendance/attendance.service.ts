@@ -482,7 +482,7 @@ async getRoleBasedAttendance(
   }
 
   let employeeIdsToQuery: Types.ObjectId[] = [];
-  let currentEmployeeId: Types.ObjectId | null = null; // The employeeId corresponding to the current userId
+  let currentEmployeeId: Types.ObjectId | null = null;
 
   // --- Handle Admin Role First ---
   if (userRole === 'company_admin') {
@@ -491,50 +491,44 @@ async getRoleBasedAttendance(
       this.logger.error(`Admin user ${userId} does not have a tenantId. Cannot fetch tenant-specific attendance.`);
       throw new BadRequestException('Admin user is missing tenant information.');
     }
-  const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) })
-    .select('_id userId') // SELECT userId for population
-    .populate({
-      path: 'userId',
-      model: 'User',
-      select: 'firstName lastName'
-    })
-    .exec();
+    
+    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) })
+      .select('_id userId profilePicture') // Include profilePicture in the select
+      .populate({
+        path: 'userId',
+        model: 'User',
+        select: 'firstName lastName'
+      })
+      .exec();
 
     employeeIdsToQuery = allTenantEmployees.map(employee => employee._id);
     this.logger.log(`Found ${employeeIdsToQuery.length} employees for tenantId: ${tenantId}.`);
-
-    // No need to find currentEmployeeId if they are just an admin viewing all records
-    // However, if an admin also needs to see their own "employee" specific attendance,
-    // you might still want to try to find their employeeId here, but for broad admin view, it's not strictly necessary.
-    // For this refactor, we assume admin just needs tenant-wide view.
   } else {
-    // --- For Non-Admin Roles (e.g., employee) ---
-    // Step 1: Find the current user's corresponding Employee ID
-    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId) }).exec();
+    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId) })
+      .select('_id profilePicture')
+      .exec();
 
     if (!currentUserEmployee) {
       this.logger.warn(`No employee record found for userId: ${userId}. User may not be an employee or record is missing.`);
       return [];
     }
-    currentEmployeeId = currentUserEmployee._id; // This is the employee ID of the logged-in user
-
-    this.logger.log(`Mapped userId: ${userId} to current user's employeeId: ${currentEmployeeId.toHexString()}`);
-
-    // Step 2: Determine which employee IDs to query based on role (now only 'employee' is expected here)
+    currentEmployeeId = currentUserEmployee._id;
+ 
     switch (userRole) {
       case 'employee':
         this.logger.log(`Role: 'employee'. Checking if any employees have reportingTo field matching userId: ${userId}`);
 
-        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId) }).select('_id').exec();
+        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId) })
+          .select('_id profilePicture')
+          .exec();
 
         if (teamMembers.length > 0) {
           this.logger.log(`Found ${teamMembers.length} team members reporting to userId: ${userId}`);
           employeeIdsToQuery.push(currentEmployeeId);
           const teamMemberIds = teamMembers.map(member => member._id);
           employeeIdsToQuery.push(...teamMemberIds);
-          this.logger.log(`Including own employeeId: ${currentEmployeeId.toHexString()} and team member IDs: [${teamMemberIds.map(id => id.toHexString()).join(', ')}]`);
         } else {
-          this.logger.log(`No team members found reporting to userId: ${userId}. Fetching only own attendance for employeeId: ${currentEmployeeId.toHexString()}`);
+          this.logger.log(`No team members found reporting to userId: ${userId}. Fetching only own attendance`);
           employeeIdsToQuery.push(currentEmployeeId);
         }
         break;
@@ -545,16 +539,14 @@ async getRoleBasedAttendance(
     }
   }
 
-  // Deduplicate and ensure all IDs are ObjectId
   employeeIdsToQuery = [...new Set(employeeIdsToQuery.map(id => id.toHexString()))].map(id => new Types.ObjectId(id));
-  this.logger.log(`Final unique employee IDs to query for attendance: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`);
 
   if (employeeIdsToQuery.length === 0) {
     this.logger.log('No employee IDs to query after role-based determination. Returning empty attendance.');
     return [];
   }
 
-  let effectiveStartDate: Date;
+ let effectiveStartDate: Date;
   let effectiveEndDate: Date;
 
   if (startDate && endDate) {
@@ -590,13 +582,11 @@ async getRoleBasedAttendance(
   try {
     const query: any = {
       employeeId: { $in: employeeIdsToQuery },
-      date: {
+            date: {
         $gte: effectiveStartDate,
         $lte: effectiveEndDate,
       },
     };
-
-    this.logger.log(`MongoDB Attendance Query: ${JSON.stringify(query)}`);
 
     const attendance = await this.attendanceModel.find(query)
       .populate({
@@ -607,56 +597,72 @@ async getRoleBasedAttendance(
           model: 'User',
           select: 'firstName lastName',
         },
-        select: 'userId'
+        select: 'userId profilePicture'
       })
       .sort({ date: -1 })
       .exec();
 
-    this.logger.log(`Found ${attendance.length} attendance records.`);
+    // Get all employee details including profile pictures in one query
+    const employees = await this.employeeModel.find({ _id: { $in: employeeIdsToQuery } })
+      .select('_id profilePicture')
+      .populate({
+        path: 'userId',
+        model: 'User',
+        select: 'firstName lastName'
+      })
+      .exec();
+
+    const employeeMap = new Map<string, any>();
+    employees.forEach(emp => {
+      employeeMap.set(emp._id.toString(), {
+        _id: emp._id,
+        profilePicture: emp.profilePicture,
+        userId: emp.userId
+      });
+    });
 
     const groupedAttendance = this.groupAttendanceByEmployee(
       attendance,
       employeeIdsToQuery,
-      userRole !== 'company_admin' ? currentEmployeeId : null
+      userRole !== 'company_admin' ? currentEmployeeId : null,
+      employeeMap // Pass the employee map to the grouping function
     );
 
-
-    for (const group of groupedAttendance) {
-      if (group.employeeInfo && group.employeeInfo.userId) {
-        const userDoc = group.employeeInfo.userId;
-        group.employeeInfo.name = `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim();
-      } else {
-        group.employeeInfo.name = 'N/A';
-      }
-    }
-
-    this.logger.log(`Grouped attendance into ${groupedAttendance.length} employee groups.`);
     return groupedAttendance;
 
   } catch (error) {
-    this.logger.error(`Error querying attendance records for employeeIds: [${employeeIdsToQuery.map(id => id.toHexString()).join(', ')}]`, error.message, error.stack);
+    this.logger.error(`Error querying attendance records:`, error.message, error.stack);
     throw new Error('Internal server error while fetching attendance records.');
   }
 }
 
-  // ... (rest of your service methods: groupAttendanceByEmployee, determineStatus, calculateMonthlyStats, formatTime, getDayName, calculateAverageTime)
-
-  /**
-   * Helper to group attendance records by employeeId and identify the current user's attendance
-   */
+// Update the groupAttendanceByEmployee method to accept employeeMap
 private groupAttendanceByEmployee(
-  attendanceRecords: any[], // populated
+  attendanceRecords: any[],
   employeeIdsToQuery: Types.ObjectId[],
-  currentEmployeeId?: Types.ObjectId | null // now optional
+  currentEmployeeId?: Types.ObjectId | null,
+  employeeMap?: Map<string, any>
 ): any[] {
   const groupedMap = new Map<string, any>();
 
   for (const empId of employeeIdsToQuery) {
+    const empIdStr = empId.toHexString();
     const isCurrentUser = currentEmployeeId ? empId.equals(currentEmployeeId) : false;
     
-    groupedMap.set(empId.toHexString(), {
-      employeeId: empId.toHexString(),
-      employeeInfo: { _id: empId.toHexString() },
+    // Get employee info from the map if available
+    const employeeInfo = employeeMap?.get(empIdStr) || { 
+      _id: empId,
+      profilePicture: null,
+      userId: null 
+    };
+
+    groupedMap.set(empIdStr, {
+      employeeId: empIdStr,
+      employeeInfo: {
+        _id: empIdStr,
+        profilePicture: employeeInfo.profilePicture, // Include profile picture
+        userId: employeeInfo.userId
+      },
       isCurrentUser,
       attendanceType: isCurrentUser ? 'myAttendance' : 'teamMemberAttendance',
       attendance: [],
@@ -669,13 +675,6 @@ private groupAttendanceByEmployee(
     if (groupedMap.has(empId)) {
       const group = groupedMap.get(empId);
       group.attendance.push(record);
-
-      if (!group.employeeInfo.userId && record.employeeId.userId) {
-        group.employeeInfo = {
-          _id: record.employeeId._id.toHexString(),
-          userId: record.employeeId.userId,
-        };
-      }
     }
   });
 
@@ -683,6 +682,14 @@ private groupAttendanceByEmployee(
 
   groupedData.forEach(group => {
     group.monthlyStats = this.calculateMonthlyStats(group.attendance);
+    
+    // Format employee name if userId is available
+    if (group.employeeInfo && group.employeeInfo.userId) {
+      const userDoc = group.employeeInfo.userId;
+      group.employeeInfo.name = `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim();
+    } else {
+      group.employeeInfo.name = 'N/A';
+    }
   });
 
   return groupedData;
