@@ -2,18 +2,87 @@ import {
   IsNotEmpty, 
   IsString, 
   IsOptional, 
-  IsBoolean, 
   IsDateString, 
-  IsArray, 
-  ArrayMaxSize,
-  MaxLength,
-  Validate,
   IsMongoId,
   IsIn,
-  Min,
-  IsNumber
+  IsNumber,
+  ValidateNested,
+  IsObject
 } from 'class-validator';
-// import { IsAfterDate } from '../validators/is-after-date.validator'; // Custom validator for date comparison
+import { Type } from 'class-transformer';
+
+// DTOs for nested objects
+export class LeaveDetailsDto {
+  @IsOptional()
+  @IsString()
+  leaveType?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsDateString()
+  from?: Date;
+
+  @IsOptional()
+  @IsDateString()
+  to?: Date;
+}
+
+export class TimeOffDetailsDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  fromHour?: string; // e.g., "14:00"
+
+  @IsOptional()
+  @IsString()
+  toHour?: string;
+
+  @IsOptional()
+  @IsNumber()
+  totalHour?: number;
+}
+
+export class OvertimeDetailsDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  fromHour?: string;
+
+  @IsOptional()
+  @IsString()
+  toHour?: string;
+
+  @IsOptional()
+  @IsNumber()
+  totalHour?: number;
+}
+
+export class WorkflowDto {
+  @IsOptional()
+  @IsIn(['pending', 'approved', 'rejected'])
+  status?: string = 'pending';
+
+  @IsOptional()
+  @IsString()
+  actionBy?: string;
+
+  @IsOptional()
+  @IsDateString()
+  actionDate?: Date;
+
+  @IsOptional()
+  @IsString()
+  rejectionReason?: string;
+}
 
 export class CreateLeaveRequestDto {
   @IsNotEmpty()
@@ -21,45 +90,32 @@ export class CreateLeaveRequestDto {
   employeeId: string;
 
   @IsNotEmpty()
-  leaveType: string;
+  @IsIn(['leave', 'timeOff', 'overtime'])
+  type: string;
 
-  @IsNotEmpty()
-  @IsDateString()
-  // @Validate(IsAfterDate, ['startDate']) // Ensures endDate is after startDate
-  startDate: Date;
-
-  @IsNotEmpty()
-  @IsDateString()
-  endDate: Date;
+  // Note: appliedDate will be auto-generated in backend, no need to include in DTO
 
   @IsOptional()
-  @IsBoolean()
-  isHalfDay?: boolean = false;
+  @IsObject()
+  @ValidateNested()
+  @Type(() => LeaveDetailsDto)
+  leaveDetails?: LeaveDetailsDto;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TimeOffDetailsDto)
+  timeOffDetails?: TimeOffDetailsDto;
 
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(5) // Limit to 5 documents
-  @IsString({ each: true })
-  documents?: string[] = [];
-
-
-
-  // You might want to add these for direct creation (admin use)
-  @IsOptional()
-  @IsIn(['pending', 'approved', 'rejected', 'cancelled'])
-  status?: string = 'pending';
+  @IsObject()
+  @ValidateNested()
+  @Type(() => OvertimeDetailsDto)
+  overtimeDetails?: OvertimeDetailsDto;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  daysCount?: number; // Will be auto-calculated if not provided
- 
-  @IsOptional()
-  @IsNumber()
-  usedDays?: number; 
+  @IsObject()
+  @ValidateNested()
+  @Type(() => WorkflowDto)
+  workflow?: WorkflowDto;
 }
