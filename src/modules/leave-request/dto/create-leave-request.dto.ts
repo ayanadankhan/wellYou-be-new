@@ -28,6 +28,10 @@ export class LeaveDetailsDto {
   @IsOptional()
   @IsDateString()
   to?: Date;
+
+  @IsOptional()
+  @IsNumber()
+  totalHour?: number;
 }
 
 export class TimeOffDetailsDto {
@@ -82,6 +86,10 @@ export class WorkflowDto {
   @IsOptional()
   @IsString()
   rejectionReason?: string;
+
+  @IsOptional()
+  @IsObject()
+  modifications?: Object;
 }
 
 export class CreateLeaveRequestDto {

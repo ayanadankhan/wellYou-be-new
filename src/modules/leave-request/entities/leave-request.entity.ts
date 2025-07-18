@@ -28,6 +28,7 @@ export class LeaveRequest {
       reason: { type: String, required: false },
       from: { type: Date, required: false },
       to: { type: Date, required: false },
+      totalHour: { type: Number, required: false },
     },
     required: false,
   })
@@ -36,6 +37,7 @@ export class LeaveRequest {
     reason?: string;
     from?: Date;
     to?: Date;
+    totalHour?: number;
   };
 
   // Time off specific details
@@ -83,6 +85,7 @@ export class LeaveRequest {
       actionBy: { type: String, required: false },
       actionDate: { type: Date, required: false },
       rejectionReason: { type: String, required: false },
+      modifications: { type: Object, required: false },
     },
     default: {
       status: 'pending',
@@ -93,6 +96,7 @@ export class LeaveRequest {
     actionBy?: string;
     actionDate?: Date;
     rejectionReason?: string;
+    modifications?: Object;
   };
 }
 
