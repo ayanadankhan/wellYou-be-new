@@ -22,47 +22,100 @@ export class LeaveRequestService {
     @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
   ) {}
 
-  async create(
-    createLeaveRequestDto: CreateLeaveRequestDto,
-    // userId: Types.ObjectId,
-  ): Promise<LeaveRequestDocument> {
-    // Validate employeeId
-    if (!Types.ObjectId.isValid(createLeaveRequestDto.employeeId)) {
-      throw new BadRequestException('Invalid employee ID format');
-    }
-
-    // Find employee and verify it belongs to the user
-    const employee = await this.employeeModel.findOne({
-      _id: createLeaveRequestDto.employeeId,
-      // userId: userId,
-    });
-
-    if (!employee) {
-      throw new NotFoundException(
-        'Employee not found or does not belong to the user',
-      );
-    }
-
-    // Validate based on type
-    await this.validateRequestByType(createLeaveRequestDto);
-
-    // Check for overlapping requests (only for leave type)
-    if (createLeaveRequestDto.type === 'leave') {
-      await this.checkOverlappingLeaveRequests(createLeaveRequestDto);
-    }
-
-    const leaveRequest = new this.leaveRequestModel({
-      ...createLeaveRequestDto,
-      employeeId: new Types.ObjectId(createLeaveRequestDto.employeeId),
-      appliedDate: new Date(), // Auto-generate applied date
-      workflow: {
-        status: 'pending',
-        ...createLeaveRequestDto.workflow,
-      },
-    });
-
-    return await leaveRequest.save();
+async create(
+  createLeaveRequestDto: CreateLeaveRequestDto,
+): Promise<LeaveRequestDocument> {
+  if (!Types.ObjectId.isValid(createLeaveRequestDto.employeeId)) {
+    throw new BadRequestException('Invalid employee ID format');
   }
+
+  const employee = await this.employeeModel.findOne({
+    _id: createLeaveRequestDto.employeeId,
+  });
+
+  if (!employee) {
+    throw new NotFoundException(
+      'Employee not found or does not belong to the user',
+    );
+  }
+  await this.validateRequestByType(createLeaveRequestDto);
+
+  if (createLeaveRequestDto.type === 'leave') {
+    await this.checkOverlappingLeaveRequests(createLeaveRequestDto);
+    
+    // Calculate total hours for leave if details are provided
+    if (createLeaveRequestDto.leaveDetails) {
+      const { from, to } = createLeaveRequestDto.leaveDetails;
+      if (from && to) {
+        createLeaveRequestDto.leaveDetails.totalHour = this.calculateLeaveHours(from, to);
+      }
+    }
+  }
+
+  // Calculate total hours for overtime if details are provided
+  if (createLeaveRequestDto.overtimeDetails) {
+    const { fromHour, toHour } = createLeaveRequestDto.overtimeDetails;
+    if (fromHour && toHour) {
+      createLeaveRequestDto.overtimeDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+    }
+  }
+
+  // Calculate total hours for time off if details are provided
+  if (createLeaveRequestDto.timeOffDetails) {
+    const { fromHour, toHour } = createLeaveRequestDto.timeOffDetails;
+    if (fromHour && toHour) {
+      createLeaveRequestDto.timeOffDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+    }
+  }
+
+  const leaveRequest = new this.leaveRequestModel({
+    ...createLeaveRequestDto,
+    employeeId: new Types.ObjectId(createLeaveRequestDto.employeeId),
+    appliedDate: new Date(),
+    workflow: {
+      status: 'pending',
+      ...createLeaveRequestDto.workflow,
+    },
+  });
+
+  return await leaveRequest.save();
+}
+
+private calculateLeaveHours(from: Date, to: Date): number {
+  const startDate = new Date(from);
+  const endDate = new Date(to);
+  
+  // Reset time components to avoid time-related issues
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+
+  let totalDays = 0;
+  const currentDate = new Date(startDate);
+
+  // Calculate working days (excluding Sundays)
+  while (currentDate <= endDate) {
+    // Sunday is day 0 in JavaScript
+    if (currentDate.getDay() !== 0) {
+      totalDays++;
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  // 8 hours per working day
+  return totalDays * 8;
+}
+
+private calculateHoursDifference(fromHour: string, toHour: string): number {
+  const fromDate = new Date(`1970-01-01T${fromHour}:00`);
+  const toDate = new Date(`1970-01-01T${toHour}:00`);
+  
+  if (toDate < fromDate) {
+    toDate.setDate(toDate.getDate() + 1);
+  }
+  
+  const diffInMs = toDate.getTime() - fromDate.getTime();
+  return diffInMs / (1000 * 60 * 60);
+}
 
   private async validateRequestByType(dto: CreateLeaveRequestDto): Promise<void> {
     switch (dto.type) {
@@ -251,7 +304,7 @@ export class LeaveRequestService {
         {
           path: 'userId',
           model: 'User',
-          select: 'firstName lastName',
+          select: 'firstName lastName', // Only name fields
         },
         {
           path: 'positionId',
