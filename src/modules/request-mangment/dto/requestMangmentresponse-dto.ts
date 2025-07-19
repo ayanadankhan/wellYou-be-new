@@ -1,6 +1,6 @@
 import { Expose, Transform } from 'class-transformer';
 
-export class LeaveRequestResponseDto {
+export class RequestMangmentResponseDto {
   @Expose()
   @Transform(({ obj }) => obj._id.toString())
   id: string;

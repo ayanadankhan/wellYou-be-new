@@ -92,7 +92,7 @@ export class WorkflowDto {
   modifications?: Object;
 }
 
-export class CreateLeaveRequestDto {
+export class CreateRequestMangmentDto {
   @IsNotEmpty()
   @IsMongoId()
   employeeId: string;
