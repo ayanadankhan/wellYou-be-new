@@ -1,13 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-export type LeaveRequestDocument = LeaveRequest & Document;
+export type RequestMangmentDocument = RequestMangment & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'leave_requests'
+  collection: 'request_management',
 })
-export class LeaveRequest {
+export class RequestMangment {
   @Prop({ type: Types.ObjectId, ref: 'Employee', required: true })
   employeeId: Types.ObjectId;
 
@@ -100,12 +100,12 @@ export class LeaveRequest {
   };
 }
 
-export const LeaveRequestSchema = SchemaFactory.createForClass(LeaveRequest);
+export const requestMangmentchema = SchemaFactory.createForClass(RequestMangment);
 
 // Add indexes for better query performance
-LeaveRequestSchema.index({ employeeId: 1 });
-LeaveRequestSchema.index({ type: 1 });
-LeaveRequestSchema.index({ appliedDate: 1 });
-LeaveRequestSchema.index({ 'workflow.status': 1 });
-LeaveRequestSchema.index({ 'leaveDetails.from': 1 });
-LeaveRequestSchema.index({ 'leaveDetails.to': 1 });
+requestMangmentchema.index({ employeeId: 1 });
+requestMangmentchema.index({ type: 1 });
+requestMangmentchema.index({ appliedDate: 1 });
+requestMangmentchema.index({ 'workflow.status': 1 });
+requestMangmentchema.index({ 'leaveDetails.from': 1 });
+requestMangmentchema.index({ 'leaveDetails.to': 1 });

@@ -7,30 +7,30 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
-import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
-import { LeaveRequest, LeaveRequestDocument } from './entities/leave-request.entity';
+import { CreateRequestMangmentDto } from './dto/create-request-mangment.dto';
+import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
+import { RequestMangment, RequestMangmentDocument } from './entities/request-mangment.entity';
 import { Employee } from '../employees/schemas/Employee.schema';
 
 @Injectable()
-export class LeaveRequestService {
-  private readonly logger = new Logger(LeaveRequestService.name);
+export class requestMangmentervice {
+  private readonly logger = new Logger(requestMangmentervice.name);
 
   constructor(
-    @InjectModel(LeaveRequest.name)
-    private readonly leaveRequestModel: Model<LeaveRequestDocument>,
+    @InjectModel(RequestMangment.name)
+    private readonly RequestMangmentModel: Model<RequestMangmentDocument>,
     @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
   ) {}
 
 async create(
-  createLeaveRequestDto: CreateLeaveRequestDto,
-): Promise<LeaveRequestDocument> {
-  if (!Types.ObjectId.isValid(createLeaveRequestDto.employeeId)) {
+  createRequestMangmentDto: CreateRequestMangmentDto,
+): Promise<RequestMangmentDocument> {
+  if (!Types.ObjectId.isValid(createRequestMangmentDto.employeeId)) {
     throw new BadRequestException('Invalid employee ID format');
   }
 
   const employee = await this.employeeModel.findOne({
-    _id: createLeaveRequestDto.employeeId,
+    _id: createRequestMangmentDto.employeeId,
   });
 
   if (!employee) {
@@ -38,47 +38,47 @@ async create(
       'Employee not found or does not belong to the user',
     );
   }
-  await this.validateRequestByType(createLeaveRequestDto);
+  await this.validateRequestByType(createRequestMangmentDto);
 
-  if (createLeaveRequestDto.type === 'leave') {
-    await this.checkOverlappingLeaveRequests(createLeaveRequestDto);
+  if (createRequestMangmentDto.type === 'leave') {
+    await this.checkOverlappingrequestMangment(createRequestMangmentDto);
     
     // Calculate total hours for leave if details are provided
-    if (createLeaveRequestDto.leaveDetails) {
-      const { from, to } = createLeaveRequestDto.leaveDetails;
+    if (createRequestMangmentDto.leaveDetails) {
+      const { from, to } = createRequestMangmentDto.leaveDetails;
       if (from && to) {
-        createLeaveRequestDto.leaveDetails.totalHour = this.calculateLeaveHours(from, to);
+        createRequestMangmentDto.leaveDetails.totalHour = this.calculateLeaveHours(from, to);
       }
     }
   }
 
   // Calculate total hours for overtime if details are provided
-  if (createLeaveRequestDto.overtimeDetails) {
-    const { fromHour, toHour } = createLeaveRequestDto.overtimeDetails;
+  if (createRequestMangmentDto.overtimeDetails) {
+    const { fromHour, toHour } = createRequestMangmentDto.overtimeDetails;
     if (fromHour && toHour) {
-      createLeaveRequestDto.overtimeDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+      createRequestMangmentDto.overtimeDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
     }
   }
 
   // Calculate total hours for time off if details are provided
-  if (createLeaveRequestDto.timeOffDetails) {
-    const { fromHour, toHour } = createLeaveRequestDto.timeOffDetails;
+  if (createRequestMangmentDto.timeOffDetails) {
+    const { fromHour, toHour } = createRequestMangmentDto.timeOffDetails;
     if (fromHour && toHour) {
-      createLeaveRequestDto.timeOffDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+      createRequestMangmentDto.timeOffDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
     }
   }
 
-  const leaveRequest = new this.leaveRequestModel({
-    ...createLeaveRequestDto,
-    employeeId: new Types.ObjectId(createLeaveRequestDto.employeeId),
+  const RequestMangment = new this.RequestMangmentModel({
+    ...createRequestMangmentDto,
+    employeeId: new Types.ObjectId(createRequestMangmentDto.employeeId),
     appliedDate: new Date(),
     workflow: {
       status: 'pending',
-      ...createLeaveRequestDto.workflow,
+      ...createRequestMangmentDto.workflow,
     },
   });
 
-  return await leaveRequest.save();
+  return await RequestMangment.save();
 }
 
 private calculateLeaveHours(from: Date, to: Date): number {
@@ -117,7 +117,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
   return diffInMs / (1000 * 60 * 60);
 }
 
-  private async validateRequestByType(dto: CreateLeaveRequestDto): Promise<void> {
+  private async validateRequestByType(dto: CreateRequestMangmentDto): Promise<void> {
     switch (dto.type) {
       case 'leave':
         if (!dto.leaveDetails) {
@@ -171,13 +171,13 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     }
   }
 
-  private async checkOverlappingLeaveRequests(dto: CreateLeaveRequestDto): Promise<void> {
+  private async checkOverlappingrequestMangment(dto: CreateRequestMangmentDto): Promise<void> {
     if (!dto.leaveDetails?.from || !dto.leaveDetails?.to) return;
 
     const startDate = new Date(dto.leaveDetails.from);
     const endDate = new Date(dto.leaveDetails.to);
 
-    const overlappingRequest = await this.leaveRequestModel.findOne({
+    const overlappingRequest = await this.RequestMangmentModel.findOne({
       employeeId: dto.employeeId,
       type: 'leave',
       $or: [
@@ -199,13 +199,13 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     }
   }
 
-  private groupLeaveRequestsByEmployee(
-    leaveRequests: any[],
+  private grouprequestMangmentByEmployee(
+    requestMangment: any[],
     employeeIds: Types.ObjectId[],
     currentEmployeeId: Types.ObjectId | null
   ) {
     const grouped = employeeIds.map(empId => {
-      const empRequests = leaveRequests.filter(lr => lr.employeeId._id.equals(empId));
+      const empRequests = requestMangment.filter(lr => lr.employeeId._id.equals(empId));
       return {
         employeeId: empId,
         isCurrentUser: currentEmployeeId ? empId.equals(currentEmployeeId) : false,
@@ -219,7 +219,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     return filtered;
   }
 
-  async getRoleBasedLeaveRequests(
+  async getRoleBasedrequestMangment(
     user: any,
     status?: string,
     type?: string,
@@ -295,7 +295,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     this.logger.log(`Leave request query: ${JSON.stringify(query)}`);
 
     // Fetch leave requests with related employee + user info
-  const leaveRequests = await this.leaveRequestModel.find(query)
+  const requestMangment = await this.RequestMangmentModel.find(query)
     .populate({
       path: 'employeeId',
       model: 'Employee',
@@ -322,19 +322,19 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     .exec();
 
     // Group data by employee
-    return this.groupLeaveRequestsByEmployee(
-      leaveRequests,
+    return this.grouprequestMangmentByEmployee(
+      requestMangment,
       employeeIdsToQuery,
       currentEmployeeId
     );
   }
 
-  async findOne(id: string): Promise<LeaveRequestDocument> {
+  async findOne(id: string): Promise<RequestMangmentDocument> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid leave request ID format');
     }
 
-    const leaveRequest = await this.leaveRequestModel
+    const RequestMangment = await this.RequestMangmentModel
       .findById(id)
       .populate({
         path: 'employeeId',
@@ -346,35 +346,35 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       })
       .exec();
 
-    if (!leaveRequest) {
+    if (!RequestMangment) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
 
-    return leaveRequest;
+    return RequestMangment;
   }
 
   async update(
     id: string,
-    updateLeaveRequestDto: UpdateLeaveRequestDto,
-  ): Promise<LeaveRequestDocument> {
+    updateRequestMangmentDto: UpdateRequestMangmentDto,
+  ): Promise<RequestMangmentDocument> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid leave request ID format');
     }
 
-    const existing = await this.leaveRequestModel.findById(id).exec();
+    const existing = await this.RequestMangmentModel.findById(id).exec();
     if (!existing) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
 
     // Validate updated data by type
-    if (updateLeaveRequestDto.type || updateLeaveRequestDto.leaveDetails || 
-        updateLeaveRequestDto.timeOffDetails || updateLeaveRequestDto.overtimeDetails) {
-      const mergedDto = { ...existing.toObject(), ...updateLeaveRequestDto };
+    if (updateRequestMangmentDto.type || updateRequestMangmentDto.leaveDetails || 
+        updateRequestMangmentDto.timeOffDetails || updateRequestMangmentDto.overtimeDetails) {
+      const mergedDto = { ...existing.toObject(), ...updateRequestMangmentDto };
       await this.validateRequestByType(mergedDto as any);
     }
 
-    const updated = await this.leaveRequestModel
-      .findByIdAndUpdate(id, updateLeaveRequestDto, { new: true })
+    const updated = await this.RequestMangmentModel
+      .findByIdAndUpdate(id, updateRequestMangmentDto, { new: true })
       .exec();
 
     if (!updated) {
@@ -389,7 +389,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     status: string,
     actionBy?: string,
     rejectionReason?: string,
-  ): Promise<LeaveRequestDocument> {
+  ): Promise<RequestMangmentDocument> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid leave request ID format');
     }
@@ -415,7 +415,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       updateData['workflow.rejectionReason'] = rejectionReason;
     }
 
-    const updated = await this.leaveRequestModel
+    const updated = await this.RequestMangmentModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
 
@@ -431,7 +431,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       throw new BadRequestException('Invalid leave request ID format');
     }
 
-    const result = await this.leaveRequestModel.findByIdAndDelete(id).exec();
+    const result = await this.RequestMangmentModel.findByIdAndDelete(id).exec();
     if (!result) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }

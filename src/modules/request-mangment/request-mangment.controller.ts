@@ -11,28 +11,28 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
-import { LeaveRequestService } from './leave-request.service';
-import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
-import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
+import { requestMangmentervice } from './request-mangment.service';
+import { CreateRequestMangmentDto } from './dto/create-request-mangment.dto';
+import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { plainToClass } from 'class-transformer';
 import { Types } from 'mongoose';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
-import { LeaveRequestResponseDto } from './dto/leaveRequestresponse-dto';
+import { RequestMangmentResponseDto } from './dto/requestMangmentresponse-dto';
 
-@Controller('leaveRequests')
+@Controller('requestMangment')
 @UseGuards()
-export class LeaveRequestController {
-  constructor(private readonly leaveRequestService: LeaveRequestService) {}
+export class RequestMangmentController {
+  constructor(private readonly requestMangmentervice: requestMangmentervice) {}
 
   @Post()
-  async create(@Body() createLeaveRequestDto: CreateLeaveRequestDto): Promise<LeaveRequestResponseDto> {
-    const leaveRequest = await this.leaveRequestService.create(createLeaveRequestDto);
-    return plainToClass(LeaveRequestResponseDto, leaveRequest.toObject(), { excludeExtraneousValues: true });
+  async create(@Body() createRequestMangmentDto: CreateRequestMangmentDto): Promise<RequestMangmentResponseDto> {
+    const RequestMangment = await this.requestMangmentervice.create(createRequestMangmentDto);
+    return plainToClass(RequestMangmentResponseDto, RequestMangment.toObject(), { excludeExtraneousValues: true });
   }
 
   @Get()
-  async getLeaveRequests(
+  async getrequestMangment(
     @CurrentUser() user: User,
     @Query('status') status?: string,
     @Query('type') type?: string,
@@ -40,7 +40,7 @@ export class LeaveRequestController {
     @Query('endDate') endDate?: string,
   ) {
     try {
-      const groupedData = await this.leaveRequestService.getRoleBasedLeaveRequests(
+      const groupedData = await this.requestMangmentervice.getRoleBasedrequestMangment(
         user,
         status,
         type,
@@ -76,7 +76,7 @@ export class LeaveRequestController {
     @Query('endDate') endDate?: string,
   ) {
     try {
-      const allRequests = await this.leaveRequestService.getRoleBasedLeaveRequests(
+      const allRequests = await this.requestMangmentervice.getRoleBasedrequestMangment(
         user,
         undefined,
         undefined,
@@ -89,13 +89,13 @@ export class LeaveRequestController {
         pendingRequests: 0,
         approvedRequests: 0,
         rejectedRequests: 0,
-        leaveRequests: 0,
+        requestMangment: 0,
         timeOffRequests: 0,
         overtimeRequests: 0,
       };
 
       allRequests.forEach(group => {
-        group.leaveRequests.forEach((request: any) => {
+        group.requestMangment.forEach((request: any) => {
           stats.totalRequests++;
           
           // Status statistics
@@ -104,7 +104,7 @@ export class LeaveRequestController {
           else if (request.workflow.status === 'rejected') stats.rejectedRequests++;
           
           // Type statistics
-          if (request.type === 'leave') stats.leaveRequests++;
+          if (request.type === 'leave') stats.requestMangment++;
           else if (request.type === 'timeOff') stats.timeOffRequests++;
           else if (request.type === 'overtime') stats.overtimeRequests++;
         });
@@ -122,9 +122,9 @@ export class LeaveRequestController {
   @Get(':id')
   async findOne(
     @Param('id') id: string,
-  ): Promise<LeaveRequestResponseDto> {
-    const leaveRequest = await this.leaveRequestService.findOne(id);
-    return plainToClass(LeaveRequestResponseDto, leaveRequest, {
+  ): Promise<RequestMangmentResponseDto> {
+    const RequestMangment = await this.requestMangmentervice.findOne(id);
+    return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
     });
   }
@@ -132,13 +132,13 @@ export class LeaveRequestController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() updateLeaveRequestDto: UpdateLeaveRequestDto,
-  ): Promise<LeaveRequestResponseDto> {
-    const leaveRequest = await this.leaveRequestService.update(
+    @Body() updateRequestMangmentDto: UpdateRequestMangmentDto,
+  ): Promise<RequestMangmentResponseDto> {
+    const RequestMangment = await this.requestMangmentervice.update(
       id,
-      updateLeaveRequestDto,
+      updateRequestMangmentDto,
     );
-    return plainToClass(LeaveRequestResponseDto, leaveRequest, {
+    return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
     });
   }
@@ -149,14 +149,14 @@ export class LeaveRequestController {
     @Body('status') status: string,
     @Body('actionBy') actionBy?: string,
     @Body('rejectionReason') rejectionReason?: string,
-  ): Promise<LeaveRequestResponseDto> {
-    const leaveRequest = await this.leaveRequestService.changeStatus(
+  ): Promise<RequestMangmentResponseDto> {
+    const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
       status,
       actionBy,
       rejectionReason,
     );
-    return plainToClass(LeaveRequestResponseDto, leaveRequest, {
+    return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
     });
   }
@@ -166,14 +166,14 @@ export class LeaveRequestController {
     @Param('id') id: string,
     @CurrentUser() user: User,
     @Body('comment') comment?: string,
-  ): Promise<LeaveRequestResponseDto> {
-    const leaveRequest = await this.leaveRequestService.changeStatus(
+  ): Promise<RequestMangmentResponseDto> {
+    const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
       'approved',
       user.firstName + ' ' + user.lastName,
       undefined,
     );
-    return plainToClass(LeaveRequestResponseDto, leaveRequest, {
+    return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
     });
   }
@@ -183,14 +183,14 @@ export class LeaveRequestController {
     @Param('id') id: string,
     @CurrentUser() user: User,
     @Body('rejectionReason') rejectionReason: string,
-  ): Promise<LeaveRequestResponseDto> {
-    const leaveRequest = await this.leaveRequestService.changeStatus(
+  ): Promise<RequestMangmentResponseDto> {
+    const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
       'rejected',
       user.firstName + ' ' + user.lastName,
       rejectionReason,
     );
-    return plainToClass(LeaveRequestResponseDto, leaveRequest, {
+    return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
     });
   }
@@ -198,6 +198,6 @@ export class LeaveRequestController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string): Promise<void> {
-    await this.leaveRequestService.remove(id);
+    await this.requestMangmentervice.remove(id);
   }
 }
