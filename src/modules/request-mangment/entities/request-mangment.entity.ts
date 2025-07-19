@@ -13,7 +13,7 @@ export class RequestMangment {
 
   @Prop({
     type: String,
-    enum: ['leave', 'timeOff', 'overtime'],
+    enum: ['leave', 'timeOff', 'overtime', 'attendance'],
     required: true,
   })
   type: string;
@@ -72,6 +72,22 @@ export class RequestMangment {
     fromHour?: string;
     toHour?: string;
     totalHour?: number;
+  };
+
+  @Prop({
+    type: {
+      reason: { type: String, required: false },
+      checkInTime: { type: String, required: false },
+      checkOutTime: { type: String, required: false },
+      attendanceId: { type: String, required: false },
+    },
+    required: false,
+  })
+  attendanceDetails?: {
+    reason?: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    attendanceId?: string;
   };
 
   // Workflow management
