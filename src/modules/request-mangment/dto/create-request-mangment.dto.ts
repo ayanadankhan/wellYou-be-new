@@ -70,6 +70,22 @@ export class OvertimeDetailsDto {
   totalHour?: number;
 }
 
+export class AttendanceDetailsDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  checkInTime?: string;
+
+  @IsOptional()
+  checkOutTime?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  attendanceId?: string;
+}
+
 export class WorkflowDto {
   @IsOptional()
   @IsIn(['pending', 'approved', 'rejected'])
@@ -98,7 +114,7 @@ export class CreateRequestMangmentDto {
   employeeId: string;
 
   @IsNotEmpty()
-  @IsIn(['leave', 'timeOff', 'overtime'])
+@IsIn(['leave', 'timeOff', 'overtime', 'attendance'])
   type: string;
 
   // Note: appliedDate will be auto-generated in backend, no need to include in DTO
@@ -120,6 +136,12 @@ export class CreateRequestMangmentDto {
   @ValidateNested()
   @Type(() => OvertimeDetailsDto)
   overtimeDetails?: OvertimeDetailsDto;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => AttendanceDetailsDto)
+  attendanceDetails?: AttendanceDetailsDto;
 
   @IsOptional()
   @IsObject()
