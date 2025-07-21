@@ -39,7 +39,7 @@ export class DeductionsService {
       this.logger.log(`Fetching deductions with query: ${JSON.stringify(query)}`);
       const filter: any = {};
       if (query.title) {
-        filter.title = { $regex: query.title, $options: 'i' }; // Case-insensitive partial match
+        filter.title = { $regex: query.title, $options: 'i' };
       }
       if (query.isDefault !== undefined) {
         filter.isDefault = query.isDefault;

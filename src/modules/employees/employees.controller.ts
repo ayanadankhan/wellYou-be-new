@@ -16,19 +16,33 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Post()
-  async create( @Body() createEmployeeDto: CreateEmployeeDto, @CurrentUser() user: User): Promise<any> {
+  async create(@Body() createEmployeeDto: CreateEmployeeDto,@CurrentUser() user: User): Promise<any> {
     try {
       if (!user.tenantId) {
-        throw new HttpException( 'Your account has no tenant association',
+        throw new HttpException('Your account has no tenant association',
           HttpStatus.FORBIDDEN
         );
       }
-      if (user && user.tenantId) {
-        createEmployeeDto.tenantId = new Types.ObjectId(user.tenantId)
-      };
+
+      const dob = new Date(createEmployeeDto.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+
+      if (age < 18) {
+        throw new HttpException(
+          'Employee must be at least 18 years old',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      createEmployeeDto.tenantId = new Types.ObjectId(user.tenantId);
 
       return await this.employeesService.create(createEmployeeDto);
-      
     } catch (error) {
       throw new HttpException(
         {

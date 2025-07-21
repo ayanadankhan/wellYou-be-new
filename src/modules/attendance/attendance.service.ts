@@ -211,22 +211,22 @@ export class AttendanceService {
     }));
   }
 
-
-  // Check-in (Auto-called on login)
   async checkin(employeeId: string): Promise<Attendance> {
     try {
       this.logger.log(`Processing check-in for employee: ${employeeId}`);
 
-      // Validate ObjectId
       if (!Types.ObjectId.isValid(employeeId)) {
         throw new BadRequestException('Invalid employee ID format');
       }
 
       const today = new Date();
+      if (today.getDay() === 0) {
+        throw new BadRequestException('Today is Sunday, check-in not allowed');
+      }
+
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-      // Check if already checked in today
       const existingAttendance = await this.attendanceModel.findOne({
         employeeId: new Types.ObjectId(employeeId),
         date: { $gte: startOfDay, $lte: endOfDay },
@@ -237,7 +237,6 @@ export class AttendanceService {
         return existingAttendance;
       }
 
-      // Create new attendance record
       const attendanceData = {
         employeeId: new Types.ObjectId(employeeId),
         date: startOfDay,

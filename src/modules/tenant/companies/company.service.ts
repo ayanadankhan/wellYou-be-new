@@ -1,10 +1,11 @@
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Company } from './schemas/company.schema';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { GetCompanyDto } from './dto/get-company.dto';
 
 @Injectable()
 export class CompanyService {
@@ -15,8 +16,39 @@ export class CompanyService {
     return createdCompany.save();
   }
 
-  async findAll(): Promise<Company[]> {
-    return this.companyModel.find().exec();
+  async findAll(getDto: GetCompanyDto) {
+    try {
+      const pipeline: any[] = [];
+
+      if (getDto.name) {
+        pipeline.push({ $match: { name: new RegExp(getDto.name, 'i') } });
+      }
+
+      if (getDto.industry) {
+        pipeline.push({ $match: { industry: new RegExp(getDto.industry, 'i') } });
+      }
+
+      if (getDto.status) {
+        pipeline.push({ $match: { status: getDto.status } });
+      }
+
+      const [list, countQuery] = await Promise.all([
+        this.companyModel.aggregate([
+          ...pipeline,
+          { $sort: { [getDto.sb]: getDto.sd === '1' ? 1 : -1 } },
+          { $skip: Number(getDto.o || 0) },
+          { $limit: Number(getDto.l || 10) },
+        ]).exec(),
+        this.companyModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to retrieve companies');
+    }
   }
 
   async findById(id: string): Promise<Company> {

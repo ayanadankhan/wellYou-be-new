@@ -31,7 +31,7 @@ export class Company extends BaseDto {
   address: string;
 
   @Prop({ required: true })
-  foundedYear: string;
+  foundedYear: number;
 
   @Prop({ required: true })
   numberOfEmployees: string;
@@ -46,7 +46,6 @@ export class Company extends BaseDto {
   @Prop({ required: true })
   description: string;
 
-  // Keeping isActive for backward compatibility if needed
   @Prop({ default: true })
   isActive: boolean;
 }
