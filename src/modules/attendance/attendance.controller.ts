@@ -136,10 +136,11 @@ export class AttendanceController {
    * This logic was previously in `formatGroupedAttendanceData` but is now extracted
    * to apply to individual attendance arrays.
    */
-  private formatRawAttendanceRecords(rawData: any[]): any[] {
+
+    private formatRawAttendanceRecords(rawData: any[]): any[] {
     interface AttendanceRecord {
       _id: string;
-      employeeId: any; // Can be ObjectId or populated object
+      employeeId: any;
       date: string | Date;
       checkInTime?: string | Date | null;
       checkOutTime?: string | Date | null;
@@ -151,54 +152,35 @@ export class AttendanceController {
       remarks?: string;
     }
 
-    interface FormattedAttendance {
-      date: number;
-      day: string;
-      checkIn: string;
-      checkOut: string;
-      status: string;
-      totalHours: number;
-      remarks: string;
-      originalData: {
-        _id: string;
-        employeeId: string;
-        date: string | Date;
-        checkInTime?: string | Date | null;
-        checkOutTime?: string | Date | null;
-        isAutoCheckout?: boolean;
-        createdAt?: string | Date;
-        updatedAt?: string | Date;
-      };
-    }
+  return (rawData as AttendanceRecord[])
+    .filter(record => record.checkInTime)
+    .map((record): any => {
+      const checkInDate = record.checkInTime ? new Date(record.checkInTime) : null;
+      const checkOutDate = record.checkOutTime ? new Date(record.checkOutTime) : null;
 
-    return (rawData as AttendanceRecord[])
-      .filter((record: AttendanceRecord) => record.checkInTime) // Filter out records that conceptually represent 'absent' (no check-in)
-      .map((record: AttendanceRecord): FormattedAttendance => {
-        const date = new Date(record.date);
-        const checkInTime = record.checkInTime ? new Date(record.checkInTime) : null;
-        const checkOutTime = record.checkOutTime ? new Date(record.checkOutTime) : null;
+      const localCheckIn = checkInDate ? new Date(checkInDate.getTime() - checkInDate.getTimezoneOffset() * 60000) : null;
+      const localCheckOut = checkOutDate ? new Date(checkOutDate.getTime() - checkOutDate.getTimezoneOffset() * 60000) : null;
 
       return {
-        date: date.getDate(),
-        day: date.toLocaleDateString('en-US', { weekday: 'long' }),
-        checkIn: checkInTime ? checkInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
-        checkOut: checkOutTime ? checkOutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
         status: record.status || '',
-        totalHours: record.totalHours || 0,
         remarks: record.remarks || '',
         originalData: {
           _id: record._id,
-          employeeId: record.employeeId._id.toHexString(), // Ensure it's the string ID
+          employeeId: record.employeeId._id.toHexString(),
           date: record.date,
-          checkInTime: record.checkInTime,
-          checkOutTime: record.checkOutTime,
+          checkInTime: localCheckIn ? localCheckIn.toISOString() : null,
+          checkOutTime: localCheckOut ? localCheckOut.toISOString() : null,
           isAutoCheckout: record.isAutoCheckout,
           createdAt: record.createdAt,
-          updatedAt: record.updatedAt
+          updatedAt: record.updatedAt,
         }
       };
-      })
-      .sort((a, b) => a.date - b.date); // Sort by date
+    })
+    .sort((a, b) => {
+        const aDate = new Date(a.originalData.date).getTime();
+        const bDate = new Date(b.originalData.date).getTime();
+        return aDate - bDate;
+      });
   }
 
 

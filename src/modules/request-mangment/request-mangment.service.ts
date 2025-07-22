@@ -69,14 +69,8 @@ async create(
   }
 
   if (createRequestMangmentDto.attendanceDetails) {
-  const { checkInTime, checkOutTime } = createRequestMangmentDto.attendanceDetails;
-  if (checkInTime && checkOutTime) {
-    // Validate that checkOutTime is after checkInTime
-    if (new Date(checkOutTime) <= new Date(checkInTime)) {
-      throw new BadRequestException('Check-out time must be after check-in time');
-    }
+    // No validation — attendanceDetails may exist, but no check on time order
   }
-}
 
   const RequestMangment = new this.RequestMangmentModel({
     ...createRequestMangmentDto,
@@ -161,18 +155,11 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
         this.validateTimeFormat(dto.overtimeDetails.fromHour, dto.overtimeDetails.toHour);
         break;
 
-      // Add this case for attendance type
-      case 'attendance':
-        if (!dto.attendanceDetails) {
-          throw new BadRequestException('Attendance details are required for attendance type');
-        }
-        if (!dto.attendanceDetails.checkInTime || !dto.attendanceDetails.checkOutTime) {
-          throw new BadRequestException('Check-in and check-out times are required for attendance');
-        }
-        if (new Date(dto.attendanceDetails.checkOutTime) <= new Date(dto.attendanceDetails.checkInTime)) {
-          throw new BadRequestException('Check-out time must be after check-in time');
-        }
-        break;
+        case 'attendance':
+          if (!dto.attendanceDetails) {
+            throw new BadRequestException('Attendance details are required for attendance type');
+          }
+          break;
 
       default:
         throw new BadRequestException('Invalid request type');
