@@ -43,7 +43,7 @@ export class Company extends BaseDto {
   })
   status: CompanyStatus;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   description: string;
 
   @Prop({ default: true })
