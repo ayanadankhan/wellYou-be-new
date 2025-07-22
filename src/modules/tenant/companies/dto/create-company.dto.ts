@@ -39,6 +39,5 @@ export class CreateCompanyDto {
   status: CompanyStatus;
 
   @IsString()
-  @IsNotEmpty()
   description: string;
 }
