@@ -63,6 +63,7 @@ export class RequestMangment {
       reason: { type: String, required: false },
       fromHour: { type: String, required: false },
       toHour: { type: String, required: false },
+      date: { type: Date, required: false },
       totalHour: { type: Number, required: false },
     },
     required: false,
@@ -71,6 +72,7 @@ export class RequestMangment {
     reason?: string;
     fromHour?: string;
     toHour?: string;
+    date?: Date;
     totalHour?: number;
   };
 

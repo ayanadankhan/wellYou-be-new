@@ -1010,4 +1010,34 @@ private groupAttendanceByEmployee(
       throw error;
     }
   }
+
+  async markAbsentForLeave(employeeId: string, dates: Date[]): Promise<void> {
+    try {
+      const attendanceRecords = await this.attendanceModel.find({
+        employeeId: new Types.ObjectId(employeeId),
+        date: { $in: dates },
+      }).exec();
+
+      const existingDates = attendanceRecords.map((rec) => rec.date.toDateString());
+
+      const newAbsentRecords = dates
+        .filter((date) => !existingDates.includes(date.toDateString()))
+        .map((date) => ({
+          employeeId: new Types.ObjectId(employeeId),
+          date,
+          checkInTime: null,
+          checkOutTime: null,
+          totalHours: 0,
+          status: 'Absent',
+          isAutoCheckout: false,
+        }));
+
+      if (newAbsentRecords.length > 0) {
+        await this.attendanceModel.insertMany(newAbsentRecords);
+      }
+    } catch (error) {
+      this.logger.error('Failed to mark absent for leave:', error.message);
+      throw error;
+    }
+  }
 }

@@ -5,14 +5,18 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { RequestMangment, requestMangmentchema } from './entities/request-mangment.entity';
 import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
 import { User, UserSchema } from '../tenant/users/schemas/user.schema';
+import { Attendance, AttendanceSchema } from '../attendance/schemas/Attendance.schema';
+import { AttendanceModule } from '../attendance/attendance.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: RequestMangment.name, schema: requestMangmentchema },
       { name: Employee.name, schema: EmployeeSchema },
-      { name: User.name, schema: UserSchema }
+      { name: User.name, schema: UserSchema },
+      { name: Attendance.name, schema: AttendanceSchema}
     ]),
+    AttendanceModule
   ],
   controllers: [RequestMangmentController],
   providers: [requestMangmentervice],

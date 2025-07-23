@@ -66,6 +66,10 @@ export class OvertimeDetailsDto {
   toHour?: string;
 
   @IsOptional()
+  @IsDateString()
+  date?: Date;
+
+  @IsOptional()
   @IsNumber()
   totalHour?: number;
 }
