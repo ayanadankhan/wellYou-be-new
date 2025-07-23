@@ -2,6 +2,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Attendance, AttendanceDocument } from './schemas/Attendance.schema';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
@@ -9,6 +10,9 @@ import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
 // Assuming you have an Employee model - adjust import path as needed
 import { Employee, EmployeeSchema, EmployeeDocument } from '../employees/schemas/Employee.schema';
 import { User } from '../tenant/users/schemas/user.schema';
+
+import { EmployeesService } from '../employees/employees.service';
+import { GetEmployeeDto } from '../employees/dto/get-Employee.dto';
 
 interface AttendanceResponse {
   success: boolean;
@@ -29,7 +33,9 @@ export class AttendanceService {
     private attendanceModel: Model<AttendanceDocument>,
     @InjectModel(Employee.name)
     private employeeModel: Model<EmployeeDocument>,
-  ) {}
+    private employeeService: EmployeesService, 
+  ) {
+  }
 
   // Enhanced method to get attendance based on user role
   async getAttendanceByRole(
@@ -304,6 +310,7 @@ export class AttendanceService {
   }
 
   // Auto checkout at 5:30 PM (to be called by cron job)
+@Cron('45 17 * * *')
   async autoCheckout(): Promise<void> {
     try {
       this.logger.log('Processing auto check-out for all incomplete records');
@@ -311,21 +318,25 @@ export class AttendanceService {
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+
       
       // Default checkout time: 5:30 PM
       const autoCheckoutTime = new Date();
-      autoCheckoutTime.setHours(17, 30, 0, 0);
+      autoCheckoutTime.setHours(17, 45, 0, 0);
 
       // Find all incomplete attendance records for today
       const incompleteRecords = await this.attendanceModel.find({
         date: { $gte: startOfDay, $lte: endOfDay },
         checkOutTime: null,
+        status: { $ne: "Absent" }
       });
 
       this.logger.log(`Found ${incompleteRecords.length} incomplete records for auto checkout`);
 
       // Update each record
       for (const record of incompleteRecords) {
+        console.log(record, '`adlksadklaskl');
+        
         const totalHours = this.calculateTotalHours(record.checkInTime, autoCheckoutTime);
         
         await this.attendanceModel.updateOne(
@@ -338,6 +349,32 @@ export class AttendanceService {
           },
         );
       }
+
+      const getEmployeeDto = new GetEmployeeDto();
+      const Employees = await this.employeeService.findAll(getEmployeeDto);
+      const allEmployeeIds = Employees.map((emp:any) => emp._id.toString());
+      const existingRecords = await this.attendanceModel.find({
+        date: { $gte: startOfDay, $lte: endOfDay },
+      }, { employeeId: 1 });
+      const presentEmployeeIds = existingRecords.map(record => record.employeeId.toString());
+      const missingIds = allEmployeeIds.filter(id => !presentEmployeeIds.includes(id));
+      console.log(`Missing employee IDs for auto checkout: ${missingIds}`);
+
+      if (missingIds.length > 0) {
+      this.logger.log(`Marking ${missingIds.length} employees as absent`);
+      
+      for (const empId of missingIds) {
+        await this.attendanceModel.create({
+          employeeId: empId,
+          date: today,
+          checkInTime: null,
+          checkOutTime: null,
+          status: 'Absent',  // Absent marked
+          isAutoCheckout: false,
+          remarks: 'Auto-marked absent (no check-in)', 
+        });
+      }
+    }
 
       this.logger.log('Auto check-out completed successfully');
     } catch (error) {

@@ -114,7 +114,7 @@ export class CreateRequestMangmentDto {
   employeeId: string;
 
   @IsNotEmpty()
-@IsIn(['leave', 'timeOff', 'overtime', 'attendance'])
+  @IsIn(['leave', 'timeOff', 'overtime', 'attendance'])
   type: string;
 
   // Note: appliedDate will be auto-generated in backend, no need to include in DTO

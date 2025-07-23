@@ -155,12 +155,6 @@ export class AttendanceController {
   return (rawData as AttendanceRecord[])
     .filter(record => record.checkInTime)
     .map((record): any => {
-      const checkInDate = record.checkInTime ? new Date(record.checkInTime) : null;
-      const checkOutDate = record.checkOutTime ? new Date(record.checkOutTime) : null;
-
-      const localCheckIn = checkInDate ? new Date(checkInDate.getTime() - checkInDate.getTimezoneOffset() * 60000) : null;
-      const localCheckOut = checkOutDate ? new Date(checkOutDate.getTime() - checkOutDate.getTimezoneOffset() * 60000) : null;
-
       return {
         status: record.status || '',
         remarks: record.remarks || '',
@@ -168,8 +162,8 @@ export class AttendanceController {
           _id: record._id,
           employeeId: record.employeeId._id.toHexString(),
           date: record.date,
-          checkInTime: localCheckIn ? localCheckIn.toISOString() : null,
-          checkOutTime: localCheckOut ? localCheckOut.toISOString() : null,
+          checkInTime: record.checkInTime || null,
+          checkOutTime: record.checkOutTime || null,
           isAutoCheckout: record.isAutoCheckout,
           createdAt: record.createdAt,
           updatedAt: record.updatedAt,
