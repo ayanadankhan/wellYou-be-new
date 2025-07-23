@@ -11,6 +11,7 @@ import { CreateRequestMangmentDto } from './dto/create-request-mangment.dto';
 import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { RequestMangment, RequestMangmentDocument } from './entities/request-mangment.entity';
 import { Employee } from '../employees/schemas/Employee.schema';
+import { AttendanceService } from '../attendance/attendance.service';
 
 @Injectable()
 export class requestMangmentervice {
@@ -20,6 +21,7 @@ export class requestMangmentervice {
     @InjectModel(RequestMangment.name)
     private readonly RequestMangmentModel: Model<RequestMangmentDocument>,
     @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
+    private attendanceService: AttendanceService,
   ) {}
 
 async create(
@@ -389,6 +391,22 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
 
     if (!updated) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
+    }
+    if (updated.workflow?.status === 'approved' && updated.type === 'leave') {
+      const leaveDetails = updated.leaveDetails;
+      if (leaveDetails?.from && leaveDetails?.to) {
+        const fromDate = new Date(leaveDetails.from);
+        const toDate = new Date(leaveDetails.to);
+
+        const dates: Date[] = [];
+        const current = new Date(fromDate);
+        while (current <= toDate) {
+          dates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+
+        await this.attendanceService.markAbsentForLeave(updated.employeeId.toString(), dates);
+      }
     }
 
     return updated;

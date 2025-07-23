@@ -153,7 +153,6 @@ export class AttendanceController {
     }
 
   return (rawData as AttendanceRecord[])
-    .filter(record => record.checkInTime)
     .map((record): any => {
       return {
         status: record.status || '',
