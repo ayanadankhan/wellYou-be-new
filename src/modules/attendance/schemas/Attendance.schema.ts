@@ -12,7 +12,7 @@ export class Attendance {
   @Prop({ type: Date, required: true })
   date: Date;
 
-  @Prop({ type: Date, required: true })
+  @Prop({ type: Date, required: false, default: null })
   checkInTime: Date;
 
   @Prop({ type: Date, default: null })

@@ -20,6 +20,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { SkillsModule } from './modules/masterTables/skills/skills.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { ScheduleModule } from '@nestjs/schedule';
 // ... other imports
 
 @Module({
@@ -49,6 +50,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     AttendanceModule, // Importing the AttendanceModule
     AuditModule,
     SkillsModule,
-    FeedbackModule
+    FeedbackModule,
+    ScheduleModule.forRoot(),
   ]
 })export class AppModule { }
