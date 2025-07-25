@@ -12,6 +12,7 @@ import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { RequestMangment, RequestMangmentDocument } from './entities/request-mangment.entity';
 import { Employee } from '../employees/schemas/Employee.schema';
 import { AttendanceService } from '../attendance/attendance.service';
+import { GetRequestDto } from './dto/get-request-mangment.dto';
 
 @Injectable()
 export class requestMangmentervice {
@@ -211,38 +212,18 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     }
   }
 
-  private grouprequestMangmentByEmployee(
-    requestMangment: any[],
-    employeeIds: Types.ObjectId[],
-    currentEmployeeId: Types.ObjectId | null
-  ) {
-    const grouped = employeeIds.map(empId => {
-      const empRequests = requestMangment.filter(lr => lr.employeeId._id.equals(empId));
-      return {
-        employeeId: empId,
-        isCurrentUser: currentEmployeeId ? empId.equals(currentEmployeeId) : false,
-        Requests: empRequests,
-        count: empRequests.length
-      };
-    });
-
-    const filtered = grouped.filter(group => group.count > 0);
-
-    return filtered;
-  }
-
-  async getRoleBasedrequestMangment(
-    user: any,
-    status?: string,
-    type?: string,
-    startDate?: string,
-    endDate?: string,
-  ): Promise<any[]> {
+  async getRoleBasedrequestMangment(user: any,getDto: GetRequestDto,): Promise<{
+    myRequests: any[];
+    teamRequests: any[];
+    summary: {
+      totalRequests: number;
+      myRequestsCount: number;
+      teamRequestsCount: number;
+    };
+  }> {
     const userId = user._id;
     const userRole = user.role;
     const tenantId = user.tenantId;
-
-    this.logger.log(`Fetching leave requests for user ${userId}, role ${userRole}`);
 
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user ID format');
@@ -250,10 +231,11 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
 
     let employeeIdsToQuery: Types.ObjectId[] = [];
     let currentEmployeeId: Types.ObjectId | null = null;
+    let teamMemberIds: Types.ObjectId[] = [];
 
     if (userRole === 'company_admin') {
       if (!tenantId) {
-        throw new BadRequestException('Admin missing tenant information');
+        throw new BadRequestException('Admin missing tenant info');
       }
 
       const employees = await this.employeeModel.find({ tenantId }).select('_id').exec();
@@ -261,8 +243,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     } else {
       const currentEmployee = await this.employeeModel.findOne({ userId }).exec();
       if (!currentEmployee) {
-        this.logger.warn(`No employee record found for user ${userId}`);
-        return [];
+        throw new BadRequestException('Employee not found');
       }
 
       currentEmployeeId = currentEmployee._id;
@@ -272,73 +253,74 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
         .find({ reportingTo: userId })
         .select('_id')
         .exec();
+
       if (teamMembers.length > 0) {
-        employeeIdsToQuery.push(...teamMembers.map(m => m._id));
+        const teamIds = teamMembers.map(m => m._id);
+        employeeIdsToQuery.push(...teamIds);
+        teamMemberIds = teamIds;
       }
     }
 
-    // Build the query
     const query: any = {
       employeeId: { $in: employeeIdsToQuery },
-      ...(status && { 'workflow.status': status }),
-      ...(type && { type }),
     };
 
-    // Date filtering for leave type
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+    if (getDto.type) query.type = getDto.type;
+    if (getDto.status) query['workflow.status'] = getDto.status;
 
-      query.$or = [
-        // For leave type - check leaveDetails dates
-        {
-          type: 'leave',
-          'leaveDetails.from': { $lte: end },
-          'leaveDetails.to': { $gte: start }
-        },
-        // For other types - check appliedDate
-        {
-          type: { $in: ['timeOff', 'overtime'] },
-          appliedDate: { $gte: start, $lte: end }
-        }
-      ];
+    let records = await this.RequestMangmentModel.find(query)
+      .populate({
+        path: 'employeeId',
+        model: 'Employee',
+        select: 'userId positionId departmentId profilePicture',
+        populate: [
+          { path: 'userId', model: 'User', select: 'firstName lastName' },
+          { path: 'positionId', model: 'Designation', select: 'title' },
+          { path: 'departmentId', model: 'Department', select: 'departmentName' },
+        ],
+      })
+      .exec();
+
+    if (getDto.name) {
+      const nameRegex = new RegExp(getDto.name, 'i');
+      records = records.filter(r => {
+        const emp: any = r.employeeId;
+        const user = emp?.userId;
+        return user?.firstName?.match(nameRegex) || user?.lastName?.match(nameRegex);
+      });
     }
 
-    this.logger.log(`Leave request query: ${JSON.stringify(query)}`);
+    const sortField = getDto.sb || 'appliedDate';
+    const sortOrder = getDto.sd === '1' ? 1 : -1;
+    records.sort((a, b) => {
+      const valA = (a as any)[sortField];
+      const valB = (b as any)[sortField];
+      return sortOrder * (valA > valB ? 1 : valA < valB ? -1 : 0);
+    });
 
-    // Fetch leave requests with related employee + user info
-  const requestMangment = await this.RequestMangmentModel.find(query)
-    .populate({
-      path: 'employeeId',
-      model: 'Employee',
-      select: 'userId positionId departmentId profilePicture', // Only select these fields
-      populate: [
-        {
-          path: 'userId',
-          model: 'User',
-          select: 'firstName lastName', // Only name fields
-        },
-        {
-          path: 'positionId',
-          model: 'Designation',
-          select: 'title', // Only position name
-        },
-        {
-          path: 'departmentId',
-          model: 'Department',
-          select: 'departmentName', // Only department name
-        }
-      ]
-    })
-    .sort({ appliedDate: -1 })
-    .exec();
+    const offset = Number(getDto.o || 0);
+    const limit = Number(getDto.l || 10);
+    const paginated = records.slice(offset, offset + limit);
 
-    // Group data by employee
-    return this.grouprequestMangmentByEmployee(
-      requestMangment,
-      employeeIdsToQuery,
-      currentEmployeeId
-    );
+    let myRequests: any[] = [];
+    let teamRequests: any[] = [];
+
+    if (userRole === 'company_admin') {
+      teamRequests = paginated;
+    } else {
+      myRequests = paginated.filter(r => r.employeeId._id.equals(currentEmployeeId));
+      teamRequests = paginated.filter(r => teamMemberIds.some(id => id.equals(r.employeeId._id)));
+    }
+
+    return {
+      myRequests,
+      teamRequests,
+      summary: {
+        totalRequests: paginated.length,
+        myRequestsCount: myRequests.length,
+        teamRequestsCount: teamRequests.length,
+      },
+    };
   }
 
   async findOne(id: string): Promise<RequestMangmentDocument> {
