@@ -325,6 +325,15 @@ export class PayrollService {
         },
         { $unwind: { path: "$employee.position", preserveNullAndEmptyArrays: true } },
         {
+          $lookup: {
+            from: "companies",
+            localField: "employee.tenantId",
+            foreignField: "_id",
+            as: "employee.company",
+          },
+        },
+      { $unwind: { path: "$employee.company", preserveNullAndEmptyArrays: true } },
+        {
           $project: {
             _id: 1,
             payrollMonth: 1,
@@ -351,6 +360,18 @@ export class PayrollService {
                 profilePicture: "$employee.profilePicture",
                 employmentType: "$employee.employmentType",
                 hireDate: "$employee.hireDate",
+                company: {
+                  _id: "$employee.company._id",
+                  name: "$employee.company.name",
+                  industry: "$employee.company.industry",
+                  email: "$employee.company.email",
+                  number: "$employee.company.number",
+                  address: "$employee.company.address",
+                  foundedYear: "$employee.company.foundedYear",
+                  numberOfEmployees: "$employee.company.numberOfEmployees",
+                  description: "$employee.company.description",
+                  status: "$employee.company.status"
+                }
               }
             }
           }

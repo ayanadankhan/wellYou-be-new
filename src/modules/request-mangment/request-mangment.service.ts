@@ -75,6 +75,10 @@ async create(
     // No validation — attendanceDetails may exist, but no check on time order
   }
 
+  if (createRequestMangmentDto.type === 'loan') {
+    // No validation
+  }
+
   const RequestMangment = new this.RequestMangmentModel({
     ...createRequestMangmentDto,
     employeeId: new Types.ObjectId(createRequestMangmentDto.employeeId),
@@ -161,6 +165,15 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
         case 'attendance':
           if (!dto.attendanceDetails) {
             throw new BadRequestException('Attendance details are required for attendance type');
+          }
+          break;
+
+        case 'loan':
+          if (!dto.loanDetails) {
+            throw new BadRequestException('Loan details are required for loan type');
+          }
+          if (!dto.loanDetails.loanAmount || dto.loanDetails.loanAmount <= 0) {
+            throw new BadRequestException('Valid loan amount is required');
           }
           break;
 
@@ -362,7 +375,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
 
     // Validate updated data by type
     if (updateRequestMangmentDto.type || updateRequestMangmentDto.leaveDetails || 
-        updateRequestMangmentDto.timeOffDetails || updateRequestMangmentDto.overtimeDetails) {
+        updateRequestMangmentDto.timeOffDetails || updateRequestMangmentDto.overtimeDetails || updateRequestMangmentDto.loanDetails) {
       const mergedDto = { ...existing.toObject(), ...updateRequestMangmentDto };
       await this.validateRequestByType(mergedDto as any);
     }
