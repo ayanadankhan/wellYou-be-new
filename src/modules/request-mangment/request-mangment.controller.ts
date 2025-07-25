@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { requestMangmentervice } from './request-mangment.service';
-import { CreateRequestMangmentDto } from './dto/create-request-mangment.dto';
+import { CreateRequestMangmentDto, RequestStatus } from './dto/create-request-mangment.dto';
 import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { plainToClass } from 'class-transformer';
 import { Types } from 'mongoose';
@@ -104,7 +104,7 @@ export class RequestMangmentController {
   ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
-      'approved',
+      RequestStatus.APPROVED, // Using enum here
       user.firstName + ' ' + user.lastName,
       undefined,
     );
@@ -121,7 +121,7 @@ export class RequestMangmentController {
   ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
-      'rejected',
+      RequestStatus.REJECTED, // Using enum here
       user.firstName + ' ' + user.lastName,
       rejectionReason,
     );

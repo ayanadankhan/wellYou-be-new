@@ -15,7 +15,8 @@ export enum RequestType {
   LEAVE = 'leave',
   TIME_OFF = 'timeOff',
   OVERTIME = 'overtime',
-  ATTENDANCE = 'attendance'
+  ATTENDANCE = 'attendance',
+  LOAN = 'loan'
 }
 
 export enum RequestStatus {
@@ -101,6 +102,28 @@ export class AttendanceDetailsDto {
   attendanceId?: string;
 }
 
+export class LoanDetailsDto {
+  @IsNotEmpty()
+  @IsNumber()
+  loanAmount: number;
+
+  @IsNotEmpty()
+  @IsString()
+  loanType: string;
+
+  @IsNotEmpty()
+  @IsString()
+  loanDuration: string;
+
+  @IsOptional()
+  @IsString()
+  loanPurpose?: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  installmentAmount: number;
+}
+
 export class WorkflowDto {
   @IsOptional()
   @IsIn(['pending', 'approved', 'rejected'])
@@ -129,7 +152,7 @@ export class CreateRequestMangmentDto {
   employeeId: string;
 
   @IsNotEmpty()
-  @IsIn(['leave', 'timeOff', 'overtime', 'attendance'])
+  @IsIn(Object.values(RequestType))  // Use enum values here
   type: string;
 
   // Note: appliedDate will be auto-generated in backend, no need to include in DTO
@@ -157,6 +180,12 @@ export class CreateRequestMangmentDto {
   @ValidateNested()
   @Type(() => AttendanceDetailsDto)
   attendanceDetails?: AttendanceDetailsDto;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => LoanDetailsDto)
+  loanDetails?: LoanDetailsDto;
 
   @IsOptional()
   @IsObject()
