@@ -11,7 +11,18 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// DTOs for nested objects
+export enum RequestType {
+  LEAVE = 'leave',
+  TIME_OFF = 'timeOff',
+  OVERTIME = 'overtime',
+  ATTENDANCE = 'attendance'
+}
+
+export enum RequestStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected'
+}
 export class LeaveDetailsDto {
   @IsOptional()
   @IsString()
