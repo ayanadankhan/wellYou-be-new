@@ -5,6 +5,7 @@ export enum CompanyStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   SUSPENDED = 'SUSPENDED',
+  DRAFT = 'DRAFT',
 }
 
 export class CreateCompanyDto {

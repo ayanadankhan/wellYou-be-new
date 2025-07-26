@@ -2,6 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus
 import { PayrollService } from './payroll.service';
 import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { User } from '../tenant/users/schemas/user.schema';
 
 
 @Controller('payroll')
@@ -9,13 +11,16 @@ export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
 
   @Post()
-  async create(@Body() createPayrollDto: CreatePayrollDto) {
-    return this.payrollService.create(createPayrollDto);
+  async create(
+      @Body() createPayrollDto: CreatePayrollDto,
+      @CurrentUser() user: User
+  ) {
+      return this.payrollService.create(createPayrollDto, user);
   }
 
   @Get()
-  async findAll() {
-    return this.payrollService.findAll();
+  async findAll(@CurrentUser() user: User) {
+      return this.payrollService.findAll(user);
   }
 
   @Get(':id')
