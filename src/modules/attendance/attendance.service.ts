@@ -2,7 +2,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule';
 import { Attendance, AttendanceDocument } from './schemas/Attendance.schema';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
@@ -310,7 +310,7 @@ export class AttendanceService {
   }
 
   // Auto checkout at 5:30 PM (to be called by cron job)
-@Cron('45 17 * * *')
+// @Cron('45 17 * * *')
   async autoCheckout(): Promise<void> {
     try {
       this.logger.log('Processing auto check-out for all incomplete records');

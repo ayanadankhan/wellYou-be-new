@@ -52,7 +52,7 @@ import { CurrencyModule } from './modules/masterTables/currency/currency.module'
     AuditModule,
     SkillsModule,
     FeedbackModule,
-    ScheduleModule.forRoot(),
+    // ScheduleModule.forRoot(),
     CurrencyModule
   ]
 })export class AppModule { }
