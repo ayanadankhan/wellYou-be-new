@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import fs from "fs";
 import Url from 'url';
-import * as crypto from 'crypto';
+
 import { Schema, Document, Model } from 'mongoose';
 import { InjectModel } from "@nestjs/mongoose";
 import { Counter, CounterDocument } from "../../entities/counter.entity";
