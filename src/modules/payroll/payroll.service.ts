@@ -11,10 +11,15 @@ export class PayrollService {
     @InjectModel(Payroll.name) private readonly payrollModel: Model<Payroll>,
   ) {}
 
-  async create(createPayrollDto: CreatePayrollDto): Promise<Payroll> {
-      const existingPayroll = await this.payrollModel.findOne({
-          payrollMonth: createPayrollDto.payrollMonth,
-      }).exec();
+  async create(createPayrollDto: CreatePayrollDto, user: any): Promise<Payroll> {
+      if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
+          throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+      }
+
+  const existingPayroll = await this.payrollModel.findOne({
+      payrollMonth: createPayrollDto.payrollMonth,
+      tenantId: new Types.ObjectId(user.tenantId)
+  }).exec();
 
       if (existingPayroll) {
           throw new ConflictException(`Payroll for month ${createPayrollDto.payrollMonth} already exists`);
@@ -22,6 +27,7 @@ export class PayrollService {
 
       const processedData = {
           ...createPayrollDto,
+          tenantId: new Types.ObjectId(user.tenantId),
           selectedEmployees: createPayrollDto.selectedEmployees.map(employee => ({
               ...employee,
               employeesId: new Types.ObjectId(employee.employeesId),
@@ -43,9 +49,14 @@ export class PayrollService {
       }
   }
 
-  async findAll(): Promise<any[]> {
+  async findAll(user: any): Promise<any[]> {
       try {
+          if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
+              throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+          }
+
           return await this.payrollModel.aggregate([
+              { $match: { tenantId: new Types.ObjectId(user.tenantId) } }, // Filter by tenantId
               { $sort: { payrollMonth: -1 } },
               { $unwind: "$selectedEmployees" },
               {
@@ -280,57 +291,112 @@ export class PayrollService {
         throw new HttpException('Invalid employee ID', HttpStatus.BAD_REQUEST);
       }
 
-      const payrolls = await this.payrollModel.aggregate([
+      const records = await this.payrollModel.aggregate([
+        { $sort: { payrollMonth: -1 } },
+        { $unwind: "$selectedEmployees" },
         {
           $match: {
-            'selectedEmployees.employeesId._id': new Types.ObjectId(employeeId),
-          },
-        },
-        { $unwind: '$selectedEmployees' },
-        {
-          $match: {
-            'selectedEmployees.employeesId._id': new Types.ObjectId(employeeId),
+            "selectedEmployees.employeesId": new Types.ObjectId(employeeId),
           },
         },
         {
           $lookup: {
-            from: 'employees',
-            localField: 'selectedEmployees.employeesId._id',
-            foreignField: '_id',
-            as: 'employeeDetails',
+            from: "employees",
+            localField: "selectedEmployees.employeesId",
+            foreignField: "_id",
+            as: "employee",
           },
         },
-        { $unwind: '$employeeDetails' },
+        { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "employee.userId",
+            foreignField: "_id",
+            as: "employee.user",
+          },
+        },
+        { $unwind: { path: "$employee.user", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "departments",
+            localField: "employee.departmentId",
+            foreignField: "_id",
+            as: "employee.department",
+          },
+        },
+        { $unwind: { path: "$employee.department", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "designations",
+            localField: "employee.positionId",
+            foreignField: "_id",
+            as: "employee.position",
+          },
+        },
+        { $unwind: { path: "$employee.position", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "companies",
+            localField: "employee.tenantId",
+            foreignField: "_id",
+            as: "employee.company",
+          },
+        },
+      { $unwind: { path: "$employee.company", preserveNullAndEmptyArrays: true } },
         {
           $project: {
+            _id: 1,
+            payrollMonth: 1,
             salaryData: {
-              payPeriodStart: '$selectedEmployees.payPeriodStart',
-              payPeriodEnd: '$selectedEmployees.payPeriodEnd',
-              salaryPay: '$selectedEmployees.salaryPay',
-              deductions: '$selectedEmployees.deductions',
-              additions: '$selectedEmployees.additions',
-              paymentDetails: '$selectedEmployees.paymentDetails',
-              status: '$selectedEmployees.status',
+              payPeriodStart: "$selectedEmployees.payPeriodStart",
+              payPeriodEnd: "$selectedEmployees.payPeriodEnd",
+              salaryPay: "$selectedEmployees.salaryPay",
+              deductions: "$selectedEmployees.deductions",
+              additions: "$selectedEmployees.additions",
+              paymentDetails: "$selectedEmployees.paymentDetails",
+              status: "$selectedEmployees.status",
               employeeInfo: {
-                _id: '$employeeDetails._id',
-                firstName: '$employeeDetails.userId.firstName',
-                lastName: '$employeeDetails.userId.lastName',
-                position: '$employeeDetails.positionId.title',
-                department: '$employeeDetails.departmentId.departmentName',
-              },
-            },
-          },
-        },
+                _id: "$employee._id",
+                name: {
+                  $concat: [
+                    { $ifNull: ["$employee.user.firstName", ""] },
+                    " ",
+                    { $ifNull: ["$employee.user.lastName", ""] }
+                  ]
+                },
+                email: "$employee.user.email",
+                department: "$employee.department.departmentName",
+                position: "$employee.position.title",
+                profilePicture: "$employee.profilePicture",
+                employmentType: "$employee.employmentType",
+                hireDate: "$employee.hireDate",
+                company: {
+                  _id: "$employee.company._id",
+                  name: "$employee.company.name",
+                  industry: "$employee.company.industry",
+                  email: "$employee.company.email",
+                  number: "$employee.company.number",
+                  address: "$employee.company.address",
+                  foundedYear: "$employee.company.foundedYear",
+                  numberOfEmployees: "$employee.company.numberOfEmployees",
+                  description: "$employee.company.description",
+                  status: "$employee.company.status"
+                }
+              }
+            }
+          }
+        }
       ]);
 
-      if (!payrolls || payrolls.length === 0) {
+      if (!records || records.length === 0) {
         throw new HttpException(
           `No payroll records found for employee with ID ${employeeId}`,
           HttpStatus.NOT_FOUND,
         );
       }
 
-      return payrolls;
+      return records;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

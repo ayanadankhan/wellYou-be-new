@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { RequestStatus, RequestType } from '../dto/create-request-mangment.dto';
 
 export type RequestMangmentDocument = RequestMangment & Document;
 
@@ -13,13 +14,16 @@ export class RequestMangment {
 
   @Prop({
     type: String,
-    enum: ['leave', 'timeOff', 'overtime', 'attendance'],
+    enum: Object.values(RequestType),
     required: true,
   })
   type: string;
 
   @Prop({ type: Date, default: Date.now })
   appliedDate: Date;
+
+  @Prop({ type: Boolean, default: false })
+  adminApproval: boolean;
 
   // Leave specific details
   @Prop({
@@ -92,13 +96,31 @@ export class RequestMangment {
     attendanceId?: string;
   };
 
+  @Prop({
+    type: {
+      loanAmount: { type: Number, required: false },
+      loanType: { type: String, required: false },
+      loanDuration: { type: String, required: false },
+      loanPurpose: { type: String, required: false },
+      installmentAmount: { type: Number, required: false },
+    },
+    required: false,
+  })
+  loanDetails?: {
+    loanAmount?: number;
+    loanType?: string;
+    loanDuration?: string;
+    loanPurpose?: string;
+    installmentAmount?: number;
+  };
+
   // Workflow management
   @Prop({
     type: {
       status: {
         type: String,
-        enum: ['pending', 'approved', 'rejected'],
-        default: 'pending',
+        enum: Object.values(RequestStatus), // Using enum here too
+        default: RequestStatus.PENDING,
       },
       actionBy: { type: String, required: false },
       actionDate: { type: Date, required: false },
@@ -106,7 +128,7 @@ export class RequestMangment {
       modifications: { type: Object, required: false },
     },
     default: {
-      status: 'pending',
+      status: RequestStatus.PENDING,
     },
   })
   workflow: {
@@ -127,3 +149,4 @@ requestMangmentchema.index({ appliedDate: 1 });
 requestMangmentchema.index({ 'workflow.status': 1 });
 requestMangmentchema.index({ 'leaveDetails.from': 1 });
 requestMangmentchema.index({ 'leaveDetails.to': 1 });
+requestMangmentchema.index({ adminApproval: 1 });

@@ -12,13 +12,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { requestMangmentervice } from './request-mangment.service';
-import { CreateRequestMangmentDto } from './dto/create-request-mangment.dto';
+import { CreateRequestMangmentDto, RequestStatus } from './dto/create-request-mangment.dto';
 import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { plainToClass } from 'class-transformer';
 import { Types } from 'mongoose';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
 import { RequestMangmentResponseDto } from './dto/requestMangmentresponse-dto';
+import { GetRequestDto } from './dto/get-request-mangment.dto';
 
 @Controller('requestMangment')
 @UseGuards()
@@ -34,89 +35,23 @@ export class RequestMangmentController {
   @Get()
   async getrequestMangment(
     @CurrentUser() user: User,
-    @Query('status') status?: string,
-    @Query('type') type?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
+    @Query() getDto: GetRequestDto,
   ) {
-    try {
-      const groupedData = await this.requestMangmentervice.getRoleBasedrequestMangment(
-        user,
-        status,
-        type,
-        startDate,
-        endDate
-      );
+    const {
+      myRequests,
+      teamRequests,
+      summary,
+    } = await this.requestMangmentervice.getRoleBasedrequestMangment(user, getDto);
 
-      const myRequests = groupedData.find(g => g.isCurrentUser);
-      const teamRequests = groupedData.filter(g => !g.isCurrentUser);
-
-      return {
-        success: true,
-        data: {
-          myRequests,
-          teamRequests,
-        },
-        count: groupedData.reduce((sum, group) => sum + group.count, 0),
-        summary: {
-          totalRequests: groupedData.reduce((sum, group) => sum + group.count, 0),
-          myRequestsCount: myRequests ? myRequests.count : 0,
-          teamRequestsCount: teamRequests.reduce((sum, group) => sum + group.count, 0),
-        }
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  @Get('stats')
-  async getStats(
-    @CurrentUser() user: User,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    try {
-      const allRequests = await this.requestMangmentervice.getRoleBasedrequestMangment(
-        user,
-        undefined,
-        undefined,
-        startDate,
-        endDate
-      );
-
-      const stats = {
-        totalRequests: 0,
-        pendingRequests: 0,
-        approvedRequests: 0,
-        rejectedRequests: 0,
-        requestMangment: 0,
-        timeOffRequests: 0,
-        overtimeRequests: 0,
-      };
-
-      allRequests.forEach(group => {
-        group.requestMangment.forEach((request: any) => {
-          stats.totalRequests++;
-          
-          // Status statistics
-          if (request.workflow.status === 'pending') stats.pendingRequests++;
-          else if (request.workflow.status === 'approved') stats.approvedRequests++;
-          else if (request.workflow.status === 'rejected') stats.rejectedRequests++;
-          
-          // Type statistics
-          if (request.type === 'leave') stats.requestMangment++;
-          else if (request.type === 'timeOff') stats.timeOffRequests++;
-          else if (request.type === 'overtime') stats.overtimeRequests++;
-        });
-      });
-
-      return {
-        success: true,
-        data: stats
-      };
-    } catch (error) {
-      throw error;
-    }
+    return {
+      success: true,
+      list: {
+        myRequests,
+        teamRequests,
+      },
+      count: summary.totalRequests,
+      summary,
+    };
   }
 
   @Get(':id')
@@ -169,7 +104,7 @@ export class RequestMangmentController {
   ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
-      'approved',
+      RequestStatus.APPROVED, // Using enum here
       user.firstName + ' ' + user.lastName,
       undefined,
     );
@@ -186,7 +121,7 @@ export class RequestMangmentController {
   ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.changeStatus(
       id,
-      'rejected',
+      RequestStatus.REJECTED, // Using enum here
       user.firstName + ' ' + user.lastName,
       rejectionReason,
     );

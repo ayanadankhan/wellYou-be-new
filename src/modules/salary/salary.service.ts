@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateSalaryDto } from './dto/create-salary.dto';
@@ -31,52 +31,66 @@ export class SalaryService {
     return createdSalary.save();
   }
 
-  async findAll(): Promise<Salary[]> {
-    return this.salaryModel.aggregate([
-      // Step 1: Lookup employee
-      {
-        $lookup: {
-          from: 'employees',
-          localField: 'employeesId',
-          foreignField: '_id',
-          as: 'employeesId'
-        }
-      },
-      { $unwind: { path: '$employeesId', preserveNullAndEmptyArrays: true } },
+  async findAll(user: any): Promise<Salary[]> {
+      if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
+          throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+      }
 
-      // Step 2: Populate userId inside employees
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'employeesId.userId',
-          foreignField: '_id',
-          as: 'employeesId.userId'
-        }
-      },
-      { $unwind: { path: '$employeesId.userId', preserveNullAndEmptyArrays: true } },
+      return this.salaryModel.aggregate([
+          {
+              $lookup: {
+                  from: 'employees',
+                  localField: 'employeesId',
+                  foreignField: '_id',
+                  as: 'employeeData'
+              }
+          },
+          { $unwind: { path: '$employeeData', preserveNullAndEmptyArrays: false } },
+          { 
+              $match: { 
+                  'employeeData.tenantId': new Types.ObjectId(user.tenantId) 
+              } 
+          },
+          {
+              $addFields: {
+                  'employeesId': '$employeeData'
+              }
+          },
+          {
+              $lookup: {
+                  from: 'users',
+                  localField: 'employeesId.userId',
+                  foreignField: '_id',
+                  as: 'employeesId.userId'
+              }
+          },
+          { $unwind: { path: '$employeesId.userId', preserveNullAndEmptyArrays: true } },
 
-      // Step 3: Populate departmentId inside employees
-      {
-        $lookup: {
-          from: 'departments',
-          localField: 'employeesId.departmentId',
-          foreignField: '_id',
-          as: 'employeesId.departmentId'
-        }
-      },
-      { $unwind: { path: '$employeesId.departmentId', preserveNullAndEmptyArrays: true } },
+          {
+              $lookup: {
+                  from: 'departments',
+                  localField: 'employeesId.departmentId',
+                  foreignField: '_id',
+                  as: 'employeesId.departmentId'
+              }
+          },
+          { $unwind: { path: '$employeesId.departmentId', preserveNullAndEmptyArrays: true } },
 
-      // Step 4: Populate positionId inside employees
-      {
-        $lookup: {
-          from: 'designations',
-          localField: 'employeesId.positionId',
-          foreignField: '_id',
-          as: 'employeesId.positionId'
-        }
-      },
-      { $unwind: { path: '$employeesId.positionId', preserveNullAndEmptyArrays: true } }
-    ]).exec();
+          {
+              $lookup: {
+                  from: 'designations',
+                  localField: 'employeesId.positionId',
+                  foreignField: '_id',
+                  as: 'employeesId.positionId'
+              }
+          },
+          { $unwind: { path: '$employeesId.positionId', preserveNullAndEmptyArrays: true } },
+          {
+              $project: {
+                  employeeData: 0
+              }
+          }
+      ]).exec();
   }
 
   async findOne(id: string): Promise<Salary> {
