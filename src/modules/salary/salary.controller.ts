@@ -26,8 +26,8 @@ export class SalaryController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: User) {
-    return this.salaryService.findAll();
+    async findAll(@CurrentUser() user: User) {
+      return this.salaryService.findAll(user);
   }
 
   @Get('employee/:employeeId')

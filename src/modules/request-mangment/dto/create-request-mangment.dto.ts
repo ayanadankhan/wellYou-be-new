@@ -155,7 +155,7 @@ export class CreateRequestMangmentDto {
   @IsIn(Object.values(RequestType))  // Use enum values here
   type: string;
 
-  // Note: appliedDate will be auto-generated in backend, no need to include in DTO
+  // Note: appliedDate and adminApproval will be auto-generated in backend, no need to include in DTO
 
   @IsOptional()
   @IsObject()

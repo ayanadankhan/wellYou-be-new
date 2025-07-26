@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum PayrollStatus {
   PENDING = 'PROCESSING',
@@ -10,7 +10,7 @@ export enum PayrollStatus {
 
 @Schema()
 export class Payroll extends Document {
-  @Prop({ required: true, unique: true }) // Added unique: true
+  @Prop({ required: true })
   payrollMonth: string;
 
   @Prop({ required: true, default: 0 })
@@ -28,11 +28,14 @@ export class Payroll extends Document {
   @Prop({ enum: PayrollStatus, default: PayrollStatus.PENDING })
   status: PayrollStatus;
 
+  @Prop({ type: Types.ObjectId, required: true })
+  tenantId: Types.ObjectId;
+
   @Prop({ type: Array, default: [] })
   selectedEmployees: Record<string, any>[];
 }
 
 export const PayrollSchema = SchemaFactory.createForClass(Payroll);
 
-// Add index to ensure uniqueness
-PayrollSchema.index({ payrollMonth: 1 }, { unique: true });
+// Compound unique index for payrollMonth + tenantId
+PayrollSchema.index({ payrollMonth: 1, tenantId: 1 }, { unique: true });

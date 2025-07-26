@@ -22,6 +22,9 @@ export class RequestMangment {
   @Prop({ type: Date, default: Date.now })
   appliedDate: Date;
 
+  @Prop({ type: Boolean, default: false })
+  adminApproval: boolean;
+
   // Leave specific details
   @Prop({
     type: {
@@ -146,3 +149,4 @@ requestMangmentchema.index({ appliedDate: 1 });
 requestMangmentchema.index({ 'workflow.status': 1 });
 requestMangmentchema.index({ 'leaveDetails.from': 1 });
 requestMangmentchema.index({ 'leaveDetails.to': 1 });
+requestMangmentchema.index({ adminApproval: 1 });

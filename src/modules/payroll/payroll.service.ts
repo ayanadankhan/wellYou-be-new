@@ -11,10 +11,15 @@ export class PayrollService {
     @InjectModel(Payroll.name) private readonly payrollModel: Model<Payroll>,
   ) {}
 
-  async create(createPayrollDto: CreatePayrollDto): Promise<Payroll> {
-      const existingPayroll = await this.payrollModel.findOne({
-          payrollMonth: createPayrollDto.payrollMonth,
-      }).exec();
+  async create(createPayrollDto: CreatePayrollDto, user: any): Promise<Payroll> {
+      if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
+          throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+      }
+
+  const existingPayroll = await this.payrollModel.findOne({
+      payrollMonth: createPayrollDto.payrollMonth,
+      tenantId: new Types.ObjectId(user.tenantId)
+  }).exec();
 
       if (existingPayroll) {
           throw new ConflictException(`Payroll for month ${createPayrollDto.payrollMonth} already exists`);
@@ -22,6 +27,7 @@ export class PayrollService {
 
       const processedData = {
           ...createPayrollDto,
+          tenantId: new Types.ObjectId(user.tenantId),
           selectedEmployees: createPayrollDto.selectedEmployees.map(employee => ({
               ...employee,
               employeesId: new Types.ObjectId(employee.employeesId),
@@ -43,9 +49,14 @@ export class PayrollService {
       }
   }
 
-  async findAll(): Promise<any[]> {
+  async findAll(user: any): Promise<any[]> {
       try {
+          if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
+              throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+          }
+
           return await this.payrollModel.aggregate([
+              { $match: { tenantId: new Types.ObjectId(user.tenantId) } }, // Filter by tenantId
               { $sort: { payrollMonth: -1 } },
               { $unwind: "$selectedEmployees" },
               {

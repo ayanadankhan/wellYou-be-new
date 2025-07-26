@@ -43,6 +43,8 @@ async create(
   }
   await this.validateRequestByType(createRequestMangmentDto);
 
+    let adminApproval = false;
+
   if (createRequestMangmentDto.type === 'leave') {
     await this.checkOverlappingrequestMangment(createRequestMangmentDto);
     
@@ -50,7 +52,12 @@ async create(
     if (createRequestMangmentDto.leaveDetails) {
       const { from, to } = createRequestMangmentDto.leaveDetails;
       if (from && to) {
-        createRequestMangmentDto.leaveDetails.totalHour = this.calculateLeaveHours(from, to);
+        const totalHours = this.calculateLeaveHours(from, to);
+        createRequestMangmentDto.leaveDetails.totalHour = totalHours;
+        
+        if (totalHours > 8) {
+          adminApproval = true;
+        }
       }
     }
   }
@@ -75,14 +82,15 @@ async create(
     // No validation — attendanceDetails may exist, but no check on time order
   }
 
-  if (createRequestMangmentDto.type === 'loan') {
-    // No validation
+    if (createRequestMangmentDto.type === 'loan') {
+    adminApproval = true;
   }
 
   const RequestMangment = new this.RequestMangmentModel({
     ...createRequestMangmentDto,
     employeeId: new Types.ObjectId(createRequestMangmentDto.employeeId),
     appliedDate: new Date(),
+    adminApproval,
     workflow: {
       status: 'pending',
       ...createRequestMangmentDto.workflow,
@@ -285,9 +293,10 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       .populate({
         path: 'employeeId',
         model: 'Employee',
-        select: 'userId positionId departmentId profilePicture',
+        select: 'userId reportingTo positionId departmentId profilePicture',
         populate: [
           { path: 'userId', model: 'User', select: 'firstName lastName' },
+          { path: 'reportingTo', model: 'User', select: 'firstName lastName' },
           { path: 'positionId', model: 'Designation', select: 'title' },
           { path: 'departmentId', model: 'Department', select: 'departmentName' },
         ],
