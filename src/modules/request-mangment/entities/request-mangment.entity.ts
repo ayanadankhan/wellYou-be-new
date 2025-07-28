@@ -1,8 +1,23 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { RequestStatus, RequestType } from '../dto/create-request-mangment.dto';
 
 export type RequestMangmentDocument = RequestMangment & Document;
+
+@Schema({ _id: false })
+class Document {
+  @Prop({ required: false, type: String })
+  type: string;
+
+  @Prop({ required: false, type: String })
+  name: string;
+
+  @Prop({ required: false, type: String })
+  url: string;
+
+}
+
+export const DocumentSchema = SchemaFactory.createForClass(Document);
 
 @Schema({
   timestamps: true,
@@ -25,7 +40,6 @@ export class RequestMangment {
   @Prop({ type: Boolean, default: false })
   adminApproval: boolean;
 
-  // Leave specific details
   @Prop({
     type: {
       leaveType: { type: String, required: false },
@@ -33,6 +47,11 @@ export class RequestMangment {
       from: { type: Date, required: false },
       to: { type: Date, required: false },
       totalHour: { type: Number, required: false },
+      documents: {
+        type: [DocumentSchema],
+        default: [],
+        required: false,
+      },
     },
     required: false,
   })
@@ -42,7 +61,9 @@ export class RequestMangment {
     from?: Date;
     to?: Date;
     totalHour?: number;
+    documents?: Document[];
   };
+
 
   // Time off specific details
   @Prop({
