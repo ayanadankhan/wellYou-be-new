@@ -32,7 +32,7 @@ export enum MaritalStatus {
 
 export enum EmploymentStatus {
   ACTIVE = 'ACTIVE',
-  ON_LEAVE = 'ON_LEAVE',
+  INACTIVE = 'INACTIVE',
   TERMINATED = 'TERMINATED',
   RETIRED = 'RETIRED'
 }
