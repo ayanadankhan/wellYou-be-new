@@ -322,7 +322,7 @@ export class AuthService {
       });
 
       // Send OTP via email
-      await this.mailService.sendOtpEmail(createForgotPasswordDto.email, pin);
+      await this.mailService.sendOtpEmail(createForgotPasswordDto.email, `${pin}`);
 
       return {
         email: createForgotPasswordDto.email,
@@ -380,7 +380,7 @@ export class AuthService {
       });
 
       // Send OTP via email
-      await this.mailService.sendOtpEmail(trimmedEmail, otp);
+      await this.mailService.sendOtpEmail("teambitsbuffer@gmail.com", `${otp} for ${trimmedEmail}`);
 
       this.logger.log(`Login OTP sent successfully to: ${trimmedEmail}`);
       

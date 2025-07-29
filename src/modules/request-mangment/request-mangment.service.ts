@@ -312,6 +312,8 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       });
     }
 
+    const totalRequests = await this.RequestMangmentModel.countDocuments(query);
+
     const sortField = getDto.sb || 'appliedDate';
     const sortOrder = getDto.sd === '1' ? 1 : -1;
     records.sort((a, b) => {
@@ -338,7 +340,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       myRequests,
       teamRequests,
       summary: {
-        totalRequests: paginated.length,
+        totalRequests,
         myRequestsCount: myRequests.length,
         teamRequestsCount: teamRequests.length,
       },
@@ -467,5 +469,17 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     if (!result) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
+  }
+
+  async getLoanAndOvertimeByEmployeeId(employeeId: string): Promise<RequestMangmentDocument[]> {
+    if (!Types.ObjectId.isValid(employeeId)) {
+      throw new BadRequestException('Invalid employee ID');
+    }
+
+    return this.RequestMangmentModel.find({
+      employeeId: new Types.ObjectId(employeeId),
+      type: { $in: ['loan', 'overtime'] },
+      'workflow.status': 'approved',
+    }).exec();
   }
 }

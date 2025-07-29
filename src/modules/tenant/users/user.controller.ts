@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, HttpStatus, HttpCode, Req, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, HttpStatus, HttpCode, Req, HttpException, Query } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@/common/pipes/parse-object-id.pipe';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
@@ -11,6 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '@/common/decorators/user.decorator';
+import { GetUserDto } from './dto/get-user.dto';
 
 
 // Define the authenticated user interface
@@ -44,20 +45,14 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
 }
 
   @Get()
-  // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get all users' })
-  findAll(@CurrentUser() user: User) {
-    // Validate user authentication
-    // if (!req.user) {
-    //   throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    // }
-
-    // For MVP, simplify tenant-based filtering
+  findAll(@CurrentUser() user: User,@Query() getUserDto: GetUserDto) {
     if (user.role === UserRole.SUPER_ADMIN) {
-      return this.userService.findAll(); // Super Admin sees all users
+      getUserDto.role = UserRole.COMPANY_ADMIN; // Super Admin can see all users
+      return this.userService.findAll(getUserDto); // Super Admin sees all users
     } else if (user.tenantId) { // Use tenantId if available, fallback to _id for simplicity
       const tenantId = user.tenantId.toString();
-      return this.userService.findAllByTenant(tenantId); // Tenant-specific users
+      return this.userService.findAllByTenant(tenantId, getUserDto); // Tenant-specific users
     }
     return []; // Should not reach here if user is authenticated
   }
