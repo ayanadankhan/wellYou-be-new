@@ -85,6 +85,8 @@ export class EmployeesService {
 
       if (getDto.employmentStatus) {
         matchStage.employmentStatus = getDto.employmentStatus;
+      } else {
+        matchStage.employmentStatus = 'ACTIVE';
       }
 
       if (getDto.tenantId) {

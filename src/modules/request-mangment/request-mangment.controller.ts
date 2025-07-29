@@ -27,9 +27,15 @@ export class RequestMangmentController {
   constructor(private readonly requestMangmentervice: requestMangmentervice) {}
 
   @Post()
-  async create(@Body() createRequestMangmentDto: CreateRequestMangmentDto): Promise<RequestMangmentResponseDto> {
+  async create(
+    @Body() createRequestMangmentDto: CreateRequestMangmentDto,
+  ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.create(createRequestMangmentDto);
-    return plainToClass(RequestMangmentResponseDto, RequestMangment.toObject(), { excludeExtraneousValues: true });
+    return plainToClass(
+      RequestMangmentResponseDto,
+      RequestMangment,
+      { excludeExtraneousValues: true }
+    );
   }
 
   @Get()
