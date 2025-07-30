@@ -54,6 +54,22 @@ export class AuthController {
     };
   }
 
+  @Public()
+  @Post('login/app')
+  @HttpCode(HttpStatus.OK)
+  async loginApp(@Body() loginDto: LoginDto) {
+    // First validate user credentials but don't log them in yet
+    await this.authService.validateUsers(loginDto.email, loginDto.password);
+
+    const otp : any = await this.authService.getLoginOtp(loginDto.email);
+    
+    return {
+      email: loginDto.email,
+      success: true,
+      otp: otp.verification,
+    };
+  }
+
   /**
    * Register new user
    */
