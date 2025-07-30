@@ -420,8 +420,10 @@ export class AuthService {
           message: 'If the email exists in our system, you will receive an OTP'
         };
       }
-      const otp = await this.forgotPasswordModel.findOne({
-        email: trimmedEmail}).exec();
+      const otp = await this.forgotPasswordModel
+        .findOne({ email: trimmedEmail })
+        .sort({ createdAt: -1 })
+        .exec();
       
       return otp
     } catch (error) {
