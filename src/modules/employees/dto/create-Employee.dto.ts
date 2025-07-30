@@ -42,7 +42,8 @@ export enum EmploymentType {
   PART_TIME = 'PART_TIME',
   CONTRACT = 'CONTRACT',
   TEMPORARY = 'TEMPORARY',
-  INTERN = 'INTERN'
+  INTERN = 'INTERN',
+  REMOTE = 'REMOTE'
 }
 
 export enum SkillLevel {

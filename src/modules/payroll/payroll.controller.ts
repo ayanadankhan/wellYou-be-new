@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
+import { GetPayrollDto } from './dto/get-payroll-dto';
 
 
 @Controller('payroll')
@@ -19,8 +20,11 @@ export class PayrollController {
   }
 
   @Get()
-  async findAll(@CurrentUser() user: User) {
-      return this.payrollService.findAll(user);
+  async findAll(
+    @CurrentUser() user: User,
+    @Query() getDto: GetPayrollDto
+  ) {
+    return this.payrollService.findAll(getDto, user);
   }
 
   @Get(':id')

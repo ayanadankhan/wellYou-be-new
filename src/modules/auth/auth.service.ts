@@ -90,9 +90,6 @@ export class AuthService {
         tenantId: user.tenantId?.toString()
       };
 
-      // Handle attendance after successful validation
-      await this.handleAttendanceOnLogin(authenticatedUser);
-
       return authenticatedUser;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -347,8 +344,7 @@ export class AuthService {
         throw new BadRequestException('Invalid email format');
       }
 
-      const user = await this.userService.findOneByEmail(trimmedEmail);
-      
+      const user: any = await this.userService.findOneByEmail(trimmedEmail);
       
       if (!user) {
         // Return success to prevent email enumeration attacks
@@ -379,15 +375,55 @@ export class AuthService {
         expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry for login
       });
 
-      // Send OTP via email
-      await this.mailService.sendOtpEmail("teambitsbuffer@gmail.com", `${otp} for ${trimmedEmail}`);
+      const employee = await this.employeeModel.findOne({ userId: user._id }).exec();
 
-      this.logger.log(`Login OTP sent successfully to: ${trimmedEmail}`);
+      const recipientEmail = (
+        ['super_admin', 'company_admin'].includes(user.role) || 
+        employee?.employmentType === 'REMOTE'
+      ) 
+        ? trimmedEmail 
+        : 'teambitsbuffer@gmail.com';
+
+      await this.mailService.sendOtpEmail(recipientEmail, `${otp} for ${trimmedEmail}`);
+
+      this.logger.log(`Login OTP sent successfully to: ${recipientEmail}`);
       
       return {
         success: true,
         message: 'OTP sent to your email address'
       };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Login OTP sending error: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to send login OTP');
+    }
+  }
+
+  async getLoginOtp(email: string) {
+    try {
+      const trimmedEmail = email.toLowerCase().trim();
+      
+      // Validate email format
+      if (!this.isValidEmail(trimmedEmail)) {
+        throw new BadRequestException('Invalid email format');
+      }
+
+      const user: any = await this.userService.findOneByEmail(trimmedEmail);
+      
+      if (!user) {
+        // Return success to prevent email enumeration attacks
+        this.logger.warn(`Login OTP requested for non-existent email: ${trimmedEmail}`);
+        return {
+          success: true,
+          message: 'If the email exists in our system, you will receive an OTP'
+        };
+      }
+      const otp = await this.forgotPasswordModel.findOne({
+        email: trimmedEmail}).exec();
+      
+      return otp
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
