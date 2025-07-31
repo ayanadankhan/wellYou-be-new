@@ -14,7 +14,7 @@ export class MailService {
   });
 
   // mail.service.ts
-async sendOtpEmail(to: string, otp: number) {
+async sendOtpEmail(to: string, otp: string) {
   try {
     const mailOptions = {
       from: '"BitsBuffer" <teambitsbuffer@gmail.com>',
@@ -49,9 +49,9 @@ async sendOtpEmail(to: string, otp: number) {
     };
 
     await this.transporter.sendMail(mailOptions);
-          console.log(`OTP email sent to ${to}`);
+      console.log(`OTP email sent to ${to}`);
   } catch (error) {
-          console.error('Failed to send OTP email:', error);
+      console.error('Failed to send OTP email:', error);
     throw error;
   }
 }
@@ -64,7 +64,7 @@ async sendOtpEmail(to: string, otp: number) {
   ) {
     try {
       const mailOptions = {
-        from: '"BitsBuffer" <akhtarsaharan336@gmail.com>',
+        from: '"BitsBuffer" <teambitsbuffer@gmail.com>',
         to,
         subject: 'Welcome to BitsBuffer Platform',
         html: `

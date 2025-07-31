@@ -7,7 +7,8 @@ import {
   IsIn,
   IsNumber,
   ValidateNested,
-  IsObject
+  IsObject,
+  IsArray
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -44,6 +45,12 @@ export class LeaveDetailsDto {
   @IsOptional()
   @IsNumber()
   totalHour?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DocumentDto)
+  @IsOptional()
+  documents?: DocumentDto[];
 }
 
 export class TimeOffDetailsDto {
@@ -100,6 +107,20 @@ export class AttendanceDetailsDto {
   @IsOptional()
   @IsMongoId()
   attendanceId?: string;
+}
+
+export class DocumentDto {
+  @IsString()
+  @IsOptional()
+  type: string;
+
+  @IsString()
+  @IsOptional()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  url: string;
 }
 
 export class LoanDetailsDto {
