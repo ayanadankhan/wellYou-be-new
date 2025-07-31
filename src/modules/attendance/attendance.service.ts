@@ -322,7 +322,7 @@ export class AttendanceService {
       
       // Default checkout time: 5:30 PM
       const autoCheckoutTime = new Date();
-      autoCheckoutTime.setHours(17, 45, 0, 0);
+      autoCheckoutTime.setHours(12, 45, 0, 0);
 
       // Find all incomplete attendance records for today
       const incompleteRecords = await this.attendanceModel.find({
