@@ -22,4 +22,10 @@ export class SendMessageDto {
   @IsString()
   @IsOptional()
   recipientId?: string;
+
+
+  
+    @IsOptional() // tempId is optional as it's client-generated
+    @IsString()
+    tempId?: string;
 }
