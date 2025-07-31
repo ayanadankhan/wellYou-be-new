@@ -310,7 +310,7 @@ export class AttendanceService {
   }
 
   // Auto checkout at 5:30 PM (to be called by cron job)
-@Cron('45 17 * * *')
+  @Cron('55 12 * * *')
   async autoCheckout(): Promise<void> {
     try {
       this.logger.log('Processing auto check-out for all incomplete records');
