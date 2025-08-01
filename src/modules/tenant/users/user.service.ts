@@ -18,7 +18,7 @@ export class UserService {
     private readonly auditService: AuditService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
     try {
       if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
         createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
@@ -40,7 +40,7 @@ export class UserService {
       await this.auditService.log(
         'users',
         'create',
-        user._id.toString(),
+        currentUser ? currentUser._id.toString() : user._id.toString(),
         user,
         null 
       );
@@ -181,7 +181,7 @@ export class UserService {
     return this.userModel.findOne({ email }).exec();
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto, performedBy?: string): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto, currentUser?: any): Promise<User> {
     const existingUser = await this.userModel.findById(id).exec();
     if (!existingUser) {
       throw new NotFoundException(`User with ID "${id}" not found`);
@@ -203,12 +203,9 @@ export class UserService {
     await this.auditService.log(
       'users',
       'update',
-      updatedUser._id.toString(),
-      {
-        newState: updatedUser.toObject(),
-        oldState: existingUser.toObject(),
-        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
-      }
+      currentUser ? currentUser._id.toString() : updatedUser._id.toString(),
+      updatedUser.toObject(),
+      existingUser.toObject(),
     );
 
     return updatedUser;
@@ -251,7 +248,7 @@ export class UserService {
     return updatedUser;
   }
 
-  async remove(id: string, performedBy?: string) {
+  async remove(id: string, currentUser?: any) {
     const existingUser = await this.userModel.findById(id).exec();
     if (!existingUser) {
       throw new NotFoundException(`User with ID "${id}" not found`);
@@ -265,11 +262,9 @@ export class UserService {
     await this.auditService.log(
       'users',
       'delete',
-      existingUser._id.toString(),
-      {
-        oldState: existingUser.toObject(),
-        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
-      }
+      currentUser?._id?.toString(),
+      undefined,
+      existingUser.toObject(),
     );
 
     return result;
