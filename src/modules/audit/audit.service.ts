@@ -15,14 +15,19 @@ export class AuditService {
     oldValue?: any,
   ) {
     const flag = this.getFlagByModule(module);
-    await this.auditModel.create({
+    const auditData: any = {
       module,
       action,
       performedBy,
       oldValue,
-      newValue,
       flag,
-    });
+    };
+
+    if (action !== 'delete') {
+      auditData.newValue = newValue;
+    }
+
+    await this.auditModel.create(auditData);
   }
 
   private getFlagByModule(module: string): 'green' | 'yellow' | 'red' {

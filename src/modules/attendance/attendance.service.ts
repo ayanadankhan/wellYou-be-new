@@ -230,8 +230,8 @@ export class AttendanceService {
         throw new BadRequestException('Today is Sunday, check-in not allowed');
       }
 
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+      const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0, 0));
+      const endOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
 
       const existingAttendance = await this.attendanceModel.findOne({
         employeeId: new Types.ObjectId(employeeId),
@@ -335,7 +335,6 @@ export class AttendanceService {
 
       // Update each record
       for (const record of incompleteRecords) {
-        console.log(record, '`adlksadklaskl');
         
         const totalHours = this.calculateTotalHours(record.checkInTime, autoCheckoutTime);
         
@@ -358,7 +357,6 @@ export class AttendanceService {
       }, { employeeId: 1 });
       const presentEmployeeIds = existingRecords.map(record => record.employeeId.toString());
       const missingIds = allEmployeeIds.filter(id => !presentEmployeeIds.includes(id));
-      console.log(`Missing employee IDs for auto checkout: ${missingIds}`);
 
       if (missingIds.length > 0) {
       this.logger.log(`Marking ${missingIds.length} employees as absent`);
@@ -599,21 +597,23 @@ async getRoleBasedAttendance(
     }
 
     effectiveStartDate = start;
-    end.setHours(23, 59, 59, 999);
+     end.setUTCHours(23, 59, 59, 999);
     effectiveEndDate = end;
 
     this.logger.log(`Using provided date range: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
 
   } else {
-    const now = new Date();
-    effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    effectiveStartDate.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
 
-    effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    effectiveEndDate.setHours(23, 59, 59, 999);
+  effectiveStartDate = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+  effectiveEndDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
 
-    this.logger.log(`Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
-  }
+  this.logger.log(
+    `Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`
+  );
+}
 
   try {
     const query: any = {
@@ -1028,7 +1028,7 @@ private groupAttendanceByEmployee(
           checkInTime: null,
           checkOutTime: null,
           totalHours: 0,
-          status: 'Absent',
+          status: 'Leave',
           isAutoCheckout: false,
         }));
 

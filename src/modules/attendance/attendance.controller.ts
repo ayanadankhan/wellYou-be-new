@@ -81,7 +81,6 @@ export class AttendanceController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    console.log("CurrentUser object:", user);
 
     try {
       const groupedData: any[] = await this.attendanceService.getRoleBasedAttendance(
@@ -186,7 +185,6 @@ async getTodayAttendance(
   @Param('employeeId') employeeId: string,
   @CurrentUser() user: User,
 ) {
-  console.log(`User role from token: ${user.role}`); // ✅ Log user role
   
   this.logger.log(`Decoded user object: ${JSON.stringify(user)}`); // 🔍 Full user
   this.logger.log(`User role from token: ${user.role}`); // ✅ Final role log

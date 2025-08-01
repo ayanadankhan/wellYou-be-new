@@ -41,7 +41,7 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   if (user.role !== UserRole.SUPER_ADMIN) {
     createUserDto.tenantId = user.tenantId?.toString();
   }
-  return this.userService.create(createUserDto);
+  return this.userService.create(createUserDto, user);
 }
 
   @Get()
@@ -79,7 +79,7 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   @Patch(':id')
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Super Admin or Tenant Admin can update users
   @ApiOperation({ summary: 'Update user by ID' })
-  update(
+  update(  @CurrentUser() user: User,
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
     @Req() req: AuthenticatedRequest,
@@ -89,7 +89,7 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
 
-      return this.userService.update(id, updateUserDto);
+      return this.userService.update(id, updateUserDto, user);
   
   }
 
@@ -97,14 +97,16 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Super Admin or Tenant Admin can delete users
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete user by ID' })
-  remove(@Param('id', ParseObjectIdPipe) id: string, @Req() req: AuthenticatedRequest) {
+  remove(
+    @CurrentUser() user: any,
+    @Param('id', ParseObjectIdPipe) id: string, 
+    @Req() req: AuthenticatedRequest
+  ) {
     // Validate user authentication
     if (!req.user) {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
-
- 
-      return this.userService.remove(id);
+    return this.userService.remove(id, user);
   }
 
 @Get('profile')
