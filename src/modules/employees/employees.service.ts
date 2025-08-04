@@ -7,9 +7,10 @@ import { UpdateEmployeeDto } from './dto/update-Employee.dto';
 import { GetEmployeeDto } from './dto/get-Employee.dto';
 import { isValidObjectId } from 'mongoose';
 import { plainToClass } from 'class-transformer';
-// import { MailService } from '../mail/mail.service';
 import { InjectModel as InjectUserModel } from '@nestjs/mongoose';
-import { User } from '../tenant/users/schemas/user.schema'; // 👈 Import User schema
+import { User } from '../tenant/users/schemas/user.schema';
+import { UserService } from '../tenant/users/user.service';
+import { CreateUserDto } from '../tenant/users/dto/create-user.dto';
 
 @Injectable()
 export class EmployeesService {
@@ -17,51 +18,49 @@ export class EmployeesService {
 
   constructor(
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
-    @InjectModel(User.name) private readonly userModel: Model<any>, // For fetching email/password
-    // private readonly mailService: MailService,
+    @InjectModel(User.name) private readonly userModel: Model<any>,
+    private userService: UserService,
   ) {}
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
-    try {
-      this.logger.log(`Creating employee with userId: ${createEmployeeDto.userId}`);
-      
-      // Save employee first
-      const employee = new this.employeeModel(createEmployeeDto);
-      const savedEmployee = await employee.save();
+      try {
+          this.logger.log(`Creating employee with data: ${JSON.stringify(createEmployeeDto)}`);
 
-      // send email logic temprorary disable.
-      
-      // const user = await this.userModel.findById(createEmployeeDto.userId).lean<User>();
+          const createUserDto = new CreateUserDto();
+          createUserDto.firstName = createEmployeeDto.firstName;
+          createUserDto.lastName = createEmployeeDto.lastName;
+          createUserDto.email = createEmployeeDto.email;
+          createUserDto.password = createEmployeeDto.password;
+          createUserDto.role = createEmployeeDto.role;
+          createUserDto.tenantId = createEmployeeDto.tenantId.toString();
+          createUserDto.permissions = createEmployeeDto.permissions;
 
-      // if (user?.email && user?.password) {
-        
-      //   const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-      //   await this.mailService.sendWelcomeEmail(
-      //     user.email,
-      //     fullName,
-      //     user.email,
-      //     user.password // ✅ hashed password (temporary)
-      //   );
-      //       this.logger.log(`📧 Welcome email sent to ${user.email}`);
-      //     } else {
-      //       this.logger.warn(`⚠️ Could not send email — user not found or missing info`);
-      //     }
+          const createdUser : any = await this.userService.create(createUserDto);
+          this.logger.log(`User created with ID: ${createdUser._id}`);
+
+          const employeeData = {
+              ...createEmployeeDto,
+              userId: createdUser._id.toString()
+          };
+
+          const employee = new this.employeeModel(employeeData);
+          const savedEmployee = await employee.save();
 
           return plainToClass(GetEmployeeDto, savedEmployee.toObject());
-    } catch (error) {
-      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-      throw new HttpException(
-        {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Failed to create employee',
-          message: error.message,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+      } catch (error) {
+          this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+          throw new HttpException(
+              {
+                  status: HttpStatus.BAD_REQUEST,
+                  error: 'Failed to create employee',
+                  message: error.message,
+              },
+              HttpStatus.BAD_REQUEST,
+          );
+      }
   }
 
-  async findAll (getDto: GetEmployeeDto): Promise<GetEmployeeDto[]> {
+  async findAll (getDto: GetEmployeeDto): Promise<{ count: number; list: GetEmployeeDto[] }> {
     try {
       this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(getDto)}`);
 
@@ -79,10 +78,6 @@ export class EmployeesService {
         matchStage.positionId = new Types.ObjectId(getDto.positionId);
       }
 
-      if (getDto.reportingTo) {
-        matchStage.reportingTo = new Types.ObjectId(getDto.reportingTo);
-      }
-
       if (getDto.employmentStatus) {
         matchStage.employmentStatus = getDto.employmentStatus;
       } else {
@@ -93,7 +88,7 @@ export class EmployeesService {
         matchStage.tenantId = new Types.ObjectId(getDto.tenantId);
       }
 
-      const employees = await this.employeeModel.aggregate([
+      const pipeline: any[] = [
         { $match: matchStage },
         {
           $lookup: {
@@ -104,6 +99,31 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      ];
+
+      if (getDto.name) {
+        const nameRegex = new RegExp(getDto.name, 'i');
+
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'user.firstName': { $regex: nameRegex } },
+              { 'user.lastName': { $regex: nameRegex } },
+              {
+                $expr: {
+                  $regexMatch: {
+                    input: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+                    regex: nameRegex,
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+
+      const commonPipeline = [
+        ...pipeline,
         {
           $lookup: {
             from: 'departments',
@@ -122,7 +142,7 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-                {
+        {
           $lookup: {
             from: 'users',
             localField: 'reportingTo',
@@ -157,10 +177,27 @@ export class EmployeesService {
             'user.password': 0,
           },
         }
+      ];
+
+      if (getDto.sb) {
+        const sortDirection = getDto.sd === '1' ? 1 : -1;
+        commonPipeline.push({ $sort: { [getDto.sb]: sortDirection } });
+      }
+
+      const [list, countQuery] = await Promise.all([
+        this.employeeModel.aggregate([
+          ...commonPipeline,
+          { $skip: Number(getDto.o) || 0 },
+          { $limit: Number(getDto.l) || 10 },
+        ]).exec(),
+        this.employeeModel.aggregate([...commonPipeline, { $count: 'total' }]).exec(),
       ]);
 
-      this.logger.log(`✅ Retrieved ${employees.length} employees via aggregation`);
-      return employees.map(emp => plainToClass(GetEmployeeDto, emp));
+      this.logger.log(`✅ Retrieved ${list.length} employees via aggregation`);
+        return {
+          count: countQuery[0]?.total || 0,
+          list: list || [],
+        };
     } catch (error) {
       this.logger.error(`❌ Aggregation failed: ${error.message}`, error.stack);
       throw new HttpException(
@@ -169,7 +206,7 @@ export class EmployeesService {
           error: 'Failed to fetch employees via aggregation',
           message: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }

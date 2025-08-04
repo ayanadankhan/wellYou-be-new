@@ -18,7 +18,7 @@ export class UserService {
     private readonly auditService: AuditService,
   ) {}
 
-  async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
+  async create(createUserDto: CreateUserDto, currentUser?: any) {
     try {
       if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
         createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
@@ -54,7 +54,6 @@ export class UserService {
     }
   }
 
-
   async findAll(getDto: GetUserDto) {
     try {
       const pipeline: any[] = [];
@@ -80,7 +79,6 @@ export class UserService {
       const [list, countQuery] = await Promise.all([
         this.userModel.aggregate([
           ...pipeline,
-          // Lookup companies
           {
             $lookup: {
               from: 'companies',
@@ -90,13 +88,9 @@ export class UserService {
             }
           },
           { $unwind: { path: '$companies', preserveNullAndEmptyArrays: true } },
-          // Sorting
-          { $sort: { [getDto.sb]: getDto.sd === 'asc' ? 1 : -1 } },
-          // Pagination
           { $skip: Number(getDto.o) || 0 },
           { $limit: Number(getDto.l) || 10 },
         ]).exec(),
-        // Count query (without pagination)
         this.userModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
       ]);
 

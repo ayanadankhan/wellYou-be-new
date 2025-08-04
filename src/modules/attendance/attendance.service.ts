@@ -347,13 +347,13 @@ export class AttendanceService {
 
       const getEmployeeDto = new GetEmployeeDto();
       getEmployeeDto.employmentStatus = 'ACTIVE';
-      const Employees = await this.employeeService.findAll(getEmployeeDto);
-      const allEmployeeIds = Employees.map((emp:any) => emp._id.toString());
+      const EmployeesResponse = await this.employeeService.findAll(getEmployeeDto);
+      const allEmployeeIds = EmployeesResponse.list.map((emp: any) => emp._id.toString());
       const existingRecords = await this.attendanceModel.find({
         date: { $gte: startOfDay, $lte: endOfDay },
       }, { employeeId: 1 });
       const presentEmployeeIds = existingRecords.map(record => record.employeeId.toString());
-      const missingIds = allEmployeeIds.filter(id => !presentEmployeeIds.includes(id));
+      const missingIds = allEmployeeIds.filter((id: string) => !presentEmployeeIds.includes(id));
 
       if (missingIds.length > 0) {
       this.logger.log(`Marking ${missingIds.length} employees as absent`);
