@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
+import { UserRole } from '../../tenant/users/schemas/user.schema';
 
 // Enums for consistent values
 export enum Gender {
@@ -226,7 +227,26 @@ export class DependentMemberDto {
 
 export class CreateEmployeeDto {
   @IsString()
-  @IsNotEmpty()
+  firstName: string;
+
+  @IsString()
+  lastName: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  password: string;
+
+  @IsEnum(UserRole)
+  role: UserRole;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true, message: 'Each permission must be a string' })
+  permissions?: string[];
+
+  @IsString()
   userId: Types.ObjectId;
 
   @IsDateString()

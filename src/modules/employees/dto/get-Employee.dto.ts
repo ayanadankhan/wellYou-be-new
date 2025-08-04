@@ -1,10 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsEmail, IsDateString, IsNumber, IsArray, IsBoolean, ValidateNested, IsOptional } from 'class-validator';
-import { Type } from 'class-transformer';
+import { GetApiDto } from '../../shared/dto/get-api.dto';
 import { Types } from 'mongoose';
 
-export class GetEmployeeDto {
- 
+export class GetEmployeeDto extends GetApiDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
   @IsOptional()
   tenantId: Types.ObjectId;
 
@@ -22,4 +24,10 @@ export class GetEmployeeDto {
 
   @IsOptional()
   employmentStatus: string;
+
+  constructor() {
+    super();
+    this.sb = 'createdAt';
+    this.sd = '1';
+  }
 }

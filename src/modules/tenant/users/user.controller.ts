@@ -33,16 +33,16 @@ interface AuthenticatedRequest extends Request {
 @Controller('users')
 export class UserController {constructor(private readonly userService: UserService) {}
 
-@Post()
-async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
-  if (!user) {
-    throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+  @Post()
+  async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
+    if (!user) {
+      throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    }
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      createUserDto.tenantId = user.tenantId?.toString();
+    }
+    return this.userService.create(createUserDto, user);
   }
-  if (user.role !== UserRole.SUPER_ADMIN) {
-    createUserDto.tenantId = user.tenantId?.toString();
-  }
-  return this.userService.create(createUserDto, user);
-}
 
   @Get()
   @ApiOperation({ summary: 'Get all users' })
