@@ -11,6 +11,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { GetCompanyDto } from './dto/get-company.dto';
+import { CurrentUser } from '@/common/decorators/user.decorator';
 
 @ApiTags('companies')
 @ApiBearerAuth()
@@ -21,8 +22,8 @@ export class CompanyController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
-  create(@Body() createCompanyDto: CreateCompanyDto) {
-    return this.companyService.create(createCompanyDto);
+  create(@Body() createCompanyDto: CreateCompanyDto, @CurrentUser() user: any,) {
+    return this.companyService.create(createCompanyDto, user);
   }
 
   @Get()
@@ -40,14 +41,16 @@ export class CompanyController {
   @Roles(UserRole.SUPER_ADMIN)
   update(
     @Param('id', ParseObjectIdPipe) id: string,
-    @Body() updateCompanyDto: UpdateCompanyDto,
+    @Body() updateCompanyDto: UpdateCompanyDto, @CurrentUser() user: any
   ) {
-    return this.companyService.update(id, updateCompanyDto);
+    return this.companyService.update(id, updateCompanyDto, user);
   }
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
-  remove(@Param('id', ParseObjectIdPipe) id: string) {
-    return this.companyService.remove(id);
+  async remove(@Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: any
+  ): Promise<void> {
+    return this.companyService.remove(id, user);
   }
 }

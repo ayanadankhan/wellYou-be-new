@@ -13,6 +13,7 @@ import { RequestMangment, RequestMangmentDocument } from './entities/request-man
 import { Employee } from '../employees/schemas/Employee.schema';
 import { AttendanceService } from '../attendance/attendance.service';
 import { GetRequestDto } from './dto/get-request-mangment.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class requestMangmentervice {
@@ -23,10 +24,11 @@ export class requestMangmentervice {
     private readonly RequestMangmentModel: Model<RequestMangmentDocument>,
     @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
     private attendanceService: AttendanceService,
+    private readonly auditService: AuditService,
   ) {}
 
 async create(
-  createRequestMangmentDto: CreateRequestMangmentDto,
+  createRequestMangmentDto: CreateRequestMangmentDto, currentUser?: any
 ): Promise<RequestMangmentDocument> {
   if (!Types.ObjectId.isValid(createRequestMangmentDto.employeeId)) {
     throw new BadRequestException('Invalid employee ID format');
@@ -97,30 +99,36 @@ async create(
     },
   });
 
-  return await RequestMangment.save();
+  const savedRequest = await RequestMangment.save();
+
+    await this.auditService.log(
+      'requests',
+      'create',
+      currentUser ? currentUser._id.toString() : savedRequest._id.toString(),
+      savedRequest.toObject(),
+      null
+    );
+
+  return savedRequest;
 }
 
 private calculateLeaveHours(from: Date, to: Date): number {
   const startDate = new Date(from);
   const endDate = new Date(to);
-  
-  // Reset time components to avoid time-related issues
+
   startDate.setHours(0, 0, 0, 0);
   endDate.setHours(0, 0, 0, 0);
 
   let totalDays = 0;
   const currentDate = new Date(startDate);
 
-  // Calculate working days (excluding Sundays)
   while (currentDate <= endDate) {
-    // Sunday is day 0 in JavaScript
     if (currentDate.getDay() !== 0) {
       totalDays++;
     }
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // 8 hours per working day
   return totalDays * 8;
 }
 
@@ -374,6 +382,7 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
   async update(
     id: string,
     updateRequestMangmentDto: UpdateRequestMangmentDto,
+    currentUser?: any
   ): Promise<RequestMangmentDocument> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid leave request ID format');
@@ -398,6 +407,15 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     if (!updated) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
+
+    await this.auditService.log(
+      'requests',
+      'update',
+      currentUser._id.toString(),
+      updated.toObject(),
+      existing.toObject()
+    );
+
     if (updated.workflow?.status === 'approved' && updated.type === 'leave') {
       const leaveDetails = updated.leaveDetails;
       if (leaveDetails?.from && leaveDetails?.to) {
@@ -460,15 +478,22 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
     return updated;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser?: any,): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid leave request ID format');
     }
-
     const result = await this.RequestMangmentModel.findByIdAndDelete(id).exec();
     if (!result) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
+
+    await this.auditService.log(
+      'requests',
+      'delete',
+      currentUser?._id?.toString(),
+      null,
+      result.toObject()
+    );
   }
 
   async getLoanAndOvertimeByEmployeeId(employeeId: string): Promise<RequestMangmentDocument[]> {

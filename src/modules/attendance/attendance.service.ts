@@ -319,12 +319,9 @@ export class AttendanceService {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-      
-      // Default checkout time: 5:30 PM
       const autoCheckoutTime = new Date();
       autoCheckoutTime.setHours(12, 45, 0, 0);
 
-      // Find all incomplete attendance records for today
       const incompleteRecords = await this.attendanceModel.find({
         date: { $gte: startOfDay, $lte: endOfDay },
         checkOutTime: null,
@@ -333,7 +330,6 @@ export class AttendanceService {
 
       this.logger.log(`Found ${incompleteRecords.length} incomplete records for auto checkout`);
 
-      // Update each record
       for (const record of incompleteRecords) {
         
         const totalHours = this.calculateTotalHours(record.checkInTime, autoCheckoutTime);
@@ -350,6 +346,7 @@ export class AttendanceService {
       }
 
       const getEmployeeDto = new GetEmployeeDto();
+      getEmployeeDto.employmentStatus = 'ACTIVE';
       const Employees = await this.employeeService.findAll(getEmployeeDto);
       const allEmployeeIds = Employees.map((emp:any) => emp._id.toString());
       const existingRecords = await this.attendanceModel.find({
@@ -526,8 +523,8 @@ async getRoleBasedAttendance(
       throw new BadRequestException('Admin user is missing tenant information.');
     }
     
-    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) })
-      .select('_id userId profilePicture') // Include profilePicture in the select
+    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId), employmentStatus: 'ACTIVE' })
+      .select('_id userId profilePicture')
       .populate({
         path: 'userId',
         model: 'User',
@@ -538,7 +535,7 @@ async getRoleBasedAttendance(
     employeeIdsToQuery = allTenantEmployees.map(employee => employee._id);
     this.logger.log(`Found ${employeeIdsToQuery.length} employees for tenantId: ${tenantId}.`);
   } else {
-    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId) })
+    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId), employmentStatus: 'ACTIVE' })
       .select('_id profilePicture')
       .exec();
 
@@ -552,7 +549,7 @@ async getRoleBasedAttendance(
       case 'employee':
         this.logger.log(`Role: 'employee'. Checking if any employees have reportingTo field matching userId: ${userId}`);
 
-        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId) })
+        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId), employmentStatus: 'ACTIVE' })
           .select('_id profilePicture')
           .exec();
 
@@ -638,8 +635,7 @@ async getRoleBasedAttendance(
       .sort({ date: -1 })
       .exec();
 
-    // Get all employee details including profile pictures in one query
-    const employees = await this.employeeModel.find({ _id: { $in: employeeIdsToQuery } })
+    const employees = await this.employeeModel.find({ _id: { $in: employeeIdsToQuery }, employmentStatus: 'ACTIVE' })
       .select('_id profilePicture')
       .populate({
         path: 'userId',
@@ -661,7 +657,7 @@ async getRoleBasedAttendance(
       attendance,
       employeeIdsToQuery,
       userRole !== 'company_admin' ? currentEmployeeId : null,
-      employeeMap // Pass the employee map to the grouping function
+      employeeMap
     );
 
     return groupedAttendance;
