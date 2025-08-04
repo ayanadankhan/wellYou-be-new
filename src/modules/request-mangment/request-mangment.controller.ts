@@ -28,13 +28,15 @@ export class RequestMangmentController {
 
   @Post()
   async create(
-    @Body() createRequestMangmentDto: CreateRequestMangmentDto,
-  ): Promise<RequestMangmentResponseDto> {
-    const RequestMangment = await this.requestMangmentervice.create(createRequestMangmentDto);
-    return plainToClass(
-      RequestMangmentResponseDto,
-      RequestMangment,
-      { excludeExtraneousValues: true }
+    @CurrentUser() user: any,
+    @Body() createRequestMangmentDto: CreateRequestMangmentDto
+  ) {
+    if (user.role !== 'company_admin' && user.role !== 'super_admin') {
+      createRequestMangmentDto.employeeId = user._id.toString();
+    }
+    const RequestMangment = await this.requestMangmentervice.create(
+    createRequestMangmentDto,
+    user
     );
   }
 
@@ -72,12 +74,14 @@ export class RequestMangmentController {
 
   @Patch(':id')
   async update(
+    @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() updateRequestMangmentDto: UpdateRequestMangmentDto,
   ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.update(
       id,
       updateRequestMangmentDto,
+      user
     );
     return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
@@ -137,8 +141,10 @@ export class RequestMangmentController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.requestMangmentervice.remove(id);
+  async remove(
+    @CurrentUser() user: User,
+    @Param('id') id: string
+  ) {
+    await this.requestMangmentervice.remove(id, user);
   }
 }

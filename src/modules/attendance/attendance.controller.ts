@@ -97,7 +97,7 @@ export class AttendanceController {
       const formattedMyAttendance = myAttendance ? {
         ...myAttendance,
         attendance: this.formatRawAttendanceRecords(myAttendance.attendance)
-      } : null;
+      } : [];
 
       const formattedTeamAttendance = teamAttendance.map(group => ({
         ...group,
