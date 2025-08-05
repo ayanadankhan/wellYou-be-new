@@ -15,7 +15,6 @@ import { requestMangmentervice } from './request-mangment.service';
 import { CreateRequestMangmentDto, RequestStatus } from './dto/create-request-mangment.dto';
 import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { plainToClass } from 'class-transformer';
-import { Types } from 'mongoose';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
 import { RequestMangmentResponseDto } from './dto/requestMangmentresponse-dto';
@@ -31,7 +30,7 @@ export class RequestMangmentController {
     @CurrentUser() user: any,
     @Body() createRequestMangmentDto: CreateRequestMangmentDto
   ) {
-    if (user.role !== 'company_admin' && user.role !== 'super_admin') {
+    if (user.role === 'company_admin' && user.role === 'super_admin') {
       createRequestMangmentDto.employeeId = user._id.toString();
     }
     const RequestMangment = await this.requestMangmentervice.create(

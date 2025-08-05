@@ -220,7 +220,7 @@ export class Employee {
   @Prop({ type: [Document] })
   documents?: Document[];
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   ssnTaxId: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'companies', default: null })
