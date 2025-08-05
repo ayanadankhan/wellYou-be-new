@@ -22,7 +22,7 @@ export class SalaryController {
 
   @Post()
   create(@CurrentUser() user: User, @Body() createSalaryDto: CreateSalaryDto) {
-    return this.salaryService.create(createSalaryDto);
+    return this.salaryService.create(createSalaryDto, user);
   }
 
   @Get()

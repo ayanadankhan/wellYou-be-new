@@ -101,7 +101,7 @@ export class requestMangmentervice {
       await this.auditService.log(
         'requests',
         'create',
-        currentUser ? currentUser._id.toString() : savedRequest._id.toString(),
+        currentUser._id.toString(),
         savedRequest.toObject(),
         null
       );

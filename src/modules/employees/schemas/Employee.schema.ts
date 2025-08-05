@@ -205,7 +205,7 @@ export class Employee {
   @Prop({ required: true, type: String, enum: EmploymentStatus })
   employmentStatus: EmploymentStatus;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ required: false, type: Date })
   hireDate: Date;
 
   @Prop({ type: [Experience] })
