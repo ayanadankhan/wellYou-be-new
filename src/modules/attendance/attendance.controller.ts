@@ -23,8 +23,6 @@ import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
-import { EmployeesService } from '../employees/employees.service';
-import { UserAccessLoggingSettings } from 'aws-sdk/clients/workspacesweb';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -35,9 +33,6 @@ export class AttendanceController {
 
   @Post('checkin')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Check-in employee (auto-called on login)' })
-  @ApiResponse({ status: 200, description: 'Check-in successful' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
   async checkin(@Body() body: { employeeId: string }) {
     try {
       this.logger.log(`Check-in request for employee: ${body.employeeId}`);
@@ -56,9 +51,6 @@ export class AttendanceController {
 
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Check-out employee (called on logout)' })
-  @ApiResponse({ status: 200, description: 'Check-out successful' })
-  @ApiResponse({ status: 404, description: 'No check-in record found' })
   async checkout(@Body() body: { employeeId: string }) {
     try {
       this.logger.log(`Check-out request for employee: ${body.employeeId}`);
@@ -75,25 +67,23 @@ export class AttendanceController {
     }
   }
 
-@Get('employee') // Consider renaming this endpoint for clarity if it returns more than just 'employee's own attendance
+  @Get('employee')
   async getEmployeeAttendance(
-    @CurrentUser() user: User, // This decorator provides the user object
+    @CurrentUser() user: User,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
 
     try {
       const groupedData: any[] = await this.attendanceService.getRoleBasedAttendance(
-        { ...(user as any), _id: (user as any)._id }, // Ensure _id is a string or ObjectId as expected by service
+        { ...(user as any), _id: (user as any)._id },
         startDate,
         endDate,
       );
 
-      // Separate myAttendance and teamAttendance
       const myAttendance = groupedData.find(group => group.isCurrentUser);
       const teamAttendance = groupedData.filter(group => !group.isCurrentUser);
 
-      // Format the attendance array within each group
       const formattedMyAttendance = myAttendance ? {
         ...myAttendance,
         attendance: this.formatRawAttendanceRecords(myAttendance.attendance)
@@ -104,10 +94,8 @@ export class AttendanceController {
         attendance: this.formatRawAttendanceRecords(group.attendance)
       }));
 
-      // Calculate overall monthly stats from ALL records (both mine and team's)
       const allAttendanceRecords = groupedData.flatMap((group: any) => group.attendance);
 
-      // Example: Calculate monthlyStats (customize as needed)
       const monthlyStats = {
         totalDays: allAttendanceRecords.length,
         presentDays: allAttendanceRecords.filter((rec: any) => rec.status === 'Present').length,
@@ -129,12 +117,6 @@ export class AttendanceController {
       throw error;
     }
   }
-
-  /**
-   * Helper method to format raw attendance records for a single employee group.
-   * This logic was previously in `formatGroupedAttendanceData` but is now extracted
-   * to apply to individual attendance arrays.
-   */
 
     private formatRawAttendanceRecords(rawData: any[]): any[] {
     interface AttendanceRecord {
@@ -176,39 +158,34 @@ export class AttendanceController {
   }
 
 
-@UseGuards(JwtAuthGuard)
-@Get('today/:employeeId')
-@ApiOperation({ summary: 'Get today\'s attendance for an employee' })
-@ApiParam({ name: 'employeeId', description: 'Employee ID' })
-@ApiResponse({ status: 200, description: 'Today\'s attendance retrieved successfully' })
-async getTodayAttendance(
-  @Param('employeeId') employeeId: string,
-  @CurrentUser() user: User,
-) {
-  
-  this.logger.log(`Decoded user object: ${JSON.stringify(user)}`); // 🔍 Full user
-  this.logger.log(`User role from token: ${user.role}`); // ✅ Final role log
-  
-  try {
-    this.logger.log(`Fetching today's attendance for employee: ${employeeId}`);
+  @UseGuards(JwtAuthGuard)
+  @Get('today/:employeeId')
+  async getTodayAttendance(
+    @Param('employeeId') employeeId: string,
+    @CurrentUser() user: User,
+  ) {
     
-    const result = await this.attendanceService.getTodayAttendance(employeeId);
+    this.logger.log(`Decoded user object: ${JSON.stringify(user)}`); // 🔍 Full user
+    this.logger.log(`User role from token: ${user.role}`); // ✅ Final role log
     
-    return {
-      success: true,
-      message: 'Today\'s attendance retrieved successfully',
-      data: result,
-    };
-  } catch (error) {
-    this.logger.error('Get today attendance failed:', error.message);
-    throw error;
+    try {
+      this.logger.log(`Fetching today's attendance for employee: ${employeeId}`);
+      
+      const result = await this.attendanceService.getTodayAttendance(employeeId);
+      
+      return {
+        success: true,
+        message: 'Today\'s attendance retrieved successfully',
+        data: result,
+      };
+    } catch (error) {
+      this.logger.error('Get today attendance failed:', error.message);
+      throw error;
+    }
   }
-}
   
   @Post('auto-checkout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Auto check-out all incomplete records (for cron job)' })
-  @ApiResponse({ status: 200, description: 'Auto check-out completed' })
   async autoCheckout() {
     try {
       this.logger.log('Auto check-out request received');
@@ -226,8 +203,6 @@ async getTodayAttendance(
 
   @Post('mark-absent')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Mark absent employees (for cron job)' })
-  @ApiResponse({ status: 200, description: 'Absent employees marked successfully' })
   async markAbsentEmployees(@Body() body: { employeeIds: string[] }) {
     try {
       this.logger.log('Mark absent employees request received');
@@ -245,8 +220,6 @@ async getTodayAttendance(
 
   // Admin endpoints for manual attendance management
   @Post()
-  @ApiOperation({ summary: 'Create attendance record manually (Admin only)' })
-  @ApiResponse({ status: 201, description: 'Attendance record created successfully' })
   async create(@Body() createAttendanceDto: CreateAttendanceDto) {
     try {
       this.logger.log('Manual attendance creation request');
@@ -264,9 +237,6 @@ async getTodayAttendance(
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update attendance record (Admin only)' })
-  @ApiParam({ name: 'id', description: 'Attendance record ID' })
-  @ApiResponse({ status: 200, description: 'Attendance record updated successfully' })
   async update(
     @Param('id') id: string,
     @Body() updateAttendanceDto: UpdateAttendanceDto,
@@ -288,9 +258,6 @@ async getTodayAttendance(
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete attendance record (Admin only)' })
-  @ApiParam({ name: 'id', description: 'Attendance record ID' })
-  @ApiResponse({ status: 204, description: 'Attendance record deleted successfully' })
   async remove(@Param('id') id: string) {
     try {
       this.logger.log(`Delete attendance request for ID: ${id}`);

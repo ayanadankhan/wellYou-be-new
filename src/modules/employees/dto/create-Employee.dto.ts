@@ -351,7 +351,6 @@ export class CreateEmployeeDto {
   skills?: SkillDto[];
 
   @IsString()
-  @IsNotEmpty()
   ssnTaxId: string;
 
   @IsOptional()

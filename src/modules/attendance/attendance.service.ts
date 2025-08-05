@@ -6,8 +6,6 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Attendance, AttendanceDocument } from './schemas/Attendance.schema';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
-
-// Assuming you have an Employee model - adjust import path as needed
 import { Employee, EmployeeSchema, EmployeeDocument } from '../employees/schemas/Employee.schema';
 import { User } from '../tenant/users/schemas/user.schema';
 

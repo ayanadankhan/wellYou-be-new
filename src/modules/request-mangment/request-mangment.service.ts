@@ -27,122 +27,119 @@ export class requestMangmentervice {
     private readonly auditService: AuditService,
   ) {}
 
-async create(
-  createRequestMangmentDto: CreateRequestMangmentDto, currentUser?: any
-): Promise<RequestMangmentDocument> {
-  if (!Types.ObjectId.isValid(createRequestMangmentDto.employeeId)) {
-    throw new BadRequestException('Invalid employee ID format');
-  }
+  async create(
+    createRequestMangmentDto: CreateRequestMangmentDto, currentUser?: any
+  ): Promise<RequestMangmentDocument> {
+    if (!Types.ObjectId.isValid(createRequestMangmentDto.employeeId)) {
+      throw new BadRequestException('Invalid employee ID format');
+    }
 
-  const employee = await this.employeeModel.findOne({
-    _id: createRequestMangmentDto.employeeId,
-  });
+    const employee = await this.employeeModel.findOne({
+      _id: createRequestMangmentDto.employeeId,
+    });
 
-  if (!employee) {
-    throw new NotFoundException(
-      'Employee not found or does not belong to the user',
-    );
-  }
-  await this.validateRequestByType(createRequestMangmentDto);
+    if (!employee) {
+      throw new NotFoundException(
+        'Employee not found or does not belong to the user',
+      );
+    }
+    await this.validateRequestByType(createRequestMangmentDto);
 
-    let adminApproval = false;
+      let adminApproval = false;
 
-  if (createRequestMangmentDto.type === 'leave') {
-    await this.checkOverlappingrequestMangment(createRequestMangmentDto);
-    
-    // Calculate total hours for leave if details are provided
-    if (createRequestMangmentDto.leaveDetails) {
-      const { from, to } = createRequestMangmentDto.leaveDetails;
-      if (from && to) {
-        const totalHours = this.calculateLeaveHours(from, to);
-        createRequestMangmentDto.leaveDetails.totalHour = totalHours;
-        
-        if (totalHours > 8) {
-          adminApproval = true;
+    if (createRequestMangmentDto.type === 'leave') {
+      await this.checkOverlappingrequestMangment(createRequestMangmentDto);
+
+      if (createRequestMangmentDto.leaveDetails) {
+        const { from, to } = createRequestMangmentDto.leaveDetails;
+        if (from && to) {
+          const totalHours = this.calculateLeaveHours(from, to);
+          createRequestMangmentDto.leaveDetails.totalHour = totalHours;
+          
+          if (totalHours > 8) {
+            adminApproval = true;
+          }
         }
       }
     }
-  }
 
-  // Calculate total hours for overtime if details are provided
-  if (createRequestMangmentDto.overtimeDetails) {
-    const { fromHour, toHour } = createRequestMangmentDto.overtimeDetails;
-    if (fromHour && toHour) {
-      createRequestMangmentDto.overtimeDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+    if (createRequestMangmentDto.overtimeDetails) {
+      const { fromHour, toHour } = createRequestMangmentDto.overtimeDetails;
+      if (fromHour && toHour) {
+        createRequestMangmentDto.overtimeDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+      }
     }
-  }
 
-  // Calculate total hours for time off if details are provided
-  if (createRequestMangmentDto.timeOffDetails) {
-    const { fromHour, toHour } = createRequestMangmentDto.timeOffDetails;
-    if (fromHour && toHour) {
-      createRequestMangmentDto.timeOffDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+    if (createRequestMangmentDto.timeOffDetails) {
+      const { fromHour, toHour } = createRequestMangmentDto.timeOffDetails;
+      if (fromHour && toHour) {
+        createRequestMangmentDto.timeOffDetails.totalHour = this.calculateHoursDifference(fromHour, toHour);
+      }
     }
-  }
 
-  if (createRequestMangmentDto.attendanceDetails) {
-    // No validation — attendanceDetails may exist, but no check on time order
-  }
-
-    if (createRequestMangmentDto.type === 'loan') {
-    adminApproval = true;
-  }
-
-  const RequestMangment = new this.RequestMangmentModel({
-    ...createRequestMangmentDto,
-    employeeId: new Types.ObjectId(createRequestMangmentDto.employeeId),
-    appliedDate: new Date(),
-    adminApproval,
-    workflow: {
-      status: 'pending',
-      ...createRequestMangmentDto.workflow,
-    },
-  });
-
-  const savedRequest = await RequestMangment.save();
-
-    await this.auditService.log(
-      'requests',
-      'create',
-      currentUser ? currentUser._id.toString() : savedRequest._id.toString(),
-      savedRequest.toObject(),
-      null
-    );
-
-  return savedRequest;
-}
-
-private calculateLeaveHours(from: Date, to: Date): number {
-  const startDate = new Date(from);
-  const endDate = new Date(to);
-
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
-
-  let totalDays = 0;
-  const currentDate = new Date(startDate);
-
-  while (currentDate <= endDate) {
-    if (currentDate.getDay() !== 0) {
-      totalDays++;
+    if (createRequestMangmentDto.attendanceDetails) {
+      // No validation — attendanceDetails may exist, but no check on time order
     }
-    currentDate.setDate(currentDate.getDate() + 1);
+
+      if (createRequestMangmentDto.type === 'loan') {
+      adminApproval = true;
+    }
+
+    const RequestMangment = new this.RequestMangmentModel({
+      ...createRequestMangmentDto,
+      employeeId: new Types.ObjectId(createRequestMangmentDto.employeeId),
+      appliedDate: new Date(),
+      adminApproval,
+      workflow: {
+        status: 'pending',
+        ...createRequestMangmentDto.workflow,
+      },
+    });
+
+    const savedRequest = await RequestMangment.save();
+
+      await this.auditService.log(
+        'requests',
+        'create',
+        currentUser ? currentUser._id.toString() : savedRequest._id.toString(),
+        savedRequest.toObject(),
+        null
+      );
+
+    return savedRequest;
   }
 
-  return totalDays * 8;
-}
+  private calculateLeaveHours(from: Date, to: Date): number {
+    const startDate = new Date(from);
+    const endDate = new Date(to);
 
-private calculateHoursDifference(fromHour: string, toHour: string): number {
-  const fromDate = new Date(`1970-01-01T${fromHour}:00`);
-  const toDate = new Date(`1970-01-01T${toHour}:00`);
-  
-  if (toDate < fromDate) {
-    toDate.setDate(toDate.getDate() + 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+
+    let totalDays = 0;
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      if (currentDate.getDay() !== 0) {
+        totalDays++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return totalDays * 8;
   }
-  
-  const diffInMs = toDate.getTime() - fromDate.getTime();
-  return diffInMs / (1000 * 60 * 60);
-}
+
+  private calculateHoursDifference(fromHour: string, toHour: string): number {
+    const fromDate = new Date(`1970-01-01T${fromHour}:00`);
+    const toDate = new Date(`1970-01-01T${toHour}:00`);
+    
+    if (toDate < fromDate) {
+      toDate.setDate(toDate.getDate() + 1);
+    }
+    
+    const diffInMs = toDate.getTime() - fromDate.getTime();
+    return diffInMs / (1000 * 60 * 60);
+  }
 
   private async validateRequestByType(dto: CreateRequestMangmentDto): Promise<void> {
     switch (dto.type) {
@@ -393,7 +390,6 @@ private calculateHoursDifference(fromHour: string, toHour: string): number {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
 
-    // Validate updated data by type
     if (updateRequestMangmentDto.type || updateRequestMangmentDto.leaveDetails || 
         updateRequestMangmentDto.timeOffDetails || updateRequestMangmentDto.overtimeDetails || updateRequestMangmentDto.loanDetails) {
       const mergedDto = { ...existing.toObject(), ...updateRequestMangmentDto };
