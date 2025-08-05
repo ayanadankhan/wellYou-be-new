@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, HttpStatus, HttpCode, Req, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, HttpStatus, HttpCode, Req, HttpException, Query } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@/common/pipes/parse-object-id.pipe';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
@@ -11,6 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '@/common/decorators/user.decorator';
+import { GetUserDto } from './dto/get-user.dto';
 
 
 // Define the authenticated user interface
@@ -32,41 +33,31 @@ interface AuthenticatedRequest extends Request {
 @Controller('users')
 export class UserController {constructor(private readonly userService: UserService) {}
 
-@Post()
-async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
-  if (!user) {
-    throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+  @Post()
+  async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
+    if (!user) {
+      throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    }
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      createUserDto.tenantId = user.tenantId?.toString();
+    }
+    return this.userService.create(createUserDto, user);
   }
-  if (user.role !== UserRole.SUPER_ADMIN) {
-    createUserDto.tenantId = user.tenantId?.toString();
-  }
-  return this.userService.create(createUserDto);
-}
 
   @Get()
-  // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
-  @ApiOperation({ summary: 'Get all users' })
-  findAll(@CurrentUser() user: User) {
-    // Validate user authentication
-    // if (!req.user) {
-    //   throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    // }
-
-    // For MVP, simplify tenant-based filtering
+  findAll(@CurrentUser() user: User,@Query() getUserDto: GetUserDto) {
     if (user.role === UserRole.SUPER_ADMIN) {
-      return this.userService.findAll(); // Super Admin sees all users
-    } else if (user.tenantId) { // Use tenantId if available, fallback to _id for simplicity
+      getUserDto.role = UserRole.COMPANY_ADMIN;
+      return this.userService.findAll(getUserDto);
+    } else if (user.tenantId) {
       const tenantId = user.tenantId.toString();
-      return this.userService.findAllByTenant(tenantId); // Tenant-specific users
+      return this.userService.findAllByTenant(tenantId, getUserDto);
     }
-    return []; // Should not reach here if user is authenticated
+    return [];
   }
 
   @Get(':id')
-  // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
-  @ApiOperation({ summary: 'Get user by ID' })
   findOne(@Param('id', ParseObjectIdPipe) id: string, @Req() req: AuthenticatedRequest) {
-    // Validate user authentication
     if (!req.user) {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
@@ -74,7 +65,6 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
     if (req.user.role === UserRole.SUPER_ADMIN) {
       return this.userService.findById(id);
     } else if (req.user.tenantId || req.user._id) {
-      // Users can only view users within their own tenant
       const tenantId = req.user.tenantId || req.user._id;
       return this.userService.findByIdAndTenant(id, tenantId);
     }
@@ -82,34 +72,30 @@ async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
   }
 
   @Patch(':id')
-  // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Super Admin or Tenant Admin can update users
-  @ApiOperation({ summary: 'Update user by ID' })
-  update(
+  update(  @CurrentUser() user: User,
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    // Validate user authentication
     if (!req.user) {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
 
-      return this.userService.update(id, updateUserDto);
+    return this.userService.update(id, updateUserDto, user);
   
   }
 
   @Delete(':id')
-  // @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Super Admin or Tenant Admin can delete users
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete user by ID' })
-  remove(@Param('id', ParseObjectIdPipe) id: string, @Req() req: AuthenticatedRequest) {
-    // Validate user authentication
+  remove(
+    @CurrentUser() user: any,
+    @Param('id', ParseObjectIdPipe) id: string, 
+    @Req() req: AuthenticatedRequest
+  ) {
     if (!req.user) {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
-
- 
-      return this.userService.remove(id);
+    return this.userService.remove(id, user);
   }
 
 @Get('profile')

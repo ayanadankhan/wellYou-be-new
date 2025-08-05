@@ -1,5 +1,5 @@
 
-import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
@@ -8,6 +8,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
+import { GetUserDto } from './dto/get-user.dto';
 
 @Injectable()
 export class UserService {
@@ -17,7 +18,7 @@ export class UserService {
     private readonly auditService: AuditService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto, currentUser?: any) {
     try {
       if (createUserDto.tenantId && typeof createUserDto.tenantId === 'string') {
         createUserDto.tenantId = new Types.ObjectId(createUserDto.tenantId) as any;
@@ -39,7 +40,7 @@ export class UserService {
       await this.auditService.log(
         'users',
         'create',
-        user._id.toString(),
+        currentUser ? currentUser._id.toString() : user._id.toString(),
         user,
         null 
       );
@@ -53,24 +54,105 @@ export class UserService {
     }
   }
 
+  async findAll(getDto: GetUserDto) {
+    try {
+      const pipeline: any[] = [];
 
-  async findAll(): Promise<User[]> {
-    return this.userModel.aggregate([
-      // Step 1: Lookup employee
-      {
-        $lookup: {
-          from: 'companies',
-          localField: 'tenantId',
-          foreignField: '_id',
-          as: 'companies'
-        }
-      },
-      { $unwind: { path: '$companies', preserveNullAndEmptyArrays: true } },
-    ]).exec();
+      if (getDto.name) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { firstName: new RegExp(getDto.name, 'i') },
+              { lastName: new RegExp(getDto.name, 'i') },
+            ],
+          },
+        });
+      }      
+
+      if (getDto.role) {
+        pipeline.push({ $match: { role: getDto.role } });
+      }
+
+      if (getDto.tenantId) {
+        pipeline.push({ $match: { tenantId: getDto.tenantId } });
+      }
+      const [list, countQuery] = await Promise.all([
+        this.userModel.aggregate([
+          ...pipeline,
+          {
+            $lookup: {
+              from: 'companies',
+              localField: 'tenantId',
+              foreignField: '_id',
+              as: 'companies'
+            }
+          },
+          { $unwind: { path: '$companies', preserveNullAndEmptyArrays: true } },
+          { $skip: Number(getDto.o) || 0 },
+          { $limit: Number(getDto.l) || 10 },
+        ]).exec(),
+        this.userModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to retrieve users');
+    }
   }
 
-  async findAllByTenant(tenantId: string): Promise<User[]> { // tenantId is string for MVP
-    return this.userModel.find({ tenantId: new Types.ObjectId(tenantId) }).exec();
+  async findAllByTenant(tenantId: string, getDto: GetUserDto) {
+    try {
+      const pipeline: any[] = [];
+      if (!Types.ObjectId.isValid(tenantId)) {
+        throw new BadRequestException('Invalid tenant ID');
+      }
+      
+      pipeline.push({ $match: { tenantId: new Types.ObjectId(tenantId) } });
+      if (getDto.name) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { firstName: new RegExp(getDto.name, 'i') },
+              { lastName: new RegExp(getDto.name, 'i') },
+            ],
+          },
+        });
+      }
+
+      if (getDto.role) {
+        pipeline.push({ $match: { role: getDto.role } });
+      }
+
+      const [list, countQuery] = await Promise.all([
+        this.userModel.aggregate([
+          ...pipeline,
+          {
+            $lookup: {
+              from: 'companies',
+              localField: 'tenantId',
+              foreignField: '_id',
+              as: 'companies',
+            },
+          },
+          { $unwind: { path: '$companies', preserveNullAndEmptyArrays: true } },
+          { $sort: { [getDto.sb || 'createdAt']: getDto.sd === 'asc' ? 1 : -1 } },
+          { $skip: Number(getDto.o) || 0 },
+          { $limit: Number(getDto.l) || 10 },
+        ]).exec(),
+
+        this.userModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to retrieve tenant users');
+    }
   }
 
   async findById(id: string): Promise<User> {
@@ -93,7 +175,7 @@ export class UserService {
     return this.userModel.findOne({ email }).exec();
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto, performedBy?: string): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto, currentUser?: any): Promise<User> {
     const existingUser = await this.userModel.findById(id).exec();
     if (!existingUser) {
       throw new NotFoundException(`User with ID "${id}" not found`);
@@ -115,12 +197,9 @@ export class UserService {
     await this.auditService.log(
       'users',
       'update',
-      updatedUser._id.toString(),
-      {
-        newState: updatedUser.toObject(),
-        oldState: existingUser.toObject(),
-        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
-      }
+      currentUser ? currentUser._id.toString() : updatedUser._id.toString(),
+      updatedUser.toObject(),
+      existingUser.toObject(),
     );
 
     return updatedUser;
@@ -163,7 +242,7 @@ export class UserService {
     return updatedUser;
   }
 
-  async remove(id: string, performedBy?: string) {
+  async remove(id: string, currentUser?: any) {
     const existingUser = await this.userModel.findById(id).exec();
     if (!existingUser) {
       throw new NotFoundException(`User with ID "${id}" not found`);
@@ -177,11 +256,9 @@ export class UserService {
     await this.auditService.log(
       'users',
       'delete',
-      existingUser._id.toString(),
-      {
-        oldState: existingUser.toObject(),
-        performedBy: performedBy ? new Types.ObjectId(performedBy) : undefined
-      }
+      currentUser?._id?.toString(),
+      undefined,
+      existingUser.toObject(),
     );
 
     return result;

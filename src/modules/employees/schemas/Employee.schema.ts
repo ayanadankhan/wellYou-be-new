@@ -205,7 +205,7 @@ export class Employee {
   @Prop({ required: true, type: String, enum: EmploymentStatus })
   employmentStatus: EmploymentStatus;
 
-  @Prop({ required: true, type: Date })
+  @Prop({ required: false, type: Date })
   hireDate: Date;
 
   @Prop({ type: [Experience] })
@@ -220,7 +220,7 @@ export class Employee {
   @Prop({ type: [Document] })
   documents?: Document[];
 
-  @Prop({ required: true, type: String })
+  @Prop({ required: false, type: String })
   ssnTaxId: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'companies', default: null })

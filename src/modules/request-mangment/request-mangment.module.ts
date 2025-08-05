@@ -7,6 +7,7 @@ import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
 import { User, UserSchema } from '../tenant/users/schemas/user.schema';
 import { Attendance, AttendanceSchema } from '../attendance/schemas/Attendance.schema';
 import { AttendanceModule } from '../attendance/attendance.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { AttendanceModule } from '../attendance/attendance.module';
       { name: User.name, schema: UserSchema },
       { name: Attendance.name, schema: AttendanceSchema}
     ]),
-    AttendanceModule
+    AttendanceModule, AuditModule
   ],
   controllers: [RequestMangmentController],
   providers: [requestMangmentervice],

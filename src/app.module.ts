@@ -55,6 +55,7 @@ import { ChatModule } from './modules/chat/chat.module';
     FeedbackModule,
     ChatModule,
     // ScheduleModule.forRoot(),
+    ScheduleModule.forRoot(),
     CurrencyModule
   ]
 })export class AppModule { }

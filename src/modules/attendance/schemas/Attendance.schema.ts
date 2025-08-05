@@ -23,7 +23,7 @@ export class Attendance {
 
   @Prop({ 
     type: String, 
-    enum: ['Present', 'Absent', 'Incomplete'], 
+    enum: ['Present', 'Absent', 'Incomplete', 'Leave'], 
     default: 'Present' 
   })
   status: string;

@@ -2,12 +2,10 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-// import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Attendance, AttendanceDocument } from './schemas/Attendance.schema';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
-
-// Assuming you have an Employee model - adjust import path as needed
 import { Employee, EmployeeSchema, EmployeeDocument } from '../employees/schemas/Employee.schema';
 import { User } from '../tenant/users/schemas/user.schema';
 
@@ -230,8 +228,8 @@ export class AttendanceService {
         throw new BadRequestException('Today is Sunday, check-in not allowed');
       }
 
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+      const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0, 0));
+      const endOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
 
       const existingAttendance = await this.attendanceModel.findOne({
         employeeId: new Types.ObjectId(employeeId),
@@ -310,7 +308,7 @@ export class AttendanceService {
   }
 
   // Auto checkout at 5:30 PM (to be called by cron job)
-// @Cron('45 17 * * *')
+  @Cron('55 12 * * *')
   async autoCheckout(): Promise<void> {
     try {
       this.logger.log('Processing auto check-out for all incomplete records');
@@ -319,12 +317,9 @@ export class AttendanceService {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-      
-      // Default checkout time: 5:30 PM
       const autoCheckoutTime = new Date();
-      autoCheckoutTime.setHours(17, 45, 0, 0);
+      autoCheckoutTime.setHours(12, 45, 0, 0);
 
-      // Find all incomplete attendance records for today
       const incompleteRecords = await this.attendanceModel.find({
         date: { $gte: startOfDay, $lte: endOfDay },
         checkOutTime: null,
@@ -333,9 +328,7 @@ export class AttendanceService {
 
       this.logger.log(`Found ${incompleteRecords.length} incomplete records for auto checkout`);
 
-      // Update each record
       for (const record of incompleteRecords) {
-        console.log(record, '`adlksadklaskl');
         
         const totalHours = this.calculateTotalHours(record.checkInTime, autoCheckoutTime);
         
@@ -351,14 +344,14 @@ export class AttendanceService {
       }
 
       const getEmployeeDto = new GetEmployeeDto();
-      const Employees = await this.employeeService.findAll(getEmployeeDto);
-      const allEmployeeIds = Employees.map((emp:any) => emp._id.toString());
+      getEmployeeDto.employmentStatus = 'ACTIVE';
+      const EmployeesResponse = await this.employeeService.findAll(getEmployeeDto);
+      const allEmployeeIds = EmployeesResponse.list.map((emp: any) => emp._id.toString());
       const existingRecords = await this.attendanceModel.find({
         date: { $gte: startOfDay, $lte: endOfDay },
       }, { employeeId: 1 });
       const presentEmployeeIds = existingRecords.map(record => record.employeeId.toString());
-      const missingIds = allEmployeeIds.filter(id => !presentEmployeeIds.includes(id));
-      console.log(`Missing employee IDs for auto checkout: ${missingIds}`);
+      const missingIds = allEmployeeIds.filter((id: string) => !presentEmployeeIds.includes(id));
 
       if (missingIds.length > 0) {
       this.logger.log(`Marking ${missingIds.length} employees as absent`);
@@ -528,8 +521,8 @@ async getRoleBasedAttendance(
       throw new BadRequestException('Admin user is missing tenant information.');
     }
     
-    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) })
-      .select('_id userId profilePicture') // Include profilePicture in the select
+    const allTenantEmployees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId), employmentStatus: 'ACTIVE' })
+      .select('_id userId profilePicture')
       .populate({
         path: 'userId',
         model: 'User',
@@ -540,7 +533,7 @@ async getRoleBasedAttendance(
     employeeIdsToQuery = allTenantEmployees.map(employee => employee._id);
     this.logger.log(`Found ${employeeIdsToQuery.length} employees for tenantId: ${tenantId}.`);
   } else {
-    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId) })
+    const currentUserEmployee = await this.employeeModel.findOne({ userId: new Types.ObjectId(userId), employmentStatus: 'ACTIVE' })
       .select('_id profilePicture')
       .exec();
 
@@ -554,7 +547,7 @@ async getRoleBasedAttendance(
       case 'employee':
         this.logger.log(`Role: 'employee'. Checking if any employees have reportingTo field matching userId: ${userId}`);
 
-        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId) })
+        const teamMembers = await this.employeeModel.find({ reportingTo: new Types.ObjectId(userId), employmentStatus: 'ACTIVE' })
           .select('_id profilePicture')
           .exec();
 
@@ -599,21 +592,23 @@ async getRoleBasedAttendance(
     }
 
     effectiveStartDate = start;
-    end.setHours(23, 59, 59, 999);
+     end.setUTCHours(23, 59, 59, 999);
     effectiveEndDate = end;
 
     this.logger.log(`Using provided date range: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
 
   } else {
-    const now = new Date();
-    effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    effectiveStartDate.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
 
-    effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    effectiveEndDate.setHours(23, 59, 59, 999);
+  effectiveStartDate = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+  effectiveEndDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
 
-    this.logger.log(`Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
-  }
+  this.logger.log(
+    `Defaulting to current month attendance: ${effectiveStartDate.toISOString()} to ${effectiveEndDate.toISOString()}`
+  );
+}
 
   try {
     const query: any = {
@@ -638,8 +633,7 @@ async getRoleBasedAttendance(
       .sort({ date: -1 })
       .exec();
 
-    // Get all employee details including profile pictures in one query
-    const employees = await this.employeeModel.find({ _id: { $in: employeeIdsToQuery } })
+    const employees = await this.employeeModel.find({ _id: { $in: employeeIdsToQuery }, employmentStatus: 'ACTIVE' })
       .select('_id profilePicture')
       .populate({
         path: 'userId',
@@ -661,7 +655,7 @@ async getRoleBasedAttendance(
       attendance,
       employeeIdsToQuery,
       userRole !== 'company_admin' ? currentEmployeeId : null,
-      employeeMap // Pass the employee map to the grouping function
+      employeeMap
     );
 
     return groupedAttendance;
@@ -1028,7 +1022,7 @@ private groupAttendanceByEmployee(
           checkInTime: null,
           checkOutTime: null,
           totalHours: 0,
-          status: 'Absent',
+          status: 'Leave',
           isAutoCheckout: false,
         }));
 

@@ -6,13 +6,24 @@ import { Company } from './schemas/company.schema';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { GetCompanyDto } from './dto/get-company.dto';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class CompanyService {
-  constructor(@InjectModel(Company.name) private readonly companyModel: Model<Company>) {}
+  constructor(@InjectModel(Company.name) private readonly companyModel: Model<Company>,
+  private readonly auditService: AuditService,
+) {}
 
-  async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
+  async create(createCompanyDto: CreateCompanyDto, currentUser?: any): Promise<Company> {
     const createdCompany = new this.companyModel(createCompanyDto);
+
+    await this.auditService.log(
+      'company',
+      'create',
+      currentUser?.['_id']?.toString() || null,
+      createdCompany.toObject(),
+      null
+    );
     return createdCompany.save();
   }
 
@@ -59,23 +70,52 @@ export class CompanyService {
     return company;
   }
 
-  async update(id: string, updateCompanyDto: UpdateCompanyDto): Promise<Company> {
-    const existingCompany = await this.companyModel.findByIdAndUpdate(
+  async update(id: string, updateCompanyDto: UpdateCompanyDto, currentUser?: any
+  ): Promise<Company> {
+    const existingCompany = await this.companyModel.findById(id).exec();
+    
+    if (!existingCompany) {
+      throw new NotFoundException(`Company with ID "${id}" not found`);
+    }
+
+    const updatedCompany = await this.companyModel.findByIdAndUpdate(
       id,
       { $set: updateCompanyDto },
       { new: true }
     ).exec();
 
+    if (!updatedCompany) {
+      throw new NotFoundException(`Company with ID "${id}" disappeared during update`);
+    }
+
+    await this.auditService.log(
+      'companies',
+      'update',
+      currentUser._id.toString(),
+      updatedCompany.toObject(),
+      existingCompany.toObject()
+    );
+
+    return updatedCompany;
+  }
+
+  async remove(id: string, currentUser?: any): Promise<void> {
+    const existingCompany = await this.companyModel.findById(id).lean().exec();
     if (!existingCompany) {
       throw new NotFoundException(`Company with ID "${id}" not found`);
     }
-    return existingCompany;
-  }
 
-  async remove(id: string): Promise<void> {
     const result = await this.companyModel.deleteOne({ _id: new Types.ObjectId(id) }).exec();
     if (result.deletedCount === 0) {
       throw new NotFoundException(`Company with ID "${id}" not found`);
     }
+
+    await this.auditService.log(
+      'companies',
+      'delete',
+      currentUser?._id?.toString(),
+      null,
+      existingCompany
+    );
   }
 }

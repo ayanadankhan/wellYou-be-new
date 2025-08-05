@@ -15,7 +15,6 @@ import { requestMangmentervice } from './request-mangment.service';
 import { CreateRequestMangmentDto, RequestStatus } from './dto/create-request-mangment.dto';
 import { UpdateRequestMangmentDto } from './dto/update-request-mangment.dto';
 import { plainToClass } from 'class-transformer';
-import { Types } from 'mongoose';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
 import { RequestMangmentResponseDto } from './dto/requestMangmentresponse-dto';
@@ -27,9 +26,17 @@ export class RequestMangmentController {
   constructor(private readonly requestMangmentervice: requestMangmentervice) {}
 
   @Post()
-  async create(@Body() createRequestMangmentDto: CreateRequestMangmentDto): Promise<RequestMangmentResponseDto> {
-    const RequestMangment = await this.requestMangmentervice.create(createRequestMangmentDto);
-    return plainToClass(RequestMangmentResponseDto, RequestMangment.toObject(), { excludeExtraneousValues: true });
+  async create(
+    @CurrentUser() user: any,
+    @Body() createRequestMangmentDto: CreateRequestMangmentDto
+  ) {
+    if (user.role === 'company_admin' && user.role === 'super_admin') {
+      createRequestMangmentDto.employeeId = user._id.toString();
+    }
+    const RequestMangment = await this.requestMangmentervice.create(
+    createRequestMangmentDto,
+    user
+    );
   }
 
   @Get()
@@ -66,12 +73,14 @@ export class RequestMangmentController {
 
   @Patch(':id')
   async update(
+    @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() updateRequestMangmentDto: UpdateRequestMangmentDto,
   ): Promise<RequestMangmentResponseDto> {
     const RequestMangment = await this.requestMangmentervice.update(
       id,
       updateRequestMangmentDto,
+      user
     );
     return plainToClass(RequestMangmentResponseDto, RequestMangment, {
       excludeExtraneousValues: true,
@@ -131,8 +140,10 @@ export class RequestMangmentController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.requestMangmentervice.remove(id);
+  async remove(
+    @CurrentUser() user: User,
+    @Param('id') id: string
+  ) {
+    await this.requestMangmentervice.remove(id, user);
   }
 }

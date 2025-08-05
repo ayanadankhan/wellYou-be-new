@@ -4,11 +4,14 @@ import { SalaryController } from './salary.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Salary, SalarySchema } from './entities/salary.entity';
 import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
+import { RequestMangmentModule } from '../request-mangment/request-mangment.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   
   imports: [
     MongooseModule.forFeature([{ name: Salary.name, schema: SalarySchema },{ name: Employee.name, schema: EmployeeSchema },]),
+    RequestMangmentModule, AuditModule
   ],
   controllers: [SalaryController],
   providers: [SalaryService],

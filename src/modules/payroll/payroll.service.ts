@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
 import { Payroll, PayrollStatus } from './entities/payroll.entity';
+import { GetPayrollDto } from './dto/get-payroll-dto';
 
 @Injectable()
 export class PayrollService {
@@ -49,102 +50,134 @@ export class PayrollService {
       }
   }
 
-  async findAll(user: any): Promise<any[]> {
-      try {
-          if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
-              throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
-          }
-
-          return await this.payrollModel.aggregate([
-              { $match: { tenantId: new Types.ObjectId(user.tenantId) } }, // Filter by tenantId
-              { $sort: { payrollMonth: -1 } },
-              { $unwind: "$selectedEmployees" },
-              {
-                  $lookup: {
-                      from: "employees",
-                      localField: "selectedEmployees.employeesId",
-                      foreignField: "_id",
-                      as: "employee"
-                  }
-              },
-              { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
-              {
-                  $lookup: {
-                      from: "users",
-                      localField: "employee.userId",
-                      foreignField: "_id",
-                      as: "employee.user"
-                  }
-              },
-              { $unwind: { path: "$employee.user", preserveNullAndEmptyArrays: true } },
-              {
-                  $lookup: {
-                      from: "departments",
-                      localField: "employee.departmentId",
-                      foreignField: "_id",
-                      as: "employee.department"
-                  }
-              },
-              { $unwind: { path: "$employee.department", preserveNullAndEmptyArrays: true } },
-              {
-                  $lookup: {
-                      from: "designations",
-                      localField: "employee.positionId",
-                      foreignField: "_id",
-                      as: "employee.position"
-                  }
-              },
-              { $unwind: { path: "$employee.position", preserveNullAndEmptyArrays: true } },
-              {
-                  $group: {
-                      _id: "$_id",
-                      payrollMonth: { $first: "$payrollMonth" },
-                      totalGross: { $first: "$totalGross" },
-                      totalDeduction: { $first: "$totalDeduction" },
-                      totalAddition: { $first: "$totalAddition" },
-                      netPay: { $first: "$netPay" },
-                      status: { $first: "$status" },
-                      selectedEmployees: {
-                          $push: {
-                              $mergeObjects: [
-                                  "$selectedEmployees",
-                                  {
-                                      employeeDetails: {
-                                          _id: "$employee._id",
-                                          userId: "$employee.userId",
-                                          name: {
-                                              $concat: [
-                                                  "$employee.user.firstName",
-                                                  " ",
-                                                  "$employee.user.lastName"
-                                              ]
-                                          },
-                                          email: "$employee.user.email",
-                                          department: "$employee.department.departmentName",
-                                          position: "$employee.position.title",
-                                          profilePicture: "$employee.profilePicture",
-                                          employmentType: "$employee.employmentType",
-                                          hireDate: "$employee.hireDate"
-                                      }
-                                  }
-                              ]
-                          }
-                      }
-                  }
-              },
-              {
-                  $project: {
-                      "selectedEmployees.employeeDetails.userId": 0,
-                      "selectedEmployees.employeesId": 0
-                  }
-              }
-          ]);
-      } catch (error) {
-          throw new HttpException(
-              'Failed to fetch payroll records',
-              HttpStatus.INTERNAL_SERVER_ERROR
-          );
+  async findAll(
+    getDto: GetPayrollDto,
+    user: any
+  ): Promise<{ count: number; list: any[] }> {
+    try {
+      if (!user?.tenantId || !Types.ObjectId.isValid(user.tenantId)) {
+        throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
       }
+
+      const pipeline: any[] = [
+        { $match: { tenantId: new Types.ObjectId(user.tenantId) } }
+      ];
+
+      // Apply filters
+      if (getDto.payrollMonth) {
+        pipeline.push({ $match: { payrollMonth: getDto.payrollMonth } });
+      }
+      if (getDto.status) {
+        pipeline.push({ $match: { status: getDto.status } });
+      }
+
+      // Common pipeline for both count and list queries
+      const commonPipeline = [
+        ...pipeline,
+        { $unwind: "$selectedEmployees" },
+        {
+          $lookup: {
+            from: "employees",
+            localField: "selectedEmployees.employeesId",
+            foreignField: "_id",
+            as: "employee"
+          }
+        },
+        { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "employee.userId",
+            foreignField: "_id",
+            as: "employee.user"
+          }
+        },
+        { $unwind: { path: "$employee.user", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "departments",
+            localField: "employee.departmentId",
+            foreignField: "_id",
+            as: "employee.department"
+          }
+        },
+        { $unwind: { path: "$employee.department", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "designations",
+            localField: "employee.positionId",
+            foreignField: "_id",
+            as: "employee.position"
+          }
+        },
+        { $unwind: { path: "$employee.position", preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: "$_id",
+            payrollMonth: { $first: "$payrollMonth" },
+            totalGross: { $first: "$totalGross" },
+            totalDeduction: { $first: "$totalDeduction" },
+            totalAddition: { $first: "$totalAddition" },
+            netPay: { $first: "$netPay" },
+            status: { $first: "$status" },
+            selectedEmployees: {
+              $push: {
+                $mergeObjects: [
+                  "$selectedEmployees",
+                  {
+                    employeeDetails: {
+                      _id: "$employee._id",
+                      name: {
+                        $concat: [
+                          "$employee.user.firstName",
+                          " ",
+                          "$employee.user.lastName"
+                        ]
+                      },
+                      email: "$employee.user.email",
+                      department: "$employee.department.departmentName",
+                      position: "$employee.position.title",
+                      profilePicture: "$employee.profilePicture",
+                      employmentType: "$employee.employmentType",
+                      hireDate: "$employee.hireDate"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            "selectedEmployees.employeeDetails.userId": 0,
+            "selectedEmployees.employeesId": 0
+          }
+        }
+      ];
+
+      const [list, countQuery] = await Promise.all([
+        this.payrollModel.aggregate([
+          ...commonPipeline,
+          { $sort: { [getDto.sb || 'payrollMonth']: getDto.sd === 'asc' ? 1 : -1 } },
+          { $skip: Number(getDto.o) || 0 },
+          { $limit: Number(getDto.l) || 10 },
+        ]).exec(),
+        this.payrollModel.aggregate([
+          ...pipeline,
+          { $count: 'total' }
+        ]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new HttpException(
+        'Failed to fetch payroll records',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
     async findOne(id: string): Promise<Payroll> {
