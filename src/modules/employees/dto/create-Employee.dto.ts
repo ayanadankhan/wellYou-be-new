@@ -329,7 +329,6 @@ export class CreateEmployeeDto {
   employmentStatus: EmploymentStatus;
 
   @IsDateString()
-  @IsNotEmpty()
   hireDate: string;
 
   @IsArray()

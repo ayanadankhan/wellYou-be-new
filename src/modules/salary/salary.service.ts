@@ -5,15 +5,17 @@ import { CreateSalaryDto } from './dto/create-salary.dto';
 import { UpdateSalaryDto } from './dto/update-salary.dto';
 import { Salary } from './entities/salary.entity';
 import { requestMangmentervice } from '../request-mangment/request-mangment.service'; // Importing the service
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class SalaryService {
   constructor(
     @InjectModel(Salary.name) private readonly salaryModel: Model<Salary>,
-    private readonly requestMangmentService: requestMangmentervice, // Injected here
+    private readonly requestMangmentService: requestMangmentervice,
+    private readonly auditService: AuditService,
   ) {}
 
-  async create(createSalaryDto: CreateSalaryDto): Promise<Salary> {
+  async create(createSalaryDto: CreateSalaryDto, currentUser: any): Promise<Salary> {
     const employeesId = new Types.ObjectId(createSalaryDto.employeesId);
 
     const existingSalary = await this.salaryModel.findOne({
@@ -28,6 +30,14 @@ export class SalaryService {
       ...createSalaryDto,
       employeesId,
     });
+
+      await this.auditService.log(
+      'salary',
+      'create',
+      currentUser._id.toString(),
+      createdSalary.toObject(),
+      null
+      );
 
     return createdSalary.save();
   }
