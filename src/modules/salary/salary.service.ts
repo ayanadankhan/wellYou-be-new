@@ -31,13 +31,13 @@ export class SalaryService {
       employeesId,
     });
 
-      await this.auditService.log(
+    await this.auditService.log(
       'salary',
       'create',
       currentUser._id.toString(),
       createdSalary.toObject(),
       null
-      );
+    );
 
     return createdSalary.save();
   }
@@ -167,7 +167,11 @@ export class SalaryService {
     return salary;
   }
 
-  async update(id: string, updateSalaryDto: UpdateSalaryDto): Promise<Salary> {
+  async update(id: string, updateSalaryDto: UpdateSalaryDto, currentUser?: any): Promise<Salary> {
+    const existing = await this.salaryModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException(`Salary with ID ${id} not found`);
+    }
     const updatedSalary = await this.salaryModel
       .findByIdAndUpdate(id, updateSalaryDto, { new: true })
       .exec();
@@ -175,14 +179,32 @@ export class SalaryService {
     if (!updatedSalary) {
       throw new NotFoundException(`Salary with ID ${id} not found`);
     }
+
+    await this.auditService.log(
+      'salary',
+      'update',
+      currentUser._id.toString(),
+      updatedSalary.toObject(),
+      existing.toObject()
+    );
+
     return updatedSalary;
   }
 
-  async remove(id: string): Promise<Salary> {
+  async remove(id: string, currentUser?: any,): Promise<Salary> {
     const deletedSalary = await this.salaryModel.findByIdAndDelete(id).exec();
     if (!deletedSalary) {
       throw new NotFoundException(`Salary with ID ${id} not found`);
     }
+
+    await this.auditService.log(
+      'salary',
+      'delete',
+      currentUser?._id?.toString(),
+      null,
+      deletedSalary.toObject()
+    );
+
     return deletedSalary;
   }
 

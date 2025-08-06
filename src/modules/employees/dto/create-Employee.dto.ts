@@ -277,7 +277,7 @@ export class CreateEmployeeDto {
   @IsNotEmpty()
   phoneNumber: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsObject()
   progress: Record<string, any>;
 
@@ -325,7 +325,7 @@ export class CreateEmployeeDto {
   reportingTo?: Types.ObjectId;
 
   @IsEnum(EmploymentStatus)
-  @IsNotEmpty()
+  @IsOptional()
   employmentStatus: EmploymentStatus;
 
   @IsDateString()
@@ -385,7 +385,7 @@ export class UpdateEmployeeDto {
   @IsOptional()
   phoneNumber?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   progress: number;
 
   @IsString()

@@ -175,7 +175,7 @@ export class Employee {
   @Prop({ required: true, type: String })
   phoneNumber: string;
 
-  @Prop({ type: Object, required: true })
+  @Prop({ type: Object })
   progress: Record<string, any>;
 
   @Prop({ required: true, type: String })
@@ -202,7 +202,7 @@ export class Employee {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', default: null })
   reportingTo?: MongooseSchema.Types.ObjectId;
 
-  @Prop({ required: true, type: String, enum: EmploymentStatus })
+  @Prop({ type: String, enum: EmploymentStatus })
   employmentStatus: EmploymentStatus;
 
   @Prop({ required: false, type: Date })

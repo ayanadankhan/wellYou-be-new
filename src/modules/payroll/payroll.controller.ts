@@ -33,8 +33,8 @@ export class PayrollController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updatePayrollDto: UpdatePayrollDto) {
-    return this.payrollService.update(id, updatePayrollDto);
+  async update(@Param('id') id: string, @Body() updatePayrollDto: UpdatePayrollDto, @CurrentUser() user: User,) {
+    return this.payrollService.update(id, updatePayrollDto, user);
   }
 
   @Patch('status/:id')
@@ -52,7 +52,7 @@ export class PayrollController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.payrollService.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.payrollService.remove(id, user);
   }
 }

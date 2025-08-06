@@ -433,7 +433,6 @@ export class EmployeesService {
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<GetEmployeeDto> {
     try {
-      // ✅ Validate ID
       if (!isValidObjectId(id)) {
         this.logger.warn(`Invalid MongoDB ObjectID: ${id}`);
         throw new HttpException(
@@ -448,7 +447,6 @@ export class EmployeesService {
 
       this.logger.log(`Updating employee with ID: ${id}`);
 
-      // ✅ Validate & cleanup reportingTo
       if (
         'reportingTo' in updateEmployeeDto &&
         (!updateEmployeeDto.reportingTo || !isValidObjectId(updateEmployeeDto.reportingTo))
@@ -456,7 +454,6 @@ export class EmployeesService {
         delete updateEmployeeDto.reportingTo;
       }
 
-      // ✅ Fetch existing employee to safely merge progress
       const existingEmployee = await this.employeeModel.findById(id).exec();
 
       if (!existingEmployee) {
@@ -471,7 +468,6 @@ export class EmployeesService {
         );
       }
 
-      // ✅ Merge progress object safely
       if (updateEmployeeDto.progress && existingEmployee.progress) {
         updateEmployeeDto.progress = {
           ...existingEmployee.progress,
@@ -479,9 +475,172 @@ export class EmployeesService {
         };
       }
 
-      // ✅ Update employee
+      const updateData = { ...updateEmployeeDto };
+
+      if (updateEmployeeDto.skills && Array.isArray(updateEmployeeDto.skills)) {
+        const existingSkills = existingEmployee.skills || [];
+        const skillMap = new Map();
+        
+        existingSkills.forEach(skill => {
+          const skillDto = {
+            name: skill.name,
+            level: skill.level
+          };
+          skillMap.set(skill.name, skillDto);
+        });
+        
+        updateEmployeeDto.skills.forEach(skill => {
+          skillMap.set(skill.name, skill);
+        });
+        
+        updateData.skills = Array.from(skillMap.values());
+      }
+
+      if (updateEmployeeDto.certifications && Array.isArray(updateEmployeeDto.certifications)) {
+        const existingCertifications = existingEmployee.certifications || [];
+        const certificationMap = new Map();
+        
+        existingCertifications.forEach(cert => {
+          const certDto = {
+            id: cert.id,
+            name: cert.name,
+            issuingOrganization: cert.issuingOrganization,
+            issueDate: cert.issueDate ? cert.issueDate.toISOString() : undefined,
+            expirationDate: cert.expirationDate ? cert.expirationDate.toISOString() : undefined,
+            credentialId: cert.credentialId,
+            verificationUrl: cert.verificationUrl,
+            hasNoExpiration: cert.hasNoExpiration,
+            description: cert.description
+          };
+          const key = cert.id || cert.name;
+          certificationMap.set(key, certDto);
+        });
+        
+        updateEmployeeDto.certifications.forEach(cert => {
+          const key = cert.id || cert.name;
+          certificationMap.set(key, cert);
+        });
+        
+        updateData.certifications = Array.from(certificationMap.values());
+      }
+
+      // Merge education array with deduplication and type conversion
+      if (updateEmployeeDto.education && Array.isArray(updateEmployeeDto.education)) {
+        const existingEducation = existingEmployee.education || [];
+        const educationMap = new Map();
+        
+        // Add existing education (convert Date to string)
+        existingEducation.forEach(edu => {
+          const eduDto = {
+            id: edu.id,
+            institution: edu.institution,
+            degree: edu.degree,
+            fieldOfStudy: edu.fieldOfStudy,
+            startDate: edu.startDate ? edu.startDate.toISOString() : undefined,
+            endDate: edu.endDate ? edu.endDate.toISOString() : undefined,
+            gpa: edu.gpa,
+            honors: edu.honors,
+            isEnrolled: edu.isEnrolled,
+            description: edu.description
+          };
+          const key = edu.id || `${edu.institution}-${edu.degree}`;
+          educationMap.set(key, eduDto);
+        });
+        
+        // Add/update new education
+        updateEmployeeDto.education.forEach(edu => {
+          const key = edu.id || `${edu.institution}-${edu.degree}`;
+          educationMap.set(key, edu);
+        });
+        
+        updateData.education = Array.from(educationMap.values());
+      }
+
+      // Merge experiences array with deduplication and type conversion
+      if (updateEmployeeDto.experiences && Array.isArray(updateEmployeeDto.experiences)) {
+        const existingExperiences = existingEmployee.experiences || [];
+        const experienceMap = new Map();
+        
+        // Add existing experiences (convert Date to string)
+        existingExperiences.forEach(exp => {
+          const expDto = {
+            id: exp.id,
+            companyName: exp.companyName,
+            position: exp.position,
+            startDate: exp.startDate ? exp.startDate.toISOString() : undefined,
+            endDate: exp.endDate ? exp.endDate.toISOString() : undefined,
+            isCurrentRole: exp.isCurrentRole,
+            description: exp.description,
+            location: exp.location,
+            employmentType: exp.employmentType,
+            achievements: exp.achievements
+          };
+          const key = exp.id || `${exp.companyName}-${exp.position}`;
+          experienceMap.set(key, expDto);
+        });
+        
+        // Add/update new experiences
+        updateEmployeeDto.experiences.forEach(exp => {
+          const key = exp.id || `${exp.companyName}-${exp.position}`;
+          experienceMap.set(key, exp);
+        });
+        
+        updateData.experiences = Array.from(experienceMap.values());
+      }
+
+      // Merge documents array with deduplication
+      if (updateEmployeeDto.documents && Array.isArray(updateEmployeeDto.documents)) {
+        const existingDocuments = existingEmployee.documents || [];
+        const documentMap = new Map();
+        
+        // Add existing documents
+        existingDocuments.forEach(doc => {
+          const docDto = {
+            type: doc.type,
+            name: doc.name,
+            url: doc.url
+          };
+          const key = `${doc.type}-${doc.name}`;
+          documentMap.set(key, docDto);
+        });
+        
+        // Add/update new documents
+        updateEmployeeDto.documents.forEach(doc => {
+          const key = `${doc.type}-${doc.name}`;
+          documentMap.set(key, doc);
+        });
+        
+        updateData.documents = Array.from(documentMap.values());
+      }
+
+      // Merge dependent members array with deduplication and type conversion
+      if (updateEmployeeDto.dependentMembers && Array.isArray(updateEmployeeDto.dependentMembers)) {
+        const existingDependents = existingEmployee.dependentMembers || [];
+        const dependentMap = new Map();
+        
+        // Add existing dependents (convert Date to string)
+        existingDependents.forEach(dep => {
+          const depDto = {
+            name: dep.name,
+            relation: dep.relation,
+            dateOfBirth: dep.dateOfBirth ? dep.dateOfBirth.toISOString() : undefined
+          };
+          const key = `${dep.name}-${dep.relation}`;
+          dependentMap.set(key, depDto);
+        });
+        
+        // Add/update new dependents
+        updateEmployeeDto.dependentMembers.forEach(dep => {
+          const key = `${dep.name}-${dep.relation}`;
+          dependentMap.set(key, dep);
+        });
+        
+        updateData.dependentMembers = Array.from(dependentMap.values());
+      }
+
+      // ✅ Update employee with merged data
       const updatedEmployee = await this.employeeModel
-        .findByIdAndUpdate(id, { $set: updateEmployeeDto }, { new: true })
+        .findByIdAndUpdate(id, { $set: updateData }, { new: true })
         .exec();
 
       this.logger.log(`Employee with ID ${id} updated successfully`);

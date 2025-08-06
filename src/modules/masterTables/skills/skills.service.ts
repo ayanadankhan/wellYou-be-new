@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
 import { Skill } from './entities/skill.entity';
+import { GetSkillDto } from './dto/get-skill.dto';
 
 @Injectable()
 export class SkillsService {
@@ -16,8 +17,35 @@ export class SkillsService {
     return createdSkill.save();
   }
 
-  async findAll(): Promise<Skill[]> {
-    return this.skillModel.find().exec();
+  async findAll(getDto: GetSkillDto) {
+    try {
+      const pipeline: any[] = [];
+
+      if (getDto.s) {
+        pipeline.push({ $match: { name: new RegExp(getDto.s, 'i') } });
+      }
+
+      if (getDto.skillType) {
+        pipeline.push({ $match: { skillType: getDto.skillType } });
+      }
+
+      const [list, countQuery] = await Promise.all([
+        this.skillModel.aggregate([
+          ...pipeline,
+          { $sort: { [getDto.sb]: getDto.sd === '1' ? 1 : -1 } },
+          { $skip: Number(getDto.o || 0) },
+          { $limit: Number(getDto.l || 10) },
+        ]).exec(),
+        this.skillModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to retrieve skills');
+    }
   }
 
   async findOne(id: string): Promise<Skill> {
