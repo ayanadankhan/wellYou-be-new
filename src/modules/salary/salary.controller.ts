@@ -41,12 +41,12 @@ export class SalaryController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSalaryDto: UpdateSalaryDto) {
-    return this.salaryService.update(id, updateSalaryDto);
+  update(@Param('id') id: string, @Body() updateSalaryDto: UpdateSalaryDto, @CurrentUser() user: any,) {
+    return this.salaryService.update(id, updateSalaryDto, user);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.salaryService.remove(id);
+  remove(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.salaryService.remove(id, user);
   }
 }

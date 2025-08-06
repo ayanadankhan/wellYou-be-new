@@ -4,7 +4,6 @@ import { CreateEmployeeDto } from './dto/create-Employee.dto';
 import { UpdateEmployeeDto } from './dto/update-Employee.dto';
 import { GetEmployeeDto } from './dto/get-Employee.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
-import { EmploymentStatus } from './dto/create-Employee.dto';
 import { Types } from 'mongoose';
 import { CurrentUser} from '@/common/decorators/user.decorator';
 import { User, UserRole, UserSchema } from '../tenant/users/schemas/user.schema';
@@ -84,8 +83,6 @@ export class EmployeesController {
   }
 
   @Get('user/:userId')
-  @ApiOperation({ summary: 'Retrieve an employee by userId' })
-  @ApiParam({ name: 'userId', description: 'User ID of the employee', example: 'user123' })
   async findByUserId(@Param('userId') userId: string): Promise<GetEmployeeDto> {
     try {
       this.logger.log(`Fetching employee with userId: ${userId}`);
@@ -119,53 +116,41 @@ export class EmployeesController {
     }
   }
 
-@Get('emp/:userId')
-@ApiOperation({ summary: 'Retrieve employee ID by userId' })
-@ApiParam({
-  name: 'userId',
-  description: 'User ID of the employee',
-  example: 'user123'
-})
-async findEmployeeIdByUserId(@Param('userId') userId: string): Promise<{ employeeId: string }> {
-  try {
-    this.logger.log(`Fetching employee ID with userId: ${userId}`);
-    const employeeId = await this.employeesService.findEmployeeIdByUserId(userId);
-    if (!employeeId) {
-      this.logger.warn(`Employee with userId ${userId} not found`);
+  @Get('emp/:userId')
+  async findEmployeeIdByUserId(@Param('userId') userId: string): Promise<{ employeeId: string }> {
+    try {
+      this.logger.log(`Fetching employee ID with userId: ${userId}`);
+      const employeeId = await this.employeesService.findEmployeeIdByUserId(userId);
+      if (!employeeId) {
+        this.logger.warn(`Employee with userId ${userId} not found`);
+        throw new HttpException(
+          {
+            status: HttpStatus.NOT_FOUND,
+            error: 'Employee not found',
+            message: `Employee with userId ${userId} does not exist`,
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      this.logger.log(`Employee ID for userId ${userId} retrieved successfully`);
+      return { employeeId };
+    } catch (error) {
+      this.logger.error(`Failed to fetch employee ID with userId ${userId}: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         {
-          status: HttpStatus.NOT_FOUND,
-          error: 'Employee not found',
-          message: `Employee with userId ${userId} does not exist`,
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee ID',
+          message: error.message,
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-    this.logger.log(`Employee ID for userId ${userId} retrieved successfully`);
-    return { employeeId };
-  } catch (error) {
-    this.logger.error(`Failed to fetch employee ID with userId ${userId}: ${error.message}`, error.stack);
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    throw new HttpException(
-      {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        error: 'Failed to fetch employee ID',
-        message: error.message,
-      },
-      HttpStatus.INTERNAL_SERVER_ERROR,
-    );
   }
-}
 
   @Get(':id')
-  @ApiOperation({ summary: 'Retrieve a single employee by ID' })
-  @ApiParam({ 
-    name: 'id', 
-    description: 'MongoDB ObjectID of the employee',
-    example: '507f1f77bcf86cd799439011'
-  })
   async findOne(@Param('id') id: string): Promise<GetEmployeeDto> {
     try {
       this.logger.log(`Fetching employee with ID: ${id}`);
@@ -200,30 +185,7 @@ async findEmployeeIdByUserId(@Param('userId') userId: string): Promise<{ employe
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update an employee by ID' })
-  @ApiParam({ 
-    name: 'id', 
-    description: 'MongoDB ObjectID of the employee',
-    example: '507f1f77bcf86cd799439011'
-  })
   @ApiBody({ type: UpdateEmployeeDto })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Employee updated successfully.', 
-    type: GetEmployeeDto 
-  })
-  @ApiResponse({ 
-    status: 404, 
-    description: 'Employee not found.' 
-  })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Invalid input data.' 
-  })
-  @ApiResponse({ 
-    status: 409, 
-    description: 'Employee with userId already exists.' 
-  })
   async update(
     @Param('id') id: string, 
     @Body() updateEmployeeDto: UpdateEmployeeDto
@@ -263,26 +225,6 @@ async findEmployeeIdByUserId(@Param('userId') userId: string): Promise<{ employe
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an employee by ID' })
-  @ApiParam({ 
-    name: 'id', 
-    description: 'MongoDB ObjectID of the employee',
-    example: '507f1f77bcf86cd799439011'
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Employee deleted successfully.',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'Employee deleted successfully' }
-      }
-    }
-  })
-  @ApiResponse({ 
-    status: 404, 
-    description: 'Employee not found.' 
-  })
   async remove(@Param('id') id: string) {
     try {
       this.logger.log(`Deleting employee with ID: ${id}`);

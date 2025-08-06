@@ -24,7 +24,6 @@ export enum SkillType {
   GAME_DEVELOPMENT = 'Game Development'
 }
 
-
 @Schema({ timestamps: true })
 export class Skill extends Document {
   @Prop({ required: true, unique: true })

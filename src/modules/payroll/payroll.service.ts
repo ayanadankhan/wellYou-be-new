@@ -5,11 +5,13 @@ import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
 import { Payroll, PayrollStatus } from './entities/payroll.entity';
 import { GetPayrollDto } from './dto/get-payroll-dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PayrollService {
   constructor(
     @InjectModel(Payroll.name) private readonly payrollModel: Model<Payroll>,
+    private readonly auditService: AuditService,
   ) {}
 
   async create(createPayrollDto: CreatePayrollDto, user: any): Promise<Payroll> {
@@ -17,10 +19,10 @@ export class PayrollService {
           throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
       }
 
-  const existingPayroll = await this.payrollModel.findOne({
-      payrollMonth: createPayrollDto.payrollMonth,
-      tenantId: new Types.ObjectId(user.tenantId)
-  }).exec();
+      const existingPayroll = await this.payrollModel.findOne({
+          payrollMonth: createPayrollDto.payrollMonth,
+          tenantId: new Types.ObjectId(user.tenantId)
+      }).exec();
 
       if (existingPayroll) {
           throw new ConflictException(`Payroll for month ${createPayrollDto.payrollMonth} already exists`);
@@ -41,6 +43,15 @@ export class PayrollService {
 
       try {
           const createdPayroll = new this.payrollModel(processedData);
+
+          await this.auditService.log(
+            'payroll',
+            'create',
+            user._id.toString(),
+            createdPayroll.toObject(),
+            null
+          );
+
           return await createdPayroll.save();
       } catch (error) {
           if (error.code === 11000) {
@@ -192,7 +203,7 @@ export class PayrollService {
       return this.payrollModel.findOne({ payrollMonth }).exec();
     }
 
-    async update(id: string, updatePayrollDto: UpdatePayrollDto): Promise<Payroll> {
+    async update(id: string, updatePayrollDto: UpdatePayrollDto, currentUser: any): Promise<Payroll> {
         const existingPayroll = await this.payrollModel.findById(id).exec();
         if (!existingPayroll) {
             throw new NotFoundException(`Payroll with ID ${id} not found`);
@@ -291,14 +302,30 @@ export class PayrollService {
       if (!updatedPayroll) {
           throw new NotFoundException(`Payroll with ID ${id} not found after update`);
       }
+
+    await this.auditService.log(
+      'payroll',
+      'update',
+      currentUser._id.toString(),
+      updatedPayroll.toObject(),
+      existingPayroll.toObject()
+    );
       return updatedPayroll;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser: any): Promise<void> {
     const result = await this.payrollModel.findByIdAndDelete(id).exec();
     if (!result) {
       throw new NotFoundException(`Payroll with ID ${id} not found`);
     }
+
+    await this.auditService.log(
+      'payroll',
+      'delete',
+      currentUser?._id?.toString(),
+      null,
+      result.toObject()
+    );
   }
 
   async getPayrollSummary(): Promise<{
