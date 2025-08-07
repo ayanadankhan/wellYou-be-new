@@ -1,35 +1,44 @@
-# .github/workflows/deploy.yml
-
-name: Deploy Backend to DigitalOcean
+name: Deploy Next.js App to DigitalOcean Droplet
 
 on:
   push:
     branches:
-      - main  # Adjust if your backend uses a different branch
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
 
-      - name: Deploy via SSH
+      - name: Copy files to server via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "."
+          target: "/var/www/hrms"
+          strip_components: 1
+
+      - name: SSH into server and restart PM2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
           script: |
-            cd /home/backend/hrms
-            git pull origin main
+            cd /var/www/hrms
+            rm -rf node_modules package-lock.json
             npm install
             npm run build
-            pm2 restart hrms-be || pm2 start dist/main.js --name hrms-be
+            pm2 delete hrms-fe || true
+            pm2 start npm --name hrms-fe -- run start
+            pm2 save
