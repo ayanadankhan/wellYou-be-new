@@ -38,7 +38,7 @@ jobs:
             cd /home/backend/hrms
             rm -rf node_modules package-lock.json
             npm install
-            npm run build
+            NODE_OPTIONS="--max_old_space_size=2048" npm run build
             pm2 delete hrms-be || true
             pm2 start npm --name hrms-be -- run start
             pm2 save
