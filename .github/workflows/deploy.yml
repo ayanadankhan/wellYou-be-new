@@ -25,7 +25,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "."
-          target: "/var/www/hrms"
+          target: "/home/backend/hrms"
           strip_components: 1
 
       - name: SSH into server and restart PM2
@@ -35,10 +35,10 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/hrms
+            cd /home/backend/hrms
             rm -rf node_modules package-lock.json
             npm install
             npm run build
-            pm2 delete hrms-fe || true
-            pm2 start npm --name hrms-fe -- run start
+            pm2 delete hrms-be || true
+            pm2 start npm --name hrms-be -- run start
             pm2 save
