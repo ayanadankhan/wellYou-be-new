@@ -1,0 +1,35 @@
+# .github/workflows/deploy.yml
+
+name: Deploy Backend to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main  # Adjust if your backend uses a different branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/backend/hrms
+            git pull origin main
+            npm install
+            npm run build
+            pm2 restart hrms-be || pm2 start dist/main.js --name hrms-be
