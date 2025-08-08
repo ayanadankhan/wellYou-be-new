@@ -28,7 +28,7 @@ jobs:
           target: "/home/backend/hrms"
           strip_components: 1
 
-      - name: SSH into server and restart PM2
+      - name: SSH into server and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -36,9 +36,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/backend/hrms
-            rm -rf node_modules package-lock.json
-            npm install
-            NODE_OPTIONS="--max_old_space_size=2048" npm run build
-            pm2 delete hrms-be || true
-            pm2 start npm --name hrms-be -- run start
+
+            # Check if package.json has changed in last commit
+            if git diff --name-only HEAD~1 HEAD | grep -q "package.json"; then
+              echo "package.json changed - installing dependencies..."
+              npm install --production
+            else
+              echo "package.json unchanged - skipping npm install."
+            fi
+
+            # Restart PM2 if process exists, otherwise start it
+            if pm2 list | grep -q "hrms-be"; then
+              pm2 restart hrms-be
+            else
+              pm2 start npm --name hrms-be -- run start
+            fi
+
             pm2 save
