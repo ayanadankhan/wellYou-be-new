@@ -8,5 +8,9 @@ import { DesignationController } from './designation.controller';
   imports: [MongooseModule.forFeature([{ name: Designation.name, schema: DesignationSchema }])],
   controllers: [DesignationController],
   providers: [DesignationService],
+    exports: [
+    DesignationService,
+    MongooseModule,
+  ],
 })
 export class DesignationModule {}
