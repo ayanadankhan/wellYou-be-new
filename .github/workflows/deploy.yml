@@ -1,4 +1,4 @@
-name: Deploy NestJS Backend to DigitalOcean
+name: Deploy NestJS Backend to DigitalOcean 
 
 on:
   push:
