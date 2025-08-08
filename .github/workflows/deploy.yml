@@ -18,16 +18,29 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Copy files to server via SSH
+      # Install and build locally on GitHub Actions
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      # Upload only the build output + package files
+      - name: Copy build to server via SSH
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "."
+          source: |
+            .next
+            public
+            package.json
+            package-lock.json
           target: "/home/backend/hrms"
-          strip_components: 1
+          strip_components: 0
 
+      # SSH into server and restart PM2
       - name: SSH into server and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -37,15 +50,15 @@ jobs:
           script: |
             cd /home/backend/hrms
 
-            # Check if package.json has changed in last commit
-            if git diff --name-only HEAD~1 HEAD | grep -q "package.json"; then
+            # Install dependencies only if package.json changed
+            if [ "$(git diff --name-only HEAD~1 HEAD | grep package.json)" != "" ]; then
               echo "package.json changed - installing dependencies..."
               npm install --production
             else
               echo "package.json unchanged - skipping npm install."
             fi
 
-            # Restart PM2 if process exists, otherwise start it
+            # Restart PM2 without deleting process
             if pm2 list | grep -q "hrms-be"; then
               pm2 restart hrms-be
             else
