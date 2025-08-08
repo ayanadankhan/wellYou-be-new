@@ -1,4 +1,4 @@
-name: Deploy Next.js App to DigitalOcean Droplet
+name: Deploy Backend App to DigitalOcean Droplet
 
 on:
   push:
@@ -18,14 +18,18 @@ jobs:
         with:
           node-version: '18'
 
-      # Install and build locally on GitHub Actions
+      # Install and build locally
       - name: Install dependencies
         run: npm ci
 
       - name: Build project
         run: npm run build
 
-      # Upload only the build output + package files
+      # Debug step - list all files/folders to verify dist exists
+      - name: Debug file structure
+        run: ls -R
+
+      # Upload only dist + package files
       - name: Copy build to server via SSH
         uses: appleboy/scp-action@v0.1.7
         with:
