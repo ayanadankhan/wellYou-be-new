@@ -33,8 +33,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: |
-            .next
-            public
+            dist
             package.json
             package-lock.json
           target: "/home/backend/hrms"
