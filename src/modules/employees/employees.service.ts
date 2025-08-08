@@ -11,6 +11,8 @@ import { InjectModel as InjectUserModel } from '@nestjs/mongoose';
 import { User } from '../tenant/users/schemas/user.schema';
 import { UserService } from '../tenant/users/user.service';
 import { CreateUserDto } from '../tenant/users/dto/create-user.dto';
+import { Department } from '../departments/entities/department.entity';
+import { Designation } from '../designations/entities/designation.entity';
 
 @Injectable()
 export class EmployeesService {
@@ -19,6 +21,9 @@ export class EmployeesService {
   constructor(
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(User.name) private readonly userModel: Model<any>,
+    @InjectModel(Department.name) private readonly departmentModel: Model<Department>,
+    @InjectModel(Designation.name) private readonly designationModel: Model<Designation>,
+
     private userService: UserService,
   ) {}
 
@@ -298,7 +303,7 @@ export class EmployeesService {
         { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
-            from: 'positions',
+            from: 'designations',
             localField: 'positionId',
             foreignField: '_id',
             as: 'position',
@@ -706,5 +711,152 @@ export class EmployeesService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async generateEmployeeReport(tenantId: string) {
+  const employees = await this.employeeModel
+    .find({ tenantId })
+    .populate('userId', 'firstName lastName')
+    .lean();
+
+    const departments = await this.departmentModel.find().lean();
+    const designations = await this.designationModel.find().lean();
+  console.log(designations, "designations");
+
+    const departmentMap = new Map<string, any>();
+    departments.forEach((d: any) => departmentMap.set(String(d._id), d));
+
+    const designationMap = new Map<string, any>();
+    designations.forEach((d: any) => designationMap.set(String(d._id), d));
+
+    const statusStats = { ACTIVE: 0, INACTIVE: 0, TERMINATED: 0 };
+    const newHires: any[] = [];
+    const upcomingBirthdays: any[] = [];
+    const departmentStats: Record<string, number> = {};
+    const designationStats: Record<string, number> = {};
+    const contractEmployees: any[] = [];
+
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    employees.forEach((employee: any) => {
+      const status = (employee.employmentStatus || 'INACTIVE') as 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+      statusStats[status] = (statusStats[status] || 0) + 1;
+
+      const hireDate = new Date(employee.hireDate);
+      if (hireDate.getMonth() === currentMonth && hireDate.getFullYear() === currentYear) {
+        newHires.push(employee);
+      }
+
+      if ((employee.employmentType || '').toLowerCase() === 'contract') {
+        contractEmployees.push(employee);
+      }
+
+      const dept = departmentMap.get(String(employee.departmentId));
+      if (dept?.departmentName) {
+        departmentStats[dept.departmentName] = (departmentStats[dept.departmentName] || 0) + 1;
+      }
+
+      const desg = designationMap.get(String(employee.positionId));
+      if (desg?.title) {
+        designationStats[desg.title] = (designationStats[desg.title] || 0) + 1;
+      }
+
+      const dob = new Date(employee.dateOfBirth);
+      if (
+        dob.getMonth() === currentDate.getMonth() &&
+        dob.getDate() >= currentDate.getDate()
+      ) {
+      upcomingBirthdays.push({
+        name:
+          (employee.userId?.firstName || '') +
+          ' ' +
+          (employee.userId?.lastName || 'Unnamed'),
+        date: dob.toISOString().split('T')[0],
+      });
+      }
+    });
+
+      const next30Days = new Date();
+      next30Days.setDate(currentDate.getDate() + 30);
+
+      const certificationsExpiringSoon: any[] = [];
+
+      employees.forEach((employee: any) => {
+        (employee.certifications || []).forEach((cert: any) => {
+          const expiry = new Date(cert.expirationDate);
+
+          // Check if expiry is within the next 30 days
+          if (expiry >= currentDate && expiry <= next30Days) {
+            certificationsExpiringSoon.push({
+              employeeName: `${employee.userId?.firstName || ''} ${employee.userId?.lastName || ''}`.trim() || 'Unnamed',
+              certName: cert.name || 'No Certification Name',
+              expirationDate: expiry.toISOString().split('T')[0], // YYYY-MM-DD
+            });
+          }
+        });
+      });
+
+    const profileStats = await this.calculateProfileCompletionStats(employees);
+
+    const missingDocumentsCount = employees.filter(
+      (e) => !e.documents || e.documents.length === 0
+    ).length;
+
+    return {
+      totalEmployees: employees.length,
+      activeEmployees: statusStats.ACTIVE,
+      inactiveEmployees: statusStats.INACTIVE,
+      terminatedEmployees: statusStats.TERMINATED,
+      newHiresThisMonth: newHires.length,
+      contractEmployees: contractEmployees.length,
+      employeesPerDepartment: Object.entries(departmentStats).map(([departmentName, count]) => ({ departmentName, count })),
+      employeesPerDesignation: Object.entries(designationStats).map(([designationName, count]) => ({ designationName, count })),
+      averageProfileCompletion: profileStats.averageCompletion,
+      incompleteProfiles: profileStats.incompleteProfiles,
+      topCompletedProfiles: profileStats.topProfiles,
+      certificationsExpiringSoon,
+      upcomingBirthdays,
+      missingDocuments: missingDocumentsCount,
+    };
+  }
+
+
+  private calculateProfileCompletionStats(employees: any[]) {
+    const totalEmployees = employees.length;
+
+    if (totalEmployees === 0) {
+      return {
+        averageCompletion: 0,
+        incompleteProfiles: 0,
+        topProfiles: [],
+      };
+    }
+
+    const totalProgressSum = employees.reduce(
+      (sum, e) => sum + (e.progress?.totalProgress || 0),
+      0
+    );
+    const average = Math.round(totalProgressSum / totalEmployees);
+
+    const incomplete = employees.filter(
+      e => (e.progress?.totalProgress || 0) < 100
+    ).length;
+
+    const topProfiles = employees
+      .filter(e => typeof e.progress?.totalProgress === 'number')
+      .sort((a, b) => (b.progress?.totalProgress || 0) - (a.progress?.totalProgress || 0))
+      .slice(0, 3)
+      .map(e => ({
+        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+        progress: e.progress?.totalProgress || 0,
+      }));
+
+    return {
+      averageCompletion: average,
+      incompleteProfiles: incomplete,
+      topProfiles,
+    };
   }
 }

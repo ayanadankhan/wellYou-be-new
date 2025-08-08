@@ -6,6 +6,8 @@ import { Employee, EmployeeSchema } from './schemas/Employee.schema';
 import { User, UserSchema } from '../tenant/users/schemas/user.schema';
 import { MailModule } from '../mail/mail.module'; // ✅ import mail module
 import { UserModule } from '../tenant/users/user.module';
+import { DepartmentsModule } from '../departments/departments.module';
+import { DesignationModule } from '../masterTables/designation/designation.module';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import { UserModule } from '../tenant/users/user.module';
     ]),
     MailModule,
     UserModule,
+    DepartmentsModule,
+    DesignationModule
   ],
   controllers: [EmployeesController],
   providers: [EmployeesService],
