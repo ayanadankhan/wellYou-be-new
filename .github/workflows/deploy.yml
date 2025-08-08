@@ -51,7 +51,7 @@ jobs:
           rsync -avz --delete \
             --exclude='.git' \
             --exclude='node_modules' \
-            --exclude='dist' \
+            --exclude='src' \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             ./ "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/"
 
