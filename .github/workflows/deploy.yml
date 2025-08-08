@@ -44,7 +44,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
             cd /home/backend/hrms
             npm install --production
-            npm run build
+            node --max-old-space-size=4096 node_modules/.bin/nest build
 
             if pm2 list | grep -q "hrms-be"; then
               pm2 restart hrms-be
