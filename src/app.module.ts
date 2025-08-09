@@ -22,6 +22,8 @@ import { SkillsModule } from './modules/masterTables/skills/skills.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
+import { DocumentModule } from './document/document.module';
+
 // ... other imports
 
 @Module({
@@ -53,6 +55,7 @@ import { CurrencyModule } from './modules/masterTables/currency/currency.module'
     SkillsModule,
     FeedbackModule,
     ScheduleModule.forRoot(),
-    CurrencyModule
+    CurrencyModule,
+    DocumentModule
   ]
 })export class AppModule { }

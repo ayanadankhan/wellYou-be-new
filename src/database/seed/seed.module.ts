@@ -17,7 +17,7 @@ import { Company, CompanySchema } from '@/modules/tenant/companies/schemas/compa
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI') || 'mongodb://localhost:27017/your-database',
+        uri: configService.get<string>('MONGODB_URI') || 'mongodb://localhost:27017/adan-hrm',
         // Optional: Add connection options
         // useNewUrlParser: true,
         // useUnifiedTopology: true,
