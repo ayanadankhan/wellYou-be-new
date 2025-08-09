@@ -58,7 +58,7 @@ import { DocumentTypeModule } from './modules/document-type/document-type.module
     FeedbackModule,
     ScheduleModule.forRoot(),
     CurrencyModule,
-    DocumentModule
+    DocumentModule,
     ExpensesModule,
     DocumentTypeModule
   ]
