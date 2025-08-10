@@ -1,7 +1,7 @@
 // src/attendance/attendance.service.ts
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import mongoose, { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Attendance, AttendanceDocument } from './schemas/Attendance.schema';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
@@ -11,6 +11,7 @@ import { User } from '../tenant/users/schemas/user.schema';
 
 import { EmployeesService } from '../employees/employees.service';
 import { GetEmployeeDto } from '../employees/dto/get-Employee.dto';
+import { RequestMangment, RequestMangmentDocument } from '../request-mangment/entities/request-mangment.entity';
 
 interface AttendanceResponse {
   success: boolean;
@@ -26,14 +27,16 @@ interface AttendanceResponse {
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
 
-  constructor(
-    @InjectModel(Attendance.name)
-    private attendanceModel: Model<AttendanceDocument>,
-    @InjectModel(Employee.name)
-    private employeeModel: Model<EmployeeDocument>,
-    private employeeService: EmployeesService, 
-  ) {
-  }
+constructor(
+  @InjectModel(Attendance.name)
+  private attendanceModel: Model<AttendanceDocument>,
+
+  @InjectModel(RequestMangment.name)
+  private RequestMangmentModel: Model<RequestMangmentDocument>,
+  @InjectModel(Employee.name)
+  private employeeModel: Model<EmployeeDocument>,
+  private employeeService: EmployeesService,
+) {}
 
   // Enhanced method to get attendance based on user role
   async getAttendanceByRole(
@@ -1033,5 +1036,477 @@ private groupAttendanceByEmployee(
       this.logger.error('Failed to mark absent for leave:', error.message);
       throw error;
     }
+  }
+
+  async attendanceReport(tenantId: string) {
+    try {
+      // 1. Get all employees of this tenant
+      const employees = await this.employeeModel.find({
+        tenantId: new Types.ObjectId(tenantId)
+      }).select('_id').lean();
+
+      const totalEmployees = employees.length;
+      if (totalEmployees === 0) {
+        return {
+          totalEmployees: 0,
+          presentToday: 0,
+          absentToday: 0,
+          todayAttendanceRate: 0,
+          MTDAttendanceRate: 0
+        };
+      }
+
+      const employeeIds = employees.map(emp => emp._id);
+
+      // 2. Today's date range
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // 3. Get today's attendance
+      const todayAttendance = await this.attendanceModel.find({
+        employeeId: { $in: employeeIds },
+        date: { $gte: todayStart, $lte: todayEnd }
+      }).lean();
+
+      const presentToday = todayAttendance.filter(a => a.status?.toLowerCase() === 'present').length;
+      const absentToday = totalEmployees - presentToday;
+      const todayAttendanceRate = ((presentToday / totalEmployees) * 100).toFixed(2);
+
+      // 4. MTD Attendance Rate
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const mtdAttendance = await this.attendanceModel.find({
+        employeeId: { $in: employeeIds },
+        date: { $gte: monthStart, $lte: todayEnd }
+      }).lean();
+
+      // Calculate MTD rate = (total presents in month) / (total employees × days till now) × 100
+      const daysTillNow = now.getDate();
+      const totalPossibleAttendances = totalEmployees * daysTillNow;
+      const mtdPresentCount = mtdAttendance.filter(a => a.status?.toLowerCase() === 'present').length;
+      const mtdAttendanceRate = ((mtdPresentCount / totalPossibleAttendances) * 100).toFixed(2);
+
+          // Monthly trends function call
+      const monthlyAttendanceTrands = await this.getMonthlyAttendanceTrends(tenantId);
+      const departmentWiseAttendance = await this.getDepartmentWiseAttendance(tenantId, new Date());
+      const currentMonthLateCheckIns = await this.getCurrentMonthLateCheckIns(tenantId);
+      const recentCorrectionAttendanceRequests = await this.getRecentCorrectionAttendanceRequests(tenantId);
+      const todayLeaveRequests = await this.getTodayLeaveRequests(tenantId);
+
+      return {
+        totalEmployees,
+        presentToday,
+        absentToday,
+        todayAttendanceRate: Number(todayAttendanceRate),
+        MTDAttendanceRate: Number(mtdAttendanceRate),
+        monthlyAttendanceTrands,
+        departmentWiseAttendance,
+        currentMonthLateCheckIns,
+        recentCorrectionAttendanceRequests,
+        todayLeaveRequests
+      };
+
+    } catch (error) {
+      this.logger.error(`Error generating attendance report: ${error.message}`, error.stack);
+      throw new Error('Internal server error while generating attendance report.');
+    }
+  }
+
+  private async getMonthlyAttendanceTrends(tenantId: string) {
+    const employees = await this.employeeModel.find({
+      tenantId: new Types.ObjectId(tenantId)
+    }).select('_id').lean();
+
+    const totalEmployees = employees.length;
+    if (totalEmployees === 0) return [];
+
+    const employeeIds = employees.map(emp => emp._id);
+
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+
+    const attendanceRecords = await this.attendanceModel.find({
+      employeeId: { $in: employeeIds },
+      date: { $gte: monthStart, $lte: monthEnd }
+    }).lean();
+
+    const trends: { date: string; attendancePercent: number }[] = [];
+
+    for (
+      let d = new Date(monthStart);
+      d <= monthEnd;
+      d.setUTCDate(d.getUTCDate() + 1)
+    ) {
+      const dateStr = d.toISOString().split('T')[0]; // pure UTC date string
+
+      const dayRecords = attendanceRecords.filter(a => {
+        const recDate = new Date(a.date);
+        const recDateStr = new Date(Date.UTC(recDate.getUTCFullYear(), recDate.getUTCMonth(), recDate.getUTCDate()))
+          .toISOString()
+          .split('T')[0];
+        return recDateStr === dateStr;
+      });
+
+      const presentCount = dayRecords.filter(a => a.status?.toLowerCase() === 'present').length;
+      const attendancePercent = totalEmployees > 0
+        ? Math.round((presentCount / totalEmployees) * 100)
+        : 0;
+
+      trends.push({ date: dateStr, attendancePercent });
+    }
+
+    return trends;
+  }
+
+  private async getDepartmentWiseAttendance(tenantId: string, targetDate: Date) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const startOfDay = new Date(Date.UTC(
+      targetDate.getUTCFullYear(),
+      targetDate.getUTCMonth(),
+      targetDate.getUTCDate()
+    ));
+    const endOfDay = new Date(Date.UTC(
+      targetDate.getUTCFullYear(),
+      targetDate.getUTCMonth(),
+      targetDate.getUTCDate(),
+      23, 59, 59, 999
+    ));
+
+    // ✅ Raw attendance without tenantId filter (since tenantId is in employee)
+    const rawAttendance = await this.attendanceModel.find({
+      date: { $gte: startOfDay, $lte: endOfDay }
+    }).lean();
+
+    // ✅ Aggregate marked attendance with tenantId filter after employee lookup
+    const markedAttendance = await this.attendanceModel.aggregate([
+      {
+        $match: {
+          date: { $gte: startOfDay, $lte: endOfDay }
+        }
+      },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "employeeId",
+          foreignField: "_id",
+          as: "employee"
+        }
+      },
+      { $unwind: { path: "$employee", preserveNullAndEmptyArrays: false } },
+      {
+        $match: {
+          "employee.tenantId": new Types.ObjectId(tenantId)
+        }
+      },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "employee.departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          presentToday: {
+            $sum: {
+              $cond: [
+                { $eq: [{ $toLower: "$status" }, "present"] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    // ✅ Get total employees per department for that tenant
+    const employeesByDept = await this.employeeModel.aggregate([
+      { $match: { tenantId: new Types.ObjectId(tenantId) } },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          totalEmployees: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // ✅ Merge attendance with total employees
+    const deptWiseAttendance = employeesByDept.map(dept => {
+      const attendance = markedAttendance.find(m => m._id === dept._id) || { presentToday: 0 };
+      const absentToday = dept.totalEmployees - attendance.presentToday;
+      const attendanceRate = dept.totalEmployees > 0
+        ? parseFloat(((attendance.presentToday / dept.totalEmployees) * 100).toFixed(2))
+        : 0;
+
+      return {
+        department: dept._id,
+        totalEmployees: dept.totalEmployees,
+        presentToday: attendance.presentToday,
+        absentToday,
+        attendanceRate
+      };
+    });
+
+    return deptWiseAttendance;
+  }
+
+  private async getCurrentMonthLateCheckIns(tenantId: string): Promise<any[]> {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const matchingEmployee = await this.employeeModel.findOne({
+      tenantId: new Types.ObjectId(tenantId)
+    }).lean();
+
+    if (!matchingEmployee) {
+      throw new HttpException('No employee found for given tenant ID', HttpStatus.NOT_FOUND);
+    }
+
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+
+    const lateCheckIns = await this.attendanceModel.aggregate([
+      {
+        $match: {
+          employeeId: matchingEmployee._id,
+          checkInTime: { $ne: null },
+          date: { $gte: monthStart, $lte: monthEnd },
+          $expr: {
+            $gt: [
+              { $hour: { date: "$checkInTime", timezone: "Asia/Karachi" } },
+              9
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { $expr: { $gt: [{ $hour: { date: "$checkInTime", timezone: "Asia/Karachi" } }, 9] } },
+            {
+              $and: [
+                { $expr: { $eq: [{ $hour: { date: "$checkInTime", timezone: "Asia/Karachi" } }, 9] } },
+                { $expr: { $gt: [{ $minute: { date: "$checkInTime", timezone: "Asia/Karachi" } }, 30] } }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employeeData'
+        }
+      },
+      { $unwind: "$employeeData" },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'employeeData.userId',
+          foreignField: '_id',
+          as: 'userData'
+        }
+      },
+      { $unwind: "$userData" },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'employeeData.departmentId',
+          foreignField: '_id',
+          as: 'departmentData'
+        }
+      },
+      { $unwind: { path: "$departmentData", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'designations',
+          localField: 'employeeData.positionId',
+          foreignField: '_id',
+          as: 'designationData'
+        }
+      },
+      { $unwind: { path: "$designationData", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'employeeData.reportingTo',
+          foreignField: '_id',
+          as: 'reportingToData'
+        }
+      },
+      { $unwind: { path: "$reportingToData", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          name: { $concat: ["$userData.firstName", " ", "$userData.lastName"] },
+          department: "$departmentData.departmentName",
+          checkInTime: {
+            $dateToString: { format: "%H:%M", date: "$checkInTime", timezone: "Asia/Karachi" }
+          },
+          designation: "$designationData.designationName",
+          reportingTo: {
+            $cond: {
+              if: { $ifNull: ["$reportingToData.firstName", false] },
+              then: { $concat: ["$reportingToData.firstName", " ", "$reportingToData.lastName"] },
+              else: null
+            }
+          }
+        }
+      }
+    ]);
+    return lateCheckIns;
+  }
+
+  private async getRecentCorrectionAttendanceRequests(tenantId: string): Promise<any[]> {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const records = await this.RequestMangmentModel.find({
+      type: "attendance",
+      "workflow.status": "pending"
+    })
+      .populate({
+        path: 'employeeId',
+        model: 'Employee',
+        select: 'tenantId userId reportingTo positionId departmentId',
+        populate: [
+          { path: 'userId', model: 'User', select: 'firstName lastName' },
+          { path: 'reportingTo', model: 'User', select: 'firstName lastName' },
+          { path: 'positionId', model: 'Designation', select: 'title' },
+          { path: 'departmentId', model: 'Department', select: 'departmentName' },
+        ],
+      })
+      .lean()
+      .exec();
+
+    // Filter by tenantId (from employeeId)
+    const filtered = records.filter(r => {
+      const emp: any = r.employeeId;
+      return emp?.tenantId?.toString() === tenantId.toString();
+    });
+
+    // Format output
+    const formatted = filtered.map(r => {
+      const emp: any = r.employeeId;
+      const user = emp?.userId;
+
+      return {
+        date: r.appliedDate,
+        employeeName: user
+          ? `${user.firstName} ${user.lastName}`
+          : null,
+        checkIn: r.attendanceDetails?.checkInTime || "--:--",
+        checkOut: r.attendanceDetails?.checkOutTime || "--:--",
+        reason: r.attendanceDetails?.reason || ""
+      };
+    });
+
+    return formatted;
+  }
+
+  private async getTodayLeaveRequests(tenantId: string) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const requests = await this.RequestMangmentModel.aggregate([
+      {
+        $match: {
+          type: "leave",
+          "leaveDetails.from": { $lte: todayEnd },
+          "leaveDetails.to": { $gte: todayStart },
+        }
+      },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "employeeId",
+          foreignField: "_id",
+          as: "employee"
+        }
+      },
+      { $unwind: "$employee" },
+      {
+        $match: {
+          "employee.tenantId": new mongoose.Types.ObjectId(tenantId)
+        }
+      },
+
+      {
+        $lookup: {
+          from: "users",
+          localField: "employee.userId",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+
+      // Lookup department info
+      {
+        $lookup: {
+          from: "departments",
+          localField: "employee.departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "designations",
+          localField: "employee.positionId",
+          foreignField: "_id",
+          as: "designation"
+        }
+      },
+      { $unwind: { path: "$designation", preserveNullAndEmptyArrays: true } },
+
+      {
+        $project: {
+          _id: 0,
+          name: { $concat: ["$user.firstName", " ", "$user.lastName"] },
+          profilePicture: "$employee.profilePicture",
+          department: "$department.departmentName",
+          designation: "$designation.title",
+          leaveType: {
+            $concat: [
+              { $toUpper: { $substrCP: ["$leaveDetails.leaveType", 0, 1] } },
+              { $substrCP: ["$leaveDetails.leaveType", 1, { $strLenCP: "$leaveDetails.leaveType" }] },
+              " Leave"
+            ]
+          }
+        }
+      }
+    ]);
+
+    return requests;
   }
 }

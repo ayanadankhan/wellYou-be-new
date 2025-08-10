@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { requestMangmentervice } from './request-mangment.service';
 import { RequestMangmentController } from './request-mangment.controller';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -15,9 +15,10 @@ import { AuditModule } from '../audit/audit.module';
       { name: RequestMangment.name, schema: requestMangmentchema },
       { name: Employee.name, schema: EmployeeSchema },
       { name: User.name, schema: UserSchema },
-      { name: Attendance.name, schema: AttendanceSchema}
+      { name: Attendance.name, schema: AttendanceSchema }
     ]),
-    AttendanceModule, AuditModule
+    forwardRef(() => AttendanceModule),
+    AuditModule
   ],
   controllers: [RequestMangmentController],
   providers: [requestMangmentervice],
