@@ -184,7 +184,25 @@ export class Employee {
   @Prop({ required: true, type: String })
   nationality: string;
 
-  @Prop({ required: true, type: EmergencyContact })
+  @Prop({ required: false, type: String })
+  CNIC: string;
+
+  @Prop({ required: false, type: Date })
+  cnicIssueDate: Date;
+
+  @Prop({ required: false, type: Date })
+  cnicExpiryDate: Date;
+
+  @Prop({ required: false, type: String })
+  drivingLincence: string;
+
+  @Prop({ required: false, type: Date })
+  drivingLincenceIssueDate: Date;
+
+  @Prop({ required: false, type: Date })
+  drivingLincenceExpiryDate: Date;
+
+  @Prop({ required: false, type: EmergencyContact })
   emergencyContact: EmergencyContact;
 
   @Prop({ type: [DependentMember] })

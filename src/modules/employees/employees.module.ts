@@ -13,7 +13,7 @@ import { DesignationModule } from '../masterTables/designation/designation.modul
   imports: [
     MongooseModule.forFeature([
       { name: Employee.name, schema: EmployeeSchema },
-      { name: User.name, schema: UserSchema }, // ✅ Add user schema for email lookup
+      { name: User.name, schema: UserSchema },
     ]),
     MailModule,
     UserModule,
@@ -22,7 +22,7 @@ import { DesignationModule } from '../masterTables/designation/designation.modul
   ],
   controllers: [EmployeesController],
   providers: [EmployeesService],
-  exports: [EmployeesService], // ✅ Export EmployeesService for use in other modules
+  exports: [EmployeesService],
 })
 export class EmployeesModule {
   
