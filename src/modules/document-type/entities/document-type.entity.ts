@@ -4,13 +4,13 @@ import { Document } from 'mongoose';
 @Schema({ timestamps: true })
 export class DocumentType extends Document {
   @Prop({ required: true })
-  name: string;
+  title: string;
 
   @Prop({ required: true })
   category: string;
 
   @Prop({ default: true })
-  isActive: boolean;
+  isDefault: boolean;
 }
 
 export const DocumentTypeSchema = SchemaFactory.createForClass(DocumentType);

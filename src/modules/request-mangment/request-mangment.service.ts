@@ -503,4 +503,87 @@ export class requestMangmentervice {
       'workflow.status': 'approved',
     }).exec();
   }
+
+async getCurrentMonthLeaveReport(tenantId: string) {
+  this.logger.log(`📌 TenantId received: ${tenantId}`);
+
+  // Dates for current and last month
+  const now = new Date();
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+  // Helper to get counts
+  const getCounts = async (startDate: Date, endDate: Date) => {
+    const matchStage = {
+      type: 'leave',
+      appliedDate: { $gte: startDate, $lte: endDate }
+    };
+
+    return await this.RequestMangmentModel.aggregate([
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employee'
+        }
+      },
+      { $unwind: '$employee' },
+      { $match: { 'employee.tenantId': new Types.ObjectId(tenantId) } },
+      {
+        $group: {
+          _id: '$workflow.status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+  };
+
+  // Get counts for current and last month
+  const currentCounts = await getCounts(startOfCurrentMonth, endOfCurrentMonth);
+  const lastCounts = await getCounts(startOfLastMonth, endOfLastMonth);
+
+  const sumCounts = (counts: any[], status?: string) => {
+    if (!status) return counts.reduce((sum, c) => sum + c.count, 0);
+    const item = counts.find(c => c._id === status);
+    return item ? item.count : 0;
+  };
+
+  // Current month numbers
+  const totalRequests = sumCounts(currentCounts);
+  const pendingRequests = sumCounts(currentCounts, 'pending');
+  const approvedRequests = sumCounts(currentCounts, 'approved');
+  const rejectedRequests = sumCounts(currentCounts, 'rejected');
+
+  // Last month total for comparison
+  const lastTotal = sumCounts(lastCounts);
+
+  // Percentage change from last month
+  const comparisonFromLastMonth =
+    lastTotal === 0 ? 100 : ((totalRequests - lastTotal) / lastTotal) * 100;
+
+  // Approval & rejection rates
+  const approvalRate = totalRequests === 0 ? 0 : (approvedRequests / totalRequests) * 100;
+  const rejectionRate = totalRequests === 0 ? 0 : (rejectedRequests / totalRequests) * 100;
+
+  return {
+    report: {
+      totalRequests,
+      pendingRequests,
+      approvedRequests,
+      rejectedRequests,
+      comparisonFromLastMonth: `${comparisonFromLastMonth.toFixed(2)}%`,
+      approvalRate: `${approvalRate.toFixed(2)}%`,
+      rejectionRate: `${rejectionRate.toFixed(2)}%`
+    }
+  };
+}
+
+
+
+
 }
