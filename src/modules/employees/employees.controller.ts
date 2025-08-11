@@ -15,7 +15,7 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Post()
-  async create(@Body() createEmployeeDto: any, @CurrentUser() user: User) {
+  async create(@Body() createEmployeeDto: CreateEmployeeDto, @CurrentUser() user: User) {
     try {
       if (!user.tenantId) {
         throw new HttpException('Your account has no tenant association',
