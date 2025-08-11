@@ -26,4 +26,7 @@ export class CreateDocumentDto {
 
   @IsBoolean()
   isExpiry: boolean;
+
+  @IsBoolean()
+  requireApproval: boolean;
 }
