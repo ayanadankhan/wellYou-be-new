@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query, Req } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
@@ -25,6 +25,13 @@ export class PayrollController {
     @Query() getDto: GetPayrollDto
   ) {
     return this.payrollService.findAll(getDto, user);
+  }
+
+  @Get('report')
+  async getPayrollSummary(@CurrentUser() user: User) {
+    console.log(`Fetching payroll summary for tenant: ${user.tenantId?.toString()}`);
+    
+    return this.payrollService.getCurrentMonthPayrollSummary(user.tenantId?.toString() || '');
   }
 
   @Get(':id')

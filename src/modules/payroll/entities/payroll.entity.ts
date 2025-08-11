@@ -8,7 +8,7 @@ export enum PayrollStatus {
   PAID = 'PAID',
 }
 
-@Schema()
+@Schema({ timestamps: true })
 export class Payroll extends Document {
   @Prop({ required: true })
   payrollMonth: string;
@@ -33,6 +33,9 @@ export class Payroll extends Document {
 
   @Prop({ type: Array, default: [] })
   selectedEmployees: Record<string, any>[];
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const PayrollSchema = SchemaFactory.createForClass(Payroll);
