@@ -14,6 +14,8 @@ import {
   HttpCode,
   Req,
   Patch,
+  BadRequestException,
+  HttpException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -270,6 +272,40 @@ export class AttendanceController {
     } catch (error) {
       this.logger.error('Delete attendance failed:', error.message);
       throw error;
+    }
+  }
+
+  @Get('report')
+  async getAttendanceReport(@CurrentUser() user: User) {
+    try {
+      if (!user.tenantId) {
+        throw new HttpException(
+          'User does not have tenant access',
+          HttpStatus.FORBIDDEN
+        );
+      }
+
+      this.logger.log(`📊 Generating attendance report for tenant: ${user.tenantId}`);
+
+      const report = await this.attendanceService.attendanceReport(
+        user.tenantId.toString()
+      );
+
+      return {
+        success: true,
+        data: report,
+        message: 'Attendance report generated successfully'
+      };
+    } catch (error) {
+      this.logger.error(`❌ Attendance report generation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to generate attendance report',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 }
