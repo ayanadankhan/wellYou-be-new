@@ -20,6 +20,9 @@ export class Document extends MongooseDocument {
 
   @Prop({ type: Boolean, required: true, default: false })
   isExpiry: boolean;
+
+  @Prop({ type: Boolean, required: true, default: false })
+  requireApproval: boolean;
 }
 
 export const DocumentSchema = SchemaFactory.createForClass(Document);
