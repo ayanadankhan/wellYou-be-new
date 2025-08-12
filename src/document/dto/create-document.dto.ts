@@ -3,6 +3,9 @@ import {
   IsNotEmpty,
   IsMongoId,
   IsBoolean,
+  IsOptional,
+  IsArray,
+  ArrayNotEmpty,
 } from 'class-validator';
 
 export class CreateDocumentDto {
@@ -18,7 +21,7 @@ export class CreateDocumentDto {
   title: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   templateUrl: string;
 
   @IsBoolean()
@@ -29,4 +32,10 @@ export class CreateDocumentDto {
 
   @IsBoolean()
   requireApproval: boolean;
+
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayNotEmpty()
+  @IsOptional()
+  allowedTypes: string[]; // Array of allowed file types like ["pdf", "doc", "docx"]
 }
