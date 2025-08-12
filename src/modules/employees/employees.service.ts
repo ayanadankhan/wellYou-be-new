@@ -815,7 +815,6 @@ export class EmployeesService {
       activeEmployees: statusStats.ACTIVE,
       inactiveEmployees: statusStats.INACTIVE,
       terminatedEmployees: statusStats.TERMINATED,
-      // newHiresThisMonth: newHires.length,
       contractEmployees: contractEmployees.length,
       remoteEmployees: remoteEmployees.length,
       employeesPerDepartment: Object.entries(departmentStats).map(([departmentName, count]) => ({ departmentName, count })),
@@ -869,161 +868,160 @@ export class EmployeesService {
     };
   }
 
-private async getCurrentMonthHires(tenantId: string) {
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
+  private async getCurrentMonthHires(tenantId: string) {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
 
-  const hires = await this.employeeModel.aggregate([
-    {
-      $match: {
-        tenantId: new Types.ObjectId(tenantId),
-        hireDate: {
-          $gte: new Date(currentYear, currentMonth, 1),
-          $lte: new Date(currentYear, currentMonth + 1, 0)
+    const hires = await this.employeeModel.aggregate([
+      {
+        $match: {
+          tenantId: new Types.ObjectId(tenantId),
+          hireDate: {
+            $gte: new Date(currentYear, currentMonth, 1),
+            $lte: new Date(currentYear, currentMonth + 1, 0)
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'departmentId',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'designations',
+          localField: 'positionId',
+          foreignField: '_id',
+          as: 'position'
+        }
+      },
+      { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'reportingTo',
+          foreignField: '_id',
+          as: 'reportingUser'
+        }
+      },
+      { $unwind: { path: '$reportingUser', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          name: {
+            $trim: {
+              input: { $concat: ['$user.firstName', ' ', '$user.lastName'] }
+            }
+          },
+          email: '$user.email',
+          departmentName: '$department.departmentName',
+          designationTitle: '$position.title',
+          profilePicture: 1,
+          location: 1,
+          phoneNumber: 1,
+          reportingToName: {
+            $trim: {
+              input: { $concat: ['$reportingUser.firstName', ' ', '$reportingUser.lastName'] }
+            }
+          },
+          hireDate: 1
         }
       }
-    },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'userId',
-        foreignField: '_id',
-        as: 'user'
-      }
-    },
-    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: 'departments',
-        localField: 'departmentId',
-        foreignField: '_id',
-        as: 'department'
-      }
-    },
-    { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: 'designations',
-        localField: 'positionId',
-        foreignField: '_id',
-        as: 'position'
-      }
-    },
-    { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'reportingTo',
-        foreignField: '_id',
-        as: 'reportingUser'
-      }
-    },
-    { $unwind: { path: '$reportingUser', preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 1,
-        name: {
-          $trim: {
-            input: { $concat: ['$user.firstName', ' ', '$user.lastName'] }
+    ]);
+
+    return hires;
+  }
+
+  private async getCurrentMonthLeavers(tenantId: string) {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    const leavers = await this.employeeModel.aggregate([
+      {
+        $match: {
+          tenantId: new Types.ObjectId(tenantId),
+          employmentStatus: { $in: ['TERMINATED', 'RETIRED', 'RESIGNED'] },
+          updatedAt: {
+            $gte: new Date(currentYear, currentMonth, 1),
+            $lte: new Date(currentYear, currentMonth + 1, 0)
           }
-        },
-        email: '$user.email',
-        departmentName: '$department.departmentName',
-        designationTitle: '$position.title',
-        profilePicture: 1,
-        location: 1,
-        phoneNumber: 1,
-        reportingToName: {
-          $trim: {
-            input: { $concat: ['$reportingUser.firstName', ' ', '$reportingUser.lastName'] }
-          }
-        },
-        hireDate: 1
-      }
-    }
-  ]);
-
-  return hires;
-}
-
-private async getCurrentMonthLeavers(tenantId: string) {
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-
-  const leavers = await this.employeeModel.aggregate([
-    {
-      $match: {
-        tenantId: new Types.ObjectId(tenantId),
-        employmentStatus: { $in: ['TERMINATED', 'RETIRED', 'RESIGNED'] },
-        updatedAt: {
-          $gte: new Date(currentYear, currentMonth, 1),
-          $lte: new Date(currentYear, currentMonth + 1, 0)
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'departmentId',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'designations',
+          localField: 'positionId',
+          foreignField: '_id',
+          as: 'position'
+        }
+      },
+      { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'reportingTo',
+          foreignField: '_id',
+          as: 'reportingUser'
+        }
+      },
+      { $unwind: { path: '$reportingUser', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          name: {
+            $trim: {
+              input: { $concat: ['$user.firstName', ' ', '$user.lastName'] }
+            }
+          },
+          email: '$user.email',
+          departmentName: '$department.departmentName',
+          designationTitle: '$position.title',
+          profilePicture: 1,
+          location: 1,
+          phoneNumber: 1,
+          reportingToName: {
+            $trim: {
+              input: { $concat: ['$reportingUser.firstName', ' ', '$reportingUser.lastName'] }
+            }
+          },
+          employmentStatus: 1,
         }
       }
-    },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'userId',
-        foreignField: '_id',
-        as: 'user'
-      }
-    },
-    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: 'departments',
-        localField: 'departmentId',
-        foreignField: '_id',
-        as: 'department'
-      }
-    },
-    { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: 'designations',
-        localField: 'positionId',
-        foreignField: '_id',
-        as: 'position'
-      }
-    },
-    { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'reportingTo',
-        foreignField: '_id',
-        as: 'reportingUser'
-      }
-    },
-    { $unwind: { path: '$reportingUser', preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 1,
-        name: {
-          $trim: {
-            input: { $concat: ['$user.firstName', ' ', '$user.lastName'] }
-          }
-        },
-        email: '$user.email',
-        departmentName: '$department.departmentName',
-        designationTitle: '$position.title',
-        profilePicture: 1,
-        location: 1,
-        phoneNumber: 1,
-        reportingToName: {
-          $trim: {
-            input: { $concat: ['$reportingUser.firstName', ' ', '$reportingUser.lastName'] }
-          }
-        },
-        employmentStatus: 1,
-      }
-    }
-  ]);
+    ]);
 
-  return leavers;
-}
-
+    return leavers;
+  }
 }
