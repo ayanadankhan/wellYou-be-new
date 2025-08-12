@@ -62,14 +62,20 @@ export class RequestMangmentController {
     };
   }
 
-@Get('report')
-async getLeaveReport(@CurrentUser() user: any) {
-  return this.requestMangmentervice.getCurrentMonthLeaveReport(
-    user?.tenantId.toString()
-  );
-}
-
-
+  @Get('report')
+  async getLeaveReport(
+    @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('month') month?: string
+  ) {
+    return this.requestMangmentervice.getCurrentMonthLeaveReport(
+      user?.tenantId.toString(),
+      from,
+      to,
+      month
+    );
+  }
 
   @Get(':id')
   async findOne(
@@ -156,5 +162,4 @@ async getLeaveReport(@CurrentUser() user: any) {
   ) {
     await this.requestMangmentervice.remove(id, user);
   }
-
 }
