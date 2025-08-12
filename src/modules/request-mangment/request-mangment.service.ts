@@ -543,32 +543,38 @@ async getCurrentMonthLeaveReport(tenantId: string) {
     ]);
   };
 
-  // Get counts for current and last month
-  const currentCounts = await getCounts(startOfCurrentMonth, endOfCurrentMonth);
-  const lastCounts = await getCounts(startOfLastMonth, endOfLastMonth);
-
   const sumCounts = (counts: any[], status?: string) => {
     if (!status) return counts.reduce((sum, c) => sum + c.count, 0);
     const item = counts.find(c => c._id === status);
     return item ? item.count : 0;
   };
 
-  // Current month numbers
+  const currentCounts = await getCounts(startOfCurrentMonth, endOfCurrentMonth);
+  const lastCounts = await getCounts(startOfLastMonth, endOfLastMonth);
+
   const totalRequests = sumCounts(currentCounts);
   const pendingRequests = sumCounts(currentCounts, 'pending');
   const approvedRequests = sumCounts(currentCounts, 'approved');
   const rejectedRequests = sumCounts(currentCounts, 'rejected');
 
-  // Last month total for comparison
   const lastTotal = sumCounts(lastCounts);
+  const lastApproved = sumCounts(lastCounts, 'approved');
+  const lastRejected = sumCounts(lastCounts, 'rejected');
 
-  // Percentage change from last month
-  const comparisonFromLastMonth =
-    lastTotal === 0 ? 100 : ((totalRequests - lastTotal) / lastTotal) * 100;
-
-  // Approval & rejection rates
   const approvalRate = totalRequests === 0 ? 0 : (approvedRequests / totalRequests) * 100;
   const rejectionRate = totalRequests === 0 ? 0 : (rejectedRequests / totalRequests) * 100;
+
+  const lastApprovalRate = lastTotal === 0 ? 0 : (lastApproved / lastTotal) * 100;
+  const lastRejectionRate = lastTotal === 0 ? 0 : (lastRejected / lastTotal) * 100;
+
+  const comparisonFromLastMonthValue =
+    lastTotal === 0 ? 100 : ((totalRequests - lastTotal) / lastTotal) * 100;
+
+  const comparisonFromLastMonthApprovalRateValue =
+    lastApprovalRate === 0 ? 100 : ((approvalRate - lastApprovalRate) / lastApprovalRate) * 100;
+
+  const comparisonFromLastMonthRejectionRateValue =
+    lastRejectionRate === 0 ? 100 : ((rejectionRate - lastRejectionRate) / lastRejectionRate) * 100;
 
   return {
     report: {
@@ -576,14 +582,11 @@ async getCurrentMonthLeaveReport(tenantId: string) {
       pendingRequests,
       approvedRequests,
       rejectedRequests,
-      comparisonFromLastMonth: `${comparisonFromLastMonth.toFixed(2)}%`,
-      approvalRate: `${approvalRate.toFixed(2)}%`,
-      rejectionRate: `${rejectionRate.toFixed(2)}%`
+      comparisonFromLastMonth: `${comparisonFromLastMonthValue >= 0 ? '+' : ''}${comparisonFromLastMonthValue.toFixed(2)}%`,
+      comparisonFromLastMonthApprovalRate: `${comparisonFromLastMonthApprovalRateValue >= 0 ? '+' : ''}${comparisonFromLastMonthApprovalRateValue.toFixed(2)}%`,
+      comparisonFromLastMonthRejectionRate: `${comparisonFromLastMonthRejectionRateValue >= 0 ? '+' : ''}${comparisonFromLastMonthRejectionRateValue.toFixed(2)}%`
     }
   };
 }
-
-
-
 
 }
