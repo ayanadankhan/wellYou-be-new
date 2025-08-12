@@ -22,11 +22,11 @@ import { SkillsModule } from './modules/masterTables/skills/skills.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { DocumentModule } from './document/document.module';
 
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { DocumentTypeModule } from './modules/document-type/document-type.module';
-// ... other imports
 
 @Module({
   imports: [
@@ -56,6 +56,8 @@ import { DocumentTypeModule } from './modules/document-type/document-type.module
     AuditModule,
     SkillsModule,
     FeedbackModule,
+    ChatModule,
+    // ScheduleModule.forRoot(),
     ScheduleModule.forRoot(),
     CurrencyModule,
     DocumentModule,
