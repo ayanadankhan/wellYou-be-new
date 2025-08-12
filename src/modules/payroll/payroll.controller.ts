@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query, Req } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { CreatePayrollDto } from './dto/create-payroll-dto';
 import { UpdatePayrollDto } from './dto/update-payroll-dto';
@@ -27,14 +27,21 @@ export class PayrollController {
     return this.payrollService.findAll(getDto, user);
   }
 
+  @Get('report')
+  async getPayrollSummary(@CurrentUser() user: User) {
+    console.log(`Fetching payroll summary for tenant: ${user.tenantId?.toString()}`);
+    
+    return this.payrollService.getCurrentMonthPayrollSummary(user.tenantId?.toString() || '');
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.payrollService.findOne(id);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updatePayrollDto: UpdatePayrollDto) {
-    return this.payrollService.update(id, updatePayrollDto);
+  async update(@Param('id') id: string, @Body() updatePayrollDto: UpdatePayrollDto, @CurrentUser() user: User,) {
+    return this.payrollService.update(id, updatePayrollDto, user);
   }
 
   @Patch('status/:id')
@@ -52,7 +59,7 @@ export class PayrollController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.payrollService.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.payrollService.remove(id, user);
   }
 }

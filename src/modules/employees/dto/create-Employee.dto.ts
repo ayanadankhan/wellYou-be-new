@@ -35,7 +35,8 @@ export enum EmploymentStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   TERMINATED = 'TERMINATED',
-  RETIRED = 'RETIRED'
+  RETIRED = 'RETIRED',
+  RESIGNED = 'RESIGNED',
 }
 
 export enum EmploymentType {
@@ -246,8 +247,8 @@ export class CreateEmployeeDto {
   @IsString({ each: true, message: 'Each permission must be a string' })
   permissions?: string[];
 
-  @IsString()
-  userId: Types.ObjectId;
+  @IsOptional()
+  userId?: Types.ObjectId;
 
   @IsDateString()
   @IsNotEmpty()
@@ -277,7 +278,7 @@ export class CreateEmployeeDto {
   @IsNotEmpty()
   phoneNumber: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsObject()
   progress: Record<string, any>;
 
@@ -288,6 +289,30 @@ export class CreateEmployeeDto {
   @IsString()
   @IsNotEmpty()
   nationality: string;
+
+  @IsString()
+  @IsOptional()
+  CNIC: string;
+
+  @IsString()
+  @IsOptional()
+  cnicIssueDate: string;
+
+  @IsString()
+  @IsOptional()
+  cnicExpiryDate: string;
+
+  @IsString()
+  @IsOptional()
+  drivingLincence: string;
+
+  @IsString()
+  @IsOptional()
+  drivingLincenceIssueDate: string;
+
+  @IsString()
+  @IsOptional()
+  drivingLincenceExpiryDate: string;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -313,11 +338,11 @@ export class CreateEmployeeDto {
   education?: EducationDto[];
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   positionId: Types.ObjectId;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   departmentId: Types.ObjectId;
 
   @IsString()
@@ -325,10 +350,10 @@ export class CreateEmployeeDto {
   reportingTo?: Types.ObjectId;
 
   @IsEnum(EmploymentStatus)
-  @IsNotEmpty()
+  @IsOptional()
   employmentStatus: EmploymentStatus;
 
-  @IsDateString()
+  @IsOptional()
   hireDate: string;
 
   @IsArray()
@@ -385,7 +410,7 @@ export class UpdateEmployeeDto {
   @IsOptional()
   phoneNumber?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   progress: number;
 
   @IsString()
@@ -395,6 +420,30 @@ export class UpdateEmployeeDto {
   @IsString()
   @IsOptional()
   nationality?: string;
+
+  @IsString()
+  @IsOptional()
+  CNIC: string;
+
+  @IsString()
+  @IsOptional()
+  cnicIssueDate: string;
+
+  @IsString()
+  @IsOptional()
+  cnicExpiryDate: string;
+
+  @IsString()
+  @IsOptional()
+  drivingLincence: string;
+
+  @IsString()
+  @IsOptional()
+  drivingLincenceIssueDate: string;
+
+  @IsString()
+  @IsOptional()
+  drivingLincenceExpiryDate: string;
 
   @IsArray()
   @ValidateNested({ each: true })

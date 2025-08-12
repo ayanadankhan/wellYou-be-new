@@ -12,6 +12,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { SkillsService } from './skills.service';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
+import { GetSkillDto } from './dto/get-skill.dto';
 
 @ApiTags('Skills')
 @Controller('skills')
@@ -24,8 +25,8 @@ export class SkillsController {
   }
 
   @Get()
-  findAll() {
-    return this.skillsService.findAll();
+  async findAll(@Query() getSkillDto: GetSkillDto) {
+    return this.skillsService.findAll(getSkillDto);
   }
 
   @Get(':id')

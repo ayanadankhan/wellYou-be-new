@@ -12,6 +12,6 @@ import { Department, DepartmentSchema } from './entities/department.entity';
   ],
   controllers: [DepartmentsController],
   providers: [DepartmentsService],
-  exports: [DepartmentsService],
+  exports: [DepartmentsService, MongooseModule],
 })
 export class DepartmentsModule {}

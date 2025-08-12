@@ -23,7 +23,10 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
 import { ChatModule } from './modules/chat/chat.module';
-// ... other imports
+import { DocumentModule } from './document/document.module';
+
+import { ExpensesModule } from './modules/expenses/expenses.module';
+import { DocumentTypeModule } from './modules/document-type/document-type.module';
 
 @Module({
   imports: [
@@ -56,6 +59,9 @@ import { ChatModule } from './modules/chat/chat.module';
     ChatModule,
     // ScheduleModule.forRoot(),
     ScheduleModule.forRoot(),
-    CurrencyModule
+    CurrencyModule,
+    DocumentModule,
+    ExpensesModule,
+    DocumentTypeModule
   ]
 })export class AppModule { }

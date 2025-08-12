@@ -12,6 +12,6 @@ import { Designation, DesignationSchema } from './entities/designation.entity';
   ],
   controllers: [DesignationsController],
   providers: [DesignationsService],
-  exports: [DesignationsService],
+  exports: [DesignationsService, MongooseModule],
 })
 export class DesignationsModule {}
