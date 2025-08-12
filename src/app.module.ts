@@ -22,6 +22,8 @@ import { SkillsModule } from './modules/masterTables/skills/skills.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
+import { PerformanceReviewModule } from './performance-review/performance-review.module';
+import { OffboardingModule } from './modules/offboarding/offboarding.module';
 // ... other imports
 
 @Module({
@@ -53,6 +55,8 @@ import { CurrencyModule } from './modules/masterTables/currency/currency.module'
     SkillsModule,
     FeedbackModule,
     ScheduleModule.forRoot(),
-    CurrencyModule
+    CurrencyModule,
+    PerformanceReviewModule,
+    OffboardingModule, // Importing the OffboardingModule
   ]
 })export class AppModule { }

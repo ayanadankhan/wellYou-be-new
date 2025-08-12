@@ -5,14 +5,15 @@ import { UpdateEmployeeDto } from './dto/update-Employee.dto';
 import { GetEmployeeDto } from './dto/get-Employee.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { Types } from 'mongoose';
-import { CurrentUser} from '@/common/decorators/user.decorator';
+import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User, UserRole, UserSchema } from '../tenant/users/schemas/user.schema';
+import { Public } from '@/common/decorators/public.decorator';
 @ApiTags('employees')
 @Controller('employees')
 export class EmployeesController {
   private readonly logger = new Logger(EmployeesController.name);
 
-  constructor(private readonly employeesService: EmployeesService) {}
+  constructor(private readonly employeesService: EmployeesService) { }
 
   @Post()
   async create(@Body() createEmployeeDto: any, @CurrentUser() user: User) {
@@ -46,8 +47,8 @@ export class EmployeesController {
       throw new HttpException(
         {
           status: error.status || HttpStatus.BAD_REQUEST,
-          error: error.message.includes('duplicate') 
-            ? 'Employee already exists' 
+          error: error.message.includes('duplicate')
+            ? 'Employee already exists'
             : 'Creation failed',
           message: error.message,
         },
@@ -57,7 +58,7 @@ export class EmployeesController {
   }
 
   @Get()
-  async findAll(@CurrentUser() user: User, @Query() getDto: GetEmployeeDto){
+  async findAll(@CurrentUser() user: User, @Query() getDto: GetEmployeeDto) {
     try {
       if (user.role !== UserRole.SUPER_ADMIN) {
         if (!user.tenantId) {
@@ -187,7 +188,7 @@ export class EmployeesController {
   @Patch(':id')
   @ApiBody({ type: UpdateEmployeeDto })
   async update(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body() updateEmployeeDto: UpdateEmployeeDto
   ): Promise<GetEmployeeDto> {
     try {
@@ -208,14 +209,14 @@ export class EmployeesController {
       return updatedEmployee;
     } catch (error) {
       this.logger.error(`Failed to update employee with ID ${id}: ${error.message}`, error.stack);
-      const status = error.message.includes('duplicate') 
-        ? HttpStatus.CONFLICT 
+      const status = error.message.includes('duplicate')
+        ? HttpStatus.CONFLICT
         : HttpStatus.BAD_REQUEST;
       throw new HttpException(
         {
           status,
-          error: status === HttpStatus.CONFLICT 
-            ? 'Employee with userId already exists' 
+          error: status === HttpStatus.CONFLICT
+            ? 'Employee with userId already exists'
             : 'Failed to update employee',
           message: error.message,
         },
@@ -257,4 +258,12 @@ export class EmployeesController {
       );
     }
   }
+@Public()
+  @Get(':id/details')
+  async getEmployeeDetails(
+    @Param('id') id: string
+  ): Promise<any> {
+    return this.employeesService.getEmployeeFullDetails(id);
+  }
+
 }

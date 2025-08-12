@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Employee, EmployeeDocument } from './schemas/Employee.schema';
@@ -11,6 +11,7 @@ import { InjectModel as InjectUserModel } from '@nestjs/mongoose';
 import { User } from '../tenant/users/schemas/user.schema';
 import { UserService } from '../tenant/users/user.service';
 import { CreateUserDto } from '../tenant/users/dto/create-user.dto';
+import { requestMangmentervice } from '../request-mangment/request-mangment.service';
 
 @Injectable()
 export class EmployeesService {
@@ -20,47 +21,47 @@ export class EmployeesService {
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(User.name) private readonly userModel: Model<any>,
     private userService: UserService,
-  ) {}
+  ) { }
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
-      try {
-          this.logger.log(`Creating employee with data: ${JSON.stringify(createEmployeeDto)}`);
+    try {
+      this.logger.log(`Creating employee with data: ${JSON.stringify(createEmployeeDto)}`);
 
-          const createUserDto = new CreateUserDto();
-          createUserDto.firstName = createEmployeeDto.firstName;
-          createUserDto.lastName = createEmployeeDto.lastName;
-          createUserDto.email = createEmployeeDto.email;
-          createUserDto.password = createEmployeeDto.password;
-          createUserDto.role = createEmployeeDto.role;
-          createUserDto.tenantId = createEmployeeDto.tenantId.toString();
-          createUserDto.permissions = createEmployeeDto.permissions;
+      const createUserDto = new CreateUserDto();
+      createUserDto.firstName = createEmployeeDto.firstName;
+      createUserDto.lastName = createEmployeeDto.lastName;
+      createUserDto.email = createEmployeeDto.email;
+      createUserDto.password = createEmployeeDto.password;
+      createUserDto.role = createEmployeeDto.role;
+      createUserDto.tenantId = createEmployeeDto.tenantId.toString();
+      createUserDto.permissions = createEmployeeDto.permissions;
 
-          const createdUser : any = await this.userService.create(createUserDto);
-          this.logger.log(`User created with ID: ${createdUser._id}`);
+      const createdUser: any = await this.userService.create(createUserDto);
+      this.logger.log(`User created with ID: ${createdUser._id}`);
 
-          const employeeData = {
-              ...createEmployeeDto,
-              userId: createdUser._id.toString()
-          };
+      const employeeData = {
+        ...createEmployeeDto,
+        userId: createdUser._id.toString()
+      };
 
-          const employee = new this.employeeModel(employeeData);
-          const savedEmployee = await employee.save();
+      const employee = new this.employeeModel(employeeData);
+      const savedEmployee = await employee.save();
 
-          return plainToClass(GetEmployeeDto, savedEmployee.toObject());
-      } catch (error) {
-          this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-          throw new HttpException(
-              {
-                  status: HttpStatus.BAD_REQUEST,
-                  error: 'Failed to create employee',
-                  message: error.message,
-              },
-              HttpStatus.BAD_REQUEST,
-          );
-      }
+      return plainToClass(GetEmployeeDto, savedEmployee.toObject());
+    } catch (error) {
+      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Failed to create employee',
+          message: error.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  async findAll (getDto: GetEmployeeDto): Promise<{ count: number; list: GetEmployeeDto[] }> {
+  async findAll(getDto: GetEmployeeDto): Promise<{ count: number; list: GetEmployeeDto[] }> {
     try {
       this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(getDto)}`);
 
@@ -194,10 +195,10 @@ export class EmployeesService {
       ]);
 
       this.logger.log(`✅ Retrieved ${list.length} employees via aggregation`);
-        return {
-          count: countQuery[0]?.total || 0,
-          list: list || [],
-        };
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
     } catch (error) {
       this.logger.error(`❌ Aggregation failed: ${error.message}`, error.stack);
       throw new HttpException(
@@ -217,49 +218,49 @@ export class EmployeesService {
       this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
 
       const mongoose = require('mongoose');
-    
+
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-      this.logger.warn(`Invalid ObjectId format: ${userId}`);
-      return null;
+        this.logger.warn(`Invalid ObjectId format: ${userId}`);
+        return null;
       }
-    
+
       const userObjectId = new mongoose.Types.ObjectId(userId);
       this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
 
-      const employee = await this.employeeModel.findOne({ 
-      userId: userObjectId 
-    }).select('_id userId');
-    
-    if (!employee) {
-      this.logger.warn(`No employee found with userId: ${userId}`);
-      
-      // Debug: Let's check what employees exist
-      const totalEmployees = await this.employeeModel.countDocuments();
-      this.logger.log(`Total employees in collection: ${totalEmployees}`);
-      
-      if (totalEmployees > 0) {
-        // Get a sample employee to see the data structure
-        const sampleEmployee = await this.employeeModel.findOne().select('_id userId');
-        
-        // Check if any employee has this userId (even with different types)
-        const employeeWithStringUserId = await this.employeeModel.findOne({ 
-          userId: userId // Try as string
-        }).select('_id userId');
-        
-        this.logger.log(`Employee found with string userId: ${employeeWithStringUserId ? 'Yes' : 'No'}`);
+      const employee = await this.employeeModel.findOne({
+        userId: userObjectId
+      }).select('_id userId');
+
+      if (!employee) {
+        this.logger.warn(`No employee found with userId: ${userId}`);
+
+        // Debug: Let's check what employees exist
+        const totalEmployees = await this.employeeModel.countDocuments();
+        this.logger.log(`Total employees in collection: ${totalEmployees}`);
+
+        if (totalEmployees > 0) {
+          // Get a sample employee to see the data structure
+          const sampleEmployee = await this.employeeModel.findOne().select('_id userId');
+
+          // Check if any employee has this userId (even with different types)
+          const employeeWithStringUserId = await this.employeeModel.findOne({
+            userId: userId // Try as string
+          }).select('_id userId');
+
+          this.logger.log(`Employee found with string userId: ${employeeWithStringUserId ? 'Yes' : 'No'}`);
+        }
+
+        return null;
       }
-      
-      return null;
+
+      this.logger.log(`Employee found - _id: ${employee._id}, userId: ${employee.userId}`);
+      return employee._id.toString();
+
+    } catch (error) {
+      this.logger.error(`Error finding employee ID for userId ${userId}: ${error.message}`, error.stack);
+      throw error;
     }
-    
-    this.logger.log(`Employee found - _id: ${employee._id}, userId: ${employee.userId}`);
-    return employee._id.toString();
-    
-  } catch (error) {
-    this.logger.error(`Error finding employee ID for userId ${userId}: ${error.message}`, error.stack);
-    throw error;
   }
-}
 
   async findOne(id: string): Promise<GetEmployeeDto> {
     try {
@@ -275,7 +276,7 @@ export class EmployeesService {
         );
       }
       this.logger.log(`Fetching employee with ID: ${id}`);
-      
+
       const employee = await this.employeeModel.aggregate([
         { $match: { _id: new Types.ObjectId(id) } },
         {
@@ -348,88 +349,88 @@ export class EmployeesService {
   }
 
   async findByUserId(userId: string): Promise<GetEmployeeDto> {
-      try {
-        this.logger.log(`Fetching employee with userId: ${userId}`);
-        
-        const employee = await this.employeeModel.aggregate([
-          { $match: { userId: new Types.ObjectId(userId) } },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'userId',
-              foreignField: '_id',
-              as: 'user',
-            },
-          },
-          { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'departments',
-              localField: 'departmentId',
-              foreignField: '_id',
-              as: 'department',
-            },
-          },
-          { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'designations',
-              localField: 'positionId',
-              foreignField: '_id',
-              as: 'position',
-            },
-          },
-          { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'reportingTo',
-              foreignField: '_id',
-              as: 'reportingTo',
-            },
-          },
-          { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'salaries',
-              localField: '_id',
-              foreignField: 'employeesId',
-              as: 'salary',
-            },
-          },
-          { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
-          { $project: { 'user.password': 0 } },
-          { $limit: 1 }
-        ]);
+    try {
+      this.logger.log(`Fetching employee with userId: ${userId}`);
 
-        if (!employee || employee.length === 0) {
-          this.logger.warn(`Employee with userId ${userId} not found`);
-          throw new HttpException(
-            {
-              status: HttpStatus.NOT_FOUND,
-              error: 'Employee not found',
-              message: `Employee with userId ${userId} does not exist`,
-            },
-            HttpStatus.NOT_FOUND,
-          );
-        }
-        this.logger.log(`Employee with userId ${userId} retrieved successfully`);
-        return plainToClass(GetEmployeeDto, employee[0]);
-      } catch (error) {
-        this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
-        if (error instanceof HttpException) {
-          throw error;
-        }
+      const employee = await this.employeeModel.aggregate([
+        { $match: { userId: new Types.ObjectId(userId) } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'departments',
+            localField: 'departmentId',
+            foreignField: '_id',
+            as: 'department',
+          },
+        },
+        { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'designations',
+            localField: 'positionId',
+            foreignField: '_id',
+            as: 'position',
+          },
+        },
+        { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'reportingTo',
+            foreignField: '_id',
+            as: 'reportingTo',
+          },
+        },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'salaries',
+            localField: '_id',
+            foreignField: 'employeesId',
+            as: 'salary',
+          },
+        },
+        { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
+        { $project: { 'user.password': 0 } },
+        { $limit: 1 }
+      ]);
+
+      if (!employee || employee.length === 0) {
+        this.logger.warn(`Employee with userId ${userId} not found`);
         throw new HttpException(
           {
-            status: HttpStatus.INTERNAL_SERVER_ERROR,
-            error: 'Failed to fetch employee',
-            message: error.message,
+            status: HttpStatus.NOT_FOUND,
+            error: 'Employee not found',
+            message: `Employee with userId ${userId} does not exist`,
           },
-          HttpStatus.INTERNAL_SERVER_ERROR,
+          HttpStatus.NOT_FOUND,
         );
       }
+      this.logger.log(`Employee with userId ${userId} retrieved successfully`);
+      return plainToClass(GetEmployeeDto, employee[0]);
+    } catch (error) {
+      this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<GetEmployeeDto> {
     try {
@@ -480,7 +481,7 @@ export class EmployeesService {
       if (updateEmployeeDto.skills && Array.isArray(updateEmployeeDto.skills)) {
         const existingSkills = existingEmployee.skills || [];
         const skillMap = new Map();
-        
+
         existingSkills.forEach(skill => {
           const skillDto = {
             name: skill.name,
@@ -488,18 +489,18 @@ export class EmployeesService {
           };
           skillMap.set(skill.name, skillDto);
         });
-        
+
         updateEmployeeDto.skills.forEach(skill => {
           skillMap.set(skill.name, skill);
         });
-        
+
         updateData.skills = Array.from(skillMap.values());
       }
 
       if (updateEmployeeDto.certifications && Array.isArray(updateEmployeeDto.certifications)) {
         const existingCertifications = existingEmployee.certifications || [];
         const certificationMap = new Map();
-        
+
         existingCertifications.forEach(cert => {
           const certDto = {
             id: cert.id,
@@ -515,12 +516,12 @@ export class EmployeesService {
           const key = cert.id || cert.name;
           certificationMap.set(key, certDto);
         });
-        
+
         updateEmployeeDto.certifications.forEach(cert => {
           const key = cert.id || cert.name;
           certificationMap.set(key, cert);
         });
-        
+
         updateData.certifications = Array.from(certificationMap.values());
       }
 
@@ -528,7 +529,7 @@ export class EmployeesService {
       if (updateEmployeeDto.education && Array.isArray(updateEmployeeDto.education)) {
         const existingEducation = existingEmployee.education || [];
         const educationMap = new Map();
-        
+
         // Add existing education (convert Date to string)
         existingEducation.forEach(edu => {
           const eduDto = {
@@ -546,13 +547,13 @@ export class EmployeesService {
           const key = edu.id || `${edu.institution}-${edu.degree}`;
           educationMap.set(key, eduDto);
         });
-        
+
         // Add/update new education
         updateEmployeeDto.education.forEach(edu => {
           const key = edu.id || `${edu.institution}-${edu.degree}`;
           educationMap.set(key, edu);
         });
-        
+
         updateData.education = Array.from(educationMap.values());
       }
 
@@ -560,7 +561,7 @@ export class EmployeesService {
       if (updateEmployeeDto.experiences && Array.isArray(updateEmployeeDto.experiences)) {
         const existingExperiences = existingEmployee.experiences || [];
         const experienceMap = new Map();
-        
+
         // Add existing experiences (convert Date to string)
         existingExperiences.forEach(exp => {
           const expDto = {
@@ -578,13 +579,13 @@ export class EmployeesService {
           const key = exp.id || `${exp.companyName}-${exp.position}`;
           experienceMap.set(key, expDto);
         });
-        
+
         // Add/update new experiences
         updateEmployeeDto.experiences.forEach(exp => {
           const key = exp.id || `${exp.companyName}-${exp.position}`;
           experienceMap.set(key, exp);
         });
-        
+
         updateData.experiences = Array.from(experienceMap.values());
       }
 
@@ -592,7 +593,7 @@ export class EmployeesService {
       if (updateEmployeeDto.documents && Array.isArray(updateEmployeeDto.documents)) {
         const existingDocuments = existingEmployee.documents || [];
         const documentMap = new Map();
-        
+
         // Add existing documents
         existingDocuments.forEach(doc => {
           const docDto = {
@@ -603,13 +604,13 @@ export class EmployeesService {
           const key = `${doc.type}-${doc.name}`;
           documentMap.set(key, docDto);
         });
-        
+
         // Add/update new documents
         updateEmployeeDto.documents.forEach(doc => {
           const key = `${doc.type}-${doc.name}`;
           documentMap.set(key, doc);
         });
-        
+
         updateData.documents = Array.from(documentMap.values());
       }
 
@@ -617,7 +618,7 @@ export class EmployeesService {
       if (updateEmployeeDto.dependentMembers && Array.isArray(updateEmployeeDto.dependentMembers)) {
         const existingDependents = existingEmployee.dependentMembers || [];
         const dependentMap = new Map();
-        
+
         // Add existing dependents (convert Date to string)
         existingDependents.forEach(dep => {
           const depDto = {
@@ -628,13 +629,13 @@ export class EmployeesService {
           const key = `${dep.name}-${dep.relation}`;
           dependentMap.set(key, depDto);
         });
-        
+
         // Add/update new dependents
         updateEmployeeDto.dependentMembers.forEach(dep => {
           const key = `${dep.name}-${dep.relation}`;
           dependentMap.set(key, dep);
         });
-        
+
         updateData.dependentMembers = Array.from(dependentMap.values());
       }
 
@@ -707,4 +708,151 @@ export class EmployeesService {
       );
     }
   }
+
+async getEmployeeFullDetails(
+  employeeId: string
+): Promise<{
+  basicInfo: {
+    name: string;
+    email: string;
+    departmentId: any;
+    departmentName?: string;
+    positionId: any;
+    positionTitle?: string;
+    hireDate: Date;
+    employmentType: string;
+    employmentStatus: string;
+    profilePicture: string;
+    location: string;
+    gender: string;
+    dateOfBirth: Date;
+    phoneNumber: string;
+    nationality: string;
+    maritalStatus: string;
+    manager: string | null;
+  };
+  attendances: any[];
+  requests: any[];
+  salaries: any[];
+  otherDetails: {
+    emergencyContact: any;
+    dependentMembers: any[];
+    certifications: any[];
+    skills: any[];
+  };
+}> {
+  const employee = await this.employeeModel
+    .findById(employeeId)
+    // populate core user info
+    .populate({
+      path: 'userId',
+      model: 'User',
+      select: 'firstName lastName email',
+      strictPopulate: false,
+    })
+    // populate manager info
+    .populate({
+      path: 'reportingTo',
+      model: 'User',
+      select: 'firstName lastName email',
+      strictPopulate: false,
+    })
+    // populate department info
+    .populate({
+      path: 'departmentId',
+      model: 'Department',
+      select: 'departmentName',
+      strictPopulate: false,
+    })
+    // populate position/designation info
+    .populate({
+      path: 'positionId',
+      model: 'Designation',
+      select: 'title',
+      strictPopulate: false,
+    })
+    // populate attendances
+    .populate({
+      path: 'attendances',
+      model: 'Attendance',
+      strictPopulate: false,
+    })
+    // populate requests
+    .populate({
+      path: 'requests',
+      model: 'RequestManagement',
+      strictPopulate: false,
+    })
+    // populate salaries
+    .populate({
+      path: 'salaries',
+      model: 'Salary',
+      strictPopulate: false,
+    })
+    .lean<{
+      userId?: { firstName?: string; lastName?: string; email?: string };
+      reportingTo?: { firstName?: string; lastName?: string; email?: string };
+      departmentId: { _id: any; departmentName?: string } | any;
+      positionId: { _id: any; title?: string } | any;
+      hireDate: Date;
+      employmentType: string;
+      employmentStatus: string;
+      profilePicture: string;
+      location: string;
+      gender: string;
+      dateOfBirth: Date;
+      phoneNumber: string;
+      nationality: string;
+      maritalStatus: string;
+      attendances: any[];
+      requests: any[];
+      salaries: any[];
+      emergencyContact: any;
+      dependentMembers: any[];
+      certifications: any[];
+      skills: any[];
+    }>();
+
+  if (!employee) {
+    throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+  }
+
+  const { userId, reportingTo, departmentId, positionId, ...rest } = employee;
+
+  return {
+    basicInfo: {
+      name: `${userId?.firstName || ''} ${userId?.lastName || ''}`.trim(),
+      email: userId?.email || '',
+      departmentId: departmentId?._id || departmentId,
+      departmentName: departmentId?.departmentName || null,
+      positionId: positionId?._id || positionId,
+      positionTitle: positionId?.title || null,
+      hireDate: rest.hireDate,
+      employmentType: rest.employmentType,
+      employmentStatus: rest.employmentStatus,
+      profilePicture: rest.profilePicture,
+      location: rest.location,
+      gender: rest.gender,
+      dateOfBirth: rest.dateOfBirth,
+      phoneNumber: rest.phoneNumber,
+      nationality: rest.nationality,
+      maritalStatus: rest.maritalStatus,
+      manager: reportingTo
+        ? `${reportingTo.firstName || ''} ${reportingTo.lastName || ''}`.trim()
+        : null,
+    },
+    attendances: rest.attendances || [],
+    requests: rest.requests || [],
+    salaries: rest.salaries || [],
+    otherDetails: {
+      emergencyContact: rest.emergencyContact,
+      dependentMembers: rest.dependentMembers,
+      certifications: rest.certifications,
+      skills: rest.skills,
+    },
+  };
+}
+
+
+
 }
