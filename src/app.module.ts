@@ -24,6 +24,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
 import { PerformanceReviewModule } from './performance-review/performance-review.module';
 import { OffboardingModule } from './modules/offboarding/offboarding.module';
+import { HolidayModule } from './holiday/holiday.module';
 // ... other imports
 
 @Module({
@@ -57,6 +58,7 @@ import { OffboardingModule } from './modules/offboarding/offboarding.module';
     ScheduleModule.forRoot(),
     CurrencyModule,
     PerformanceReviewModule,
-    OffboardingModule, // Importing the OffboardingModule
+    OffboardingModule,
+    HolidayModule, // Importing the OffboardingModule
   ]
 })export class AppModule { }
