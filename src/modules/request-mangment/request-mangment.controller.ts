@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  HttpException,
 } from '@nestjs/common';
 import { requestMangmentervice } from './request-mangment.service';
 import { CreateRequestMangmentDto, RequestStatus } from './dto/create-request-mangment.dto';
@@ -59,6 +60,21 @@ export class RequestMangmentController {
       count: summary.totalRequests,
       summary,
     };
+  }
+
+  @Get('report')
+  async getLeaveReport(
+    @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('month') month?: string
+  ) {
+    return this.requestMangmentervice.getCurrentMonthLeaveReport(
+      user?.tenantId.toString(),
+      from,
+      to,
+      month
+    );
   }
 
   @Get(':id')

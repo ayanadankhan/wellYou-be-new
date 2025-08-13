@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, Logger, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, Logger, Query, HttpCode, BadRequestException } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
 import { CreateEmployeeDto } from './dto/create-Employee.dto';
 import { UpdateEmployeeDto } from './dto/update-Employee.dto';
@@ -16,7 +16,7 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) { }
 
   @Post()
-  async create(@Body() createEmployeeDto: any, @CurrentUser() user: User) {
+  async create(@Body() createEmployeeDto: CreateEmployeeDto, @CurrentUser() user: User) {
     try {
       if (!user.tenantId) {
         throw new HttpException('Your account has no tenant association',
@@ -147,6 +147,40 @@ export class EmployeesController {
           message: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('report')
+  async getEmployeeReport(@CurrentUser() user: User) {
+    try {
+      if (!user.tenantId) {
+        throw new HttpException(
+          'User does not have tenant access',
+          HttpStatus.FORBIDDEN
+        );
+      }
+
+      this.logger.log(`🔍 Generating employee report for tenant: ${user.tenantId}`);
+
+      const report = await this.employeesService.generateEmployeeReport(
+        user.tenantId.toString()
+      );
+
+      return {
+        success: true,
+        data: report,
+        message: 'Employee report generated successfully'
+      };
+    } catch (error) {
+      this.logger.error(`❌ Report generation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to generate employee report',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }

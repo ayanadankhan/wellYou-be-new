@@ -489,4 +489,284 @@ export class PayrollService {
     return payroll;
   }
 
+  async getCurrentMonthPayrollSummary(tenantId: string) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const now = new Date();
+    const monthName = now.toLocaleString('en-US', { month: 'long' });
+    const year = now.getFullYear();
+    const currentMonthName = `${monthName} ${year}`;
+
+    const pipeline: any[] = [
+      {
+        $match: {
+          tenantId: new Types.ObjectId(tenantId),
+          payrollMonth: currentMonthName
+        }
+      },
+      {
+        $facet: {
+          payrollSummary: [
+            {
+              $project: {
+                netPay: 1,
+                selectedEmployees: 1,
+                createdAt: 1
+              }
+            },
+            {
+              $addFields: {
+                totalEmployeesInRolled: { $size: { $ifNull: ["$selectedEmployees", []] } },
+                totalBasePay: {
+                  $sum: {
+                    $map: {
+                      input: { $ifNull: ["$selectedEmployees", []] },
+                      as: "emp",
+                      in: { $ifNull: ["$$emp.salaryPay.basePay", 0] }
+                    }
+                  }
+                },
+                pendingPayments: {
+                  $size: {
+                    $filter: {
+                      input: { $ifNull: ["$selectedEmployees", []] },
+                      as: "emp",
+                      cond: { $eq: [{ $toLower: "$$emp.status" }, "pending"] }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $addFields: {
+                averageSalary: {
+                  $cond: [
+                    { $gt: ["$totalEmployeesInRolled", 0] },
+                    { $divide: ["$totalBasePay", "$totalEmployeesInRolled"] },
+                    0
+                  ]
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                totalcurrentMonthPayroll: { $ifNull: ["$netPay", 0] },
+                totalEmployeesInRolled: 1,
+                averageSalary: 1,
+                pendingPayments: 1,
+                lastPayrollRun: {
+                  $cond: [
+                    { $ifNull: ["$createdAt", false] },
+                    { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    null
+                  ]
+                }
+              }
+            }
+          ],
+          departmentPayroll: [
+            { $unwind: "$selectedEmployees" },
+            {
+              $lookup: {
+                from: "employees",
+                localField: "selectedEmployees.employeesId",
+                foreignField: "_id",
+                as: "employee"
+              }
+            },
+            { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "departments",
+                localField: "employee.departmentId",
+                foreignField: "_id",
+                as: "department"
+              }
+            },
+            { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+            {
+              $addFields: {
+                basePay: { $ifNull: ["$selectedEmployees.salaryPay.basePay", 0] },
+                totalAdditions: {
+                  $sum: {
+                    $map: {
+                      input: { $ifNull: ["$selectedEmployees.salaryPay.additions", []] },
+                      as: "add",
+                      in: { $ifNull: ["$$add.amount", 0] }
+                    }
+                  }
+                },
+                totalDeductions: {
+                  $sum: {
+                    $map: {
+                      input: { $ifNull: ["$selectedEmployees.salaryPay.deductions", []] },
+                      as: "ded",
+                      in: { $ifNull: ["$$ded.amount", 0] }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $addFields: {
+                employeeTotalPay: {
+                  $subtract: [
+                    { $add: ["$basePay", "$totalAdditions"] },
+                    "$totalDeductions"
+                  ]
+                }
+              }
+            },
+            {
+              $group: {
+                _id: "$department.departmentName",
+                employees: { $sum: 1 },
+                totalBasePay: { $sum: "$basePay" },
+                totalPayroll: { $sum: "$employeeTotalPay" }
+              }
+            },
+            {
+              $addFields: {
+                avgSalary: {
+                  $cond: [
+                    { $gt: ["$employees", 0] },
+                    { $divide: ["$totalBasePay", "$employees"] },
+                    0
+                  ]
+                }
+              }
+            },
+            {
+              $project: {
+                department: "$_id",
+                employees: 1,
+                totalPayroll: 1,
+                avgSalary: 1,
+                _id: 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        $project: {
+          payrollSummary: { $arrayElemAt: ["$payrollSummary", 0] },
+          departmentPayroll: 1
+        }
+      }
+    ];
+
+    const result = await this.payrollModel.aggregate(pipeline).exec();
+
+    return result[0] || {
+      payrollSummary: {
+        totalcurrentMonthPayroll: 0,
+        totalEmployeesInRolled: 0,
+        averageSalary: 0,
+        pendingPayments: 0,
+        lastPayrollRun: null
+      },
+      departmentPayroll: []
+    };
+  }
+
+  async getDepartmentWisePayroll(tenantId: string, payrollMonth: string) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const pipeline: any[] = [
+      {
+        $match: {
+          tenantId: new Types.ObjectId(tenantId),
+          ...(payrollMonth && { payrollMonth })
+        }
+      },
+      { $unwind: "$selectedEmployees" },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "selectedEmployees.employeesId",
+          foreignField: "_id",
+          as: "employee"
+        }
+      },
+      { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "employee.departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          basePay: { $ifNull: ["$selectedEmployees.salaryPay.basePay", 0] },
+          totalAdditions: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$selectedEmployees.salaryPay.additions", []] },
+                as: "add",
+                in: { $ifNull: ["$$add.amount", 0] }
+              }
+            }
+          },
+          totalDeductions: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$selectedEmployees.salaryPay.deductions", []] },
+                as: "ded",
+                in: { $ifNull: ["$$ded.amount", 0] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          employeeTotalPay: {
+            $subtract: [
+              { $add: ["$basePay", "$totalAdditions"] },
+              "$totalDeductions"
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          employees: { $sum: 1 },
+          totalBasePay: { $sum: "$basePay" },
+          totalPayroll: { $sum: "$employeeTotalPay" }
+        }
+      },
+      {
+        $addFields: {
+          avgSalary: {
+            $cond: [
+              { $gt: ["$employees", 0] },
+              { $divide: ["$totalBasePay", "$employees"] },
+              0
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          department: "$_id",
+          employees: 1,
+          totalPayroll: 1,
+          avgSalary: 1,
+          _id: 0
+        }
+      }
+    ];
+
+    return await this.payrollModel.aggregate(pipeline).exec();
+  }
 }

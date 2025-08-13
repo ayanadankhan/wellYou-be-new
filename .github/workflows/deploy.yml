@@ -1,4 +1,4 @@
-name: Deploy Next.js App to DigitalOcean Droplet
+name: Deploy NestJS Backend to DigitalOcean 
 
 on:
   push:
@@ -10,35 +10,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Copy files to server via SSH
-        uses: appleboy/scp-action@v0.1.7
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "."
-          target: "/home/backend/hrms"
-          strip_components: 1
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: SSH into server and restart PM2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+      - name: Deploy to server and build
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          APP_DIR="/home/backend/hrms"
+
+          echo "Ensuring app directory exists..."
+          ssh -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $APP_DIR"
+
+          echo "Syncing files to server..."
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/"
+
+          echo "Installing and building on server..."
+          ssh -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
             cd /home/backend/hrms
-            rm -rf node_modules package-lock.json
-            npm install
-            NODE_OPTIONS="--max_old_space_size=2048" npm run build
-            pm2 delete hrms-be || true
-            pm2 start npm --name hrms-be -- run start
+            npm install --production
+            npm install --save-dev @nestjs/cli
+            npm run build
+
+            if pm2 list | grep -q "hrms-be"; then
+              pm2 restart hrms-be
+            else
+              pm2 start npm --name "hrms-be" -- run start
+            fi
+
             pm2 save
+          EOF

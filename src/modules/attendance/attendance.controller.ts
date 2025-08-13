@@ -14,10 +14,12 @@ import {
   HttpCode,
   Req,
   Patch,
+  BadRequestException,
+  HttpException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { AttendanceService} from './attendance.service';
+import { AttendanceService } from './attendance.service';
 import { CreateAttendanceDto } from './dto/create-Attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
@@ -118,7 +120,7 @@ export class AttendanceController {
     }
   }
 
-    private formatRawAttendanceRecords(rawData: any[]): any[] {
+  private formatRawAttendanceRecords(rawData: any[]): any[] {
     interface AttendanceRecord {
       _id: string;
       employeeId: any;
@@ -133,24 +135,24 @@ export class AttendanceController {
       remarks?: string;
     }
 
-  return (rawData as AttendanceRecord[])
-    .map((record): any => {
-      return {
-        status: record.status || '',
-        remarks: record.remarks || '',
-        originalData: {
-          _id: record._id,
-          employeeId: record.employeeId._id.toHexString(),
-          date: record.date,
-          checkInTime: record.checkInTime || null,
-          checkOutTime: record.checkOutTime || null,
-          isAutoCheckout: record.isAutoCheckout,
-          createdAt: record.createdAt,
-          updatedAt: record.updatedAt,
-        }
-      };
-    })
-    .sort((a, b) => {
+    return (rawData as AttendanceRecord[])
+      .map((record): any => {
+        return {
+          status: record.status || '',
+          remarks: record.remarks || '',
+          originalData: {
+            _id: record._id,
+            employeeId: record.employeeId._id.toHexString(),
+            date: record.date,
+            checkInTime: record.checkInTime || null,
+            checkOutTime: record.checkOutTime || null,
+            isAutoCheckout: record.isAutoCheckout,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+          }
+        };
+      })
+      .sort((a, b) => {
         const aDate = new Date(a.originalData.date).getTime();
         const bDate = new Date(b.originalData.date).getTime();
         return aDate - bDate;
@@ -164,15 +166,15 @@ export class AttendanceController {
     @Param('employeeId') employeeId: string,
     @CurrentUser() user: User,
   ) {
-    
+
     this.logger.log(`Decoded user object: ${JSON.stringify(user)}`); // 🔍 Full user
     this.logger.log(`User role from token: ${user.role}`); // ✅ Final role log
-    
+
     try {
       this.logger.log(`Fetching today's attendance for employee: ${employeeId}`);
-      
+
       const result = await this.attendanceService.getTodayAttendance(employeeId);
-      
+
       return {
         success: true,
         message: 'Today\'s attendance retrieved successfully',
@@ -183,7 +185,7 @@ export class AttendanceController {
       throw error;
     }
   }
-  
+
   @Post('auto-checkout')
   @HttpCode(HttpStatus.OK)
   async autoCheckout() {
@@ -272,4 +274,121 @@ export class AttendanceController {
       throw error;
     }
   }
+
+  @Get('report')
+  async getAttendanceReport(
+    @CurrentUser() user: User,
+    @Query('month') month?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string
+  ) {
+    try {
+      if (!user.tenantId) {
+        throw new HttpException(
+          'User does not have tenant access',
+          HttpStatus.FORBIDDEN
+        );
+      }
+
+      this.logger.log(`📊 Generating attendance report for tenant: ${user.tenantId}`);
+
+      if (month && (from || to)) {
+        throw new HttpException(
+          'Please provide either month filter OR date range filter, not both',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (from && to) {
+        const fromDate = new Date(from);
+        const toDate = new Date(to);
+
+        if (fromDate > toDate) {
+          throw new HttpException(
+            'From date cannot be after To date',
+            HttpStatus.BAD_REQUEST
+          );
+        }
+      }
+
+      const report = await this.attendanceService.attendanceReport(
+        user.tenantId.toString(),
+        month,
+        from,
+        to
+      );
+
+      return {
+        success: true,
+        data: report,
+        message: 'Attendance report generated successfully'
+      };
+    } catch (error) {
+      this.logger.error(`❌ Attendance report generation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to generate attendance report',
+          message: error.message,
+        },
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+    @Get('hr/report')
+  async getHrAttendanceReport(
+    @CurrentUser() user: User,
+    @Query('month') month?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string
+  ) {
+    try {
+      if (!user.tenantId) {
+        throw new HttpException(
+          'User does not have tenant access',
+          HttpStatus.FORBIDDEN
+        );
+      }
+      this.logger.log(`📊 Generating HR attendance report for tenant: ${user.tenantId}`)
+      if (month && (from || to)) {
+        throw new HttpException(
+          'Please provide either month filter OR date range filter, not both',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+      if (from && to) {
+        const fromDate = new Date(from);
+        const toDate = new Date(to);
+        if (fromDate > toDate) {
+          throw new HttpException(
+            'From date cannot be after To date',
+            HttpStatus.BAD_REQUEST
+          );
+        }
+      }
+      const report = await this.attendanceService.hrAttendanceReport(
+        user.tenantId.toString(),
+        month,
+        from,
+        to
+      );
+      return {
+        success: true,
+        data: report,
+        message: 'HR Attendance report generated successfully'
+      };
+    } catch (error) { 
+      this.logger.error(`❌ HR Attendance report generation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to generate HR attendance report',
+          message: error.message,
+        },
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+  
 }

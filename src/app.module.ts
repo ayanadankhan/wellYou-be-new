@@ -24,8 +24,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
 import { PerformanceReviewModule } from './performance-review/performance-review.module';
 import { OffboardingModule } from './modules/offboarding/offboarding.module';
-import { HolidayModule } from './holiday/holiday.module';
-// ... other imports
+
+
 
 @Module({
   imports: [
@@ -55,10 +55,15 @@ import { HolidayModule } from './holiday/holiday.module';
     AuditModule,
     SkillsModule,
     FeedbackModule,
+    ChatModule,
+    // ScheduleModule.forRoot(),
     ScheduleModule.forRoot(),
     CurrencyModule,
     PerformanceReviewModule,
     OffboardingModule,
     HolidayModule, // Importing the OffboardingModule
+    DocumentModule,
+    ExpensesModule,
+    DocumentTypeModule
   ]
 })export class AppModule { }

@@ -503,4 +503,517 @@ export class requestMangmentervice {
       'workflow.status': 'approved',
     }).exec();
   }
+
+  private getDateRangeFromFilters(from?: string, to?: string, month?: string): { startDate: Date, endDate: Date } {
+    if (month) {
+      // Parse month in format YYYY-MM
+      const [year, monthNum] = month.split('-').map(Number);
+      const startDate = new Date(year, monthNum - 1, 1);
+      const endDate = new Date(year, monthNum, 0, 23, 59, 59, 999);
+      return { startDate, endDate };
+    }
+
+    if (from && to) {
+      const startDate = new Date(from);
+      const endDate = new Date(to);
+      endDate.setHours(23, 59, 59, 999);
+      return { startDate, endDate };
+    }
+
+    // Default to current month
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { startDate, endDate };
+  }
+
+  async getCurrentMonthLeaveReport(
+    tenantId: string,
+    from?: string,
+    to?: string,
+    month?: string
+  ) {
+    this.logger.log(`📌 TenantId received: ${tenantId}`);
+
+    // Get date range based on filters
+    const { startDate, endDate } = this.getDateRangeFromFilters(from, to, month);
+
+    // Calculate previous period for comparison (same length as current period)
+    const periodLength = endDate.getTime() - startDate.getTime();
+    const prevStartDate = new Date(startDate.getTime() - periodLength);
+    const prevEndDate = new Date(startDate.getTime() - 1);
+
+    const getLeaveCounts = async (queryStartDate: Date, queryEndDate: Date) => {
+      return await this.RequestMangmentModel.aggregate([
+        {
+          $match: {
+            type: 'leave',
+            $or: [
+              {
+                'leaveDetails.from': { $gte: queryStartDate, $lte: queryEndDate }
+              },
+              {
+                'leaveDetails.to': { $gte: queryStartDate, $lte: queryEndDate }
+              },
+              {
+                $and: [
+                  { 'leaveDetails.from': { $lte: queryStartDate } },
+                  { 'leaveDetails.to': { $gte: queryEndDate } }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'employees',
+            localField: 'employeeId',
+            foreignField: '_id',
+            as: 'employee'
+          }
+        },
+        { $unwind: '$employee' },
+        { $match: { 'employee.tenantId': new Types.ObjectId(tenantId) } },
+        {
+          $addFields: {
+            leaveDays: {
+              $let: {
+                vars: {
+                  adjustedFrom: {
+                    $max: ["$leaveDetails.from", queryStartDate]
+                  },
+                  adjustedTo: {
+                    $min: ["$leaveDetails.to", queryEndDate]
+                  }
+                },
+                in: {
+                  $add: [
+                    {
+                      $dateDiff: {
+                        startDate: "$$adjustedFrom",
+                        endDate: "$$adjustedTo",
+                        unit: "day"
+                      }
+                    },
+                    1 // inclusive count
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          $group: {
+            _id: '$workflow.status',
+            totalLeaves: { $sum: '$leaveDays' }
+          }
+        }
+      ]);
+    };
+
+    const sumLeaves = (counts: any[], status?: string) => {
+      if (!status) return counts.reduce((sum, c) => sum + c.totalLeaves, 0);
+      const item = counts.find(c => c._id === status);
+      return item ? item.totalLeaves : 0;
+    };
+
+    const currentCounts = await getLeaveCounts(startDate, endDate);
+    const lastCounts = await getLeaveCounts(prevStartDate, prevEndDate);
+
+    const totalLeaves = sumLeaves(currentCounts);
+    const pendingLeaves = sumLeaves(currentCounts, 'pending');
+    const approvedLeaves = sumLeaves(currentCounts, 'approved');
+    const rejectedLeaves = sumLeaves(currentCounts, 'rejected');
+
+    const lastTotalLeaves = sumLeaves(lastCounts);
+    const lastApprovedLeaves = sumLeaves(lastCounts, 'approved');
+    const lastRejectedLeaves = sumLeaves(lastCounts, 'rejected');
+
+    const approvalRate = totalLeaves === 0 ? 0 : (approvedLeaves / totalLeaves) * 100;
+    const rejectionRate = totalLeaves === 0 ? 0 : (rejectedLeaves / totalLeaves) * 100;
+
+    const lastApprovalRate = lastTotalLeaves === 0 ? 0 : (lastApprovedLeaves / lastTotalLeaves) * 100;
+    const lastRejectionRate = lastTotalLeaves === 0 ? 0 : (lastRejectedLeaves / lastTotalLeaves) * 100;
+
+    const comparisonFromLastMonthValue =
+      lastTotalLeaves === 0 ? 100 : ((totalLeaves - lastTotalLeaves) / lastTotalLeaves) * 100;
+
+    const comparisonFromLastMonthApprovalRateValue =
+      lastApprovalRate === 0 ? 100 : ((approvalRate - lastApprovalRate) / lastApprovalRate) * 100;
+
+    const comparisonFromLastMonthRejectionRateValue =
+      lastRejectionRate === 0 ? 100 : ((rejectionRate - lastRejectionRate) / lastRejectionRate) * 100;
+
+    const monthlyTrends = await this.getMonthlyLeaveTrends(tenantId);
+    const leaveTypes = await this.getLeaveTypesDistribution(tenantId, from, to, month);
+    const departmentLeaves = await this.getDepartmentLeaves(tenantId, from, to, month);
+    const recentRequests = await this.getRecentLeaveRequests(tenantId);
+
+    return {
+      report: {
+        totalLeaves,
+        pendingLeaves,
+        approvedLeaves,
+        rejectedLeaves,
+        comparisonFromLastMonth: `${comparisonFromLastMonthValue >= 0 ? '+' : ''}${comparisonFromLastMonthValue.toFixed(2)}%`,
+        comparisonFromLastMonthApprovalRate: `${comparisonFromLastMonthApprovalRateValue >= 0 ? '+' : ''}${comparisonFromLastMonthApprovalRateValue.toFixed(2)}%`,
+        comparisonFromLastMonthRejectionRate: `${comparisonFromLastMonthRejectionRateValue >= 0 ? '+' : ''}${comparisonFromLastMonthRejectionRateValue.toFixed(2)}%`
+      },
+      monthlyTrends,
+      leaveTypes,
+      departmentLeaves,
+      recentRequests
+    };
+  }
+
+  async getMonthlyLeaveTrends(tenantId: string) {
+    // Last 12 months range
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const endOfYear = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const trends = await this.RequestMangmentModel.aggregate([
+      {
+        $match: {
+          type: 'leave',
+          $or: [
+            {
+              'leaveDetails.from': { $gte: startOfYear, $lte: endOfYear }
+            },
+            {
+              'leaveDetails.to': { $gte: startOfYear, $lte: endOfYear }
+            },
+            {
+              $and: [
+                { 'leaveDetails.from': { $lte: startOfYear } },
+                { 'leaveDetails.to': { $gte: endOfYear } }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employee',
+        },
+      },
+      { $unwind: '$employee' },
+      {
+        $match: {
+          'employee.tenantId': new Types.ObjectId(tenantId),
+        },
+      },
+      {
+        $addFields: {
+          leaveMonth: { $month: '$leaveDetails.from' },
+          leaveYear: { $year: '$leaveDetails.from' },
+          leaveDays: {
+            $add: [
+              {
+                $dateDiff: {
+                  startDate: '$leaveDetails.from',
+                  endDate: '$leaveDetails.to',
+                  unit: 'day',
+                },
+              },
+              1,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: '$leaveYear',
+            month: '$leaveMonth',
+            status: '$workflow.status',
+          },
+          totalLeaves: { $sum: '$leaveDays' },
+        },
+      },
+      {
+        $group: {
+          _id: { year: '$_id.year', month: '$_id.month' },
+          approved: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.status', 'approved'] }, '$totalLeaves', 0],
+            },
+          },
+          rejected: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.status', 'rejected'] }, '$totalLeaves', 0],
+            },
+          },
+          pending: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.status', 'pending'] }, '$totalLeaves', 0],
+            },
+          },
+          totalLeaves: { $sum: '$totalLeaves' },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }, 
+      {
+        $project: {
+          _id: 0,
+          month: {
+            $let: {
+              vars: {
+                months: [
+                  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+                ],
+              },
+              in: {
+                $arrayElemAt: ['$$months', '$_id.month'],
+              },
+            },
+          },
+          requests: '$totalLeaves',
+          approved: '$approved',
+          rejected: '$rejected',
+        },
+      },
+    ]);
+
+    return trends;
+  }
+
+  async getLeaveTypesDistribution(
+    tenantId: string,
+    from?: string,
+    to?: string,
+    month?: string
+  ) {
+    const { startDate, endDate } = this.getDateRangeFromFilters(from, to, month);
+
+    const leaveTypes = await this.RequestMangmentModel.aggregate([
+      {
+        $match: {
+          type: 'leave',
+          $or: [
+            {
+              'leaveDetails.from': { $gte: startDate, $lte: endDate }
+            },
+            {
+              'leaveDetails.to': { $gte: startDate, $lte: endDate }
+            },
+            {
+              $and: [
+                { 'leaveDetails.from': { $lte: startDate } },
+                { 'leaveDetails.to': { $gte: endDate } }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employee'
+        }
+      },
+      { $unwind: '$employee' },
+      {
+        $match: {
+          'employee.tenantId': new Types.ObjectId(tenantId)
+        }
+      },
+      {
+        $addFields: {
+          leaveDays: {
+            $add: [
+              {
+                $dateDiff: {
+                  startDate: '$leaveDetails.from',
+                  endDate: '$leaveDetails.to',
+                  unit: 'day'
+                }
+              },
+              1
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$leaveDetails.leaveType',
+          totalLeaves: { $sum: '$leaveDays' }
+        }
+      }
+    ]);
+
+    const totalLeaves = leaveTypes.reduce((sum, lt) => sum + lt.totalLeaves, 0) || 1;
+
+    const getRandomColor = () => {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    };
+
+    return leaveTypes.map(lt => ({
+      name: lt._id ? lt._id.charAt(0).toUpperCase() + lt._id.slice(1) : 'Unknown',
+      percentage: Number(((lt.totalLeaves / totalLeaves) * 100).toFixed(2)),
+      color: getRandomColor(),
+    }));
+  }
+
+  async getDepartmentLeaves(
+    tenantId: string,
+    from?: string,
+    to?: string,
+    month?: string
+  ) {
+    const { startDate, endDate } = this.getDateRangeFromFilters(from, to, month);
+
+    const departmentLeaves = await this.RequestMangmentModel.aggregate([
+      {
+        $match: {
+          type: 'leave',
+          $or: [
+            {
+              'leaveDetails.from': { $gte: startDate, $lte: endDate }
+            },
+            {
+              'leaveDetails.to': { $gte: startDate, $lte: endDate }
+            },
+            {
+              $and: [
+                { 'leaveDetails.from': { $lte: startDate } },
+                { 'leaveDetails.to': { $gte: endDate } }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employee'
+        }
+      },
+      { $unwind: '$employee' },
+      {
+        $match: {
+          'employee.tenantId': new Types.ObjectId(tenantId)
+        }
+      },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'employee.departmentId',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: '$department' },
+      {
+        $addFields: {
+          leaveDays: {
+            $let: {
+              vars: {
+                adjustedFrom: {
+                  $max: ["$leaveDetails.from", startDate]
+                },
+                adjustedTo: {
+                  $min: ["$leaveDetails.to", endDate]
+                }
+              },
+              in: {
+                $add: [
+                  {
+                    $dateDiff: {
+                      startDate: "$$adjustedFrom",
+                      endDate: "$$adjustedTo",
+                      unit: "day"
+                    }
+                  },
+                  1
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$department.departmentName',
+          leaves: { $sum: '$leaveDays' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          department: '$_id',
+          leaves: 1
+        }
+      },
+      { $sort: { leaves: -1 } }
+    ]);
+
+    return departmentLeaves;
+  }
+
+  async getRecentLeaveRequests(tenantId: string) {
+    return await this.RequestMangmentModel.aggregate([
+      {
+        $match: { type: 'leave' }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'emp'
+        }
+      },
+      { $unwind: '$emp' },
+      {
+        $match: { 'emp.tenantId': new Types.ObjectId(tenantId) }
+      },
+      {
+        $lookup: {
+          from: 'users', // userId se name lane ke liye
+          localField: 'emp.userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'emp.departmentId',
+          foreignField: '_id',
+          as: 'dept'
+        }
+      },
+      { $unwind: '$dept' },
+      {
+        $addFields: {
+          employeeName: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+          departmentName: '$dept.departmentName'
+        }
+      },
+      {
+        $project: {
+          emp: 0, // employee ka pura record hide
+          user: 0, // user ka pura record hide
+          dept: 0  // department ka pura record hide
+        }
+      },
+      { $sort: { appliedDate: -1 } },
+      { $limit: 5 }
+    ]);
+  }
 }

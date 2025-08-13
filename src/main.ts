@@ -39,7 +39,9 @@ async function bootstrap() {
     // CORS configuration - be more specific in production
     app.enableCors({
       origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-frontend-domain.com'] // Replace with your actual frontend URL
+        ? 
+        ['https://your-frontend-domain.com','https://localhost:3001.com'] // Replace with your actual frontend URL
+         // Replace with your actual frontend URL
         : true, // Allow all origins in development
       credentials: true,
     });
