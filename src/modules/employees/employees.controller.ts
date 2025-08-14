@@ -297,7 +297,7 @@ export class EmployeesController {
   async getEmployeeDetails(
     @Param('id') id: string
   ): Promise<any> {
-    return this.employeesService.getEmployeeFullDetails(id);
+    // return this.employeesService.getEmployeeFullDetails(id);
   }
 
 }

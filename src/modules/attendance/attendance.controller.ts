@@ -25,6 +25,7 @@ import { UpdateAttendanceDto } from './dto/update-Attendance.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
+import { Public } from '@/common/decorators/public.decorator';
 
 @ApiTags('Attendance')
 @Controller('attendance')
