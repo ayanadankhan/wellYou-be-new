@@ -280,7 +280,8 @@ export class AttendanceController {
     @CurrentUser() user: User,
     @Query('month') month?: string,
     @Query('from') from?: string,
-    @Query('to') to?: string
+    @Query('to') to?: string,
+    @Query('departmentId') departmentId?: string
   ) {
     try {
       if (!user.tenantId) {
@@ -315,7 +316,8 @@ export class AttendanceController {
         user.tenantId.toString(),
         month,
         from,
-        to
+        to,
+        departmentId
       );
 
       return {
