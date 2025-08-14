@@ -1043,7 +1043,8 @@ private groupAttendanceByEmployee(
     tenantId: string,
     month?: string,
     fromDate?: string,
-    toDate?: string
+    toDate?: string,
+    departmentId?: string
   ) {
     try {
       let filterStart: Date;
@@ -1071,9 +1072,18 @@ private groupAttendanceByEmployee(
         filterStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
         filterEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
       }
-      const employees = await this.employeeModel.find({
-        tenantId: new Types.ObjectId(tenantId)
-      }).select('_id').lean();
+      const filter: any = {
+        tenantId: new Types.ObjectId(tenantId),
+      };
+
+      if (departmentId && Types.ObjectId.isValid(departmentId)) {
+        filter.departmentId = new Types.ObjectId(departmentId);
+      }
+
+      const employees = await this.employeeModel
+        .find(filter)
+        .select('_id')
+        .lean();
 
       const totalEmployees = employees.length;
       if (totalEmployees === 0) {
@@ -1221,12 +1231,40 @@ private groupAttendanceByEmployee(
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
     }
 
+    const start = new Date(Date.UTC(
+      startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), 0, 0, 0, 0
+    ));
+    const end = new Date(Date.UTC(
+      endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate(), 23, 59, 59, 999
+    ));
+
+    const today = new Date();
+    const todayUTC = new Date(Date.UTC(
+      today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999
+    ));
+
+    const effectiveEndForAbsent = end < todayUTC ? end : todayUTC;
+
+    let workingDays = 0;
+    const current = new Date(start);
+    while (current <= end) {
+      if (current.getUTCDay() !== 0) { 
+        workingDays++;
+      }
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    let workingDaysForAbsent = 0;
+    const currentForAbsent = new Date(start);
+    while (currentForAbsent <= effectiveEndForAbsent) {
+      if (currentForAbsent.getUTCDay() !== 0) { 
+        workingDaysForAbsent++;
+      }
+      currentForAbsent.setUTCDate(currentForAbsent.getUTCDate() + 1);
+    }
+
     const markedAttendance = await this.attendanceModel.aggregate([
-      {
-        $match: {
-          date: { $gte: startDate, $lte: endDate }
-        }
-      },
+      { $match: { date: { $gte: start, $lte: end } } },
       {
         $lookup: {
           from: "employees",
@@ -1236,11 +1274,7 @@ private groupAttendanceByEmployee(
         }
       },
       { $unwind: "$employee" },
-      {
-        $match: {
-          "employee.tenantId": new Types.ObjectId(tenantId)
-        }
-      },
+      { $match: { "employee.tenantId": new Types.ObjectId(tenantId) } },
       {
         $lookup: {
           from: "departments",
@@ -1254,13 +1288,7 @@ private groupAttendanceByEmployee(
         $group: {
           _id: "$department.departmentName",
           presentCount: {
-            $sum: {
-              $cond: [
-                { $eq: [{ $toLower: "$status" }, "present"] },
-                1,
-                0
-              ]
-            }
+            $sum: { $cond: [{ $eq: [{ $toLower: "$status" }, "present"] }, 1, 0] }
           }
         }
       }
@@ -1285,18 +1313,22 @@ private groupAttendanceByEmployee(
       }
     ]);
 
-    // Merge results
     return employeesByDept.map(dept => {
-      const attendance = markedAttendance.find(m => m._id === dept._id) || { presentCount: 0 };
-      const absentCount = dept.totalEmployees - attendance.presentCount;
-      const attendanceRate = dept.totalEmployees > 0
-        ? parseFloat(((attendance.presentCount / dept.totalEmployees) * 100).toFixed(2))
+      const present = (markedAttendance.find(m => m._id === dept._id)?.presentCount) ?? 0;
+
+      const totalPossible = dept.totalEmployees * workingDays;
+
+      const totalPossibleForAbsent = dept.totalEmployees * workingDaysForAbsent;
+      const absentCount = Math.max(0, totalPossibleForAbsent - present);
+
+      const attendanceRate = totalPossible > 0
+        ? parseFloat(((present / totalPossible) * 100).toFixed(2))
         : 0;
 
       return {
         department: dept._id || 'Unassigned',
         totalEmployees: dept.totalEmployees,
-        presentCount: attendance.presentCount,
+        presentCount: present,
         absentCount,
         attendanceRate
       };
