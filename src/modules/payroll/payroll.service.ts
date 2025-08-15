@@ -738,11 +738,6 @@ constructor(
 
     const result = await this.payrollModel.aggregate(pipeline).exec();
 
-    console.log("📅 Monthly Payroll Trend Debug");
-    result.forEach((item, i) => {
-      console.log(`${i + 1}: Month = ${item.month}, Payroll = ${item.payroll}, Employees = ${item.employees}`);
-    });
-
     return result;
   }
 
@@ -871,7 +866,7 @@ constructor(
       {
         $project: {
           department: "$_id",
-          regularHours: 1,
+          // regularHours: 1,
           overtimeHours: 1,
           _id: 0
         }
