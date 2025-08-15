@@ -1190,14 +1190,15 @@ private groupAttendanceByEmployee(
       date: { $gte: startDate, $lte: endDate }
     }).lean();
 
-    const trends: { date: string; attendancePercent: number }[] = [];
+    const trends: { date: string; day: string; attendancePercent: number }[] = [];
 
     for (
       let d = new Date(startDate);
       d <= endDate;
       d.setUTCDate(d.getUTCDate() + 1)
     ) {
-      const dateStr = d.toISOString().split('T')[0]; // "YYYY-MM-DD"
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
 
       const dayRecords = attendanceRecords.filter(a => {
         const recDate = new Date(a.date);
@@ -1214,7 +1215,8 @@ private groupAttendanceByEmployee(
         : 0;
 
       trends.push({ 
-        date: dateStr, 
+        date: dateStr,
+        day: dayName,
         attendancePercent 
       });
     }
@@ -1316,7 +1318,7 @@ private groupAttendanceByEmployee(
     return employeesByDept.map(dept => {
       const present = (markedAttendance.find(m => m._id === dept._id)?.presentCount) ?? 0;
 
-      const totalPossible = dept.totalEmployees * workingDays;
+      const totalPossible = dept.totalEmployees * workingDaysForAbsent;      
 
       const totalPossibleForAbsent = dept.totalEmployees * workingDaysForAbsent;
       const absentCount = Math.max(0, totalPossibleForAbsent - present);
@@ -1360,7 +1362,6 @@ private groupAttendanceByEmployee(
           ]
         }
       },
-
       {
         $lookup: {
           from: 'employees',
@@ -1431,7 +1432,9 @@ private groupAttendanceByEmployee(
     return lateCheckIns;
   }
 
-  private async getRecentCorrectionAttendanceRequests(tenantId: string): Promise<any[]> {
+  private async getRecentCorrectionAttendanceRequests(
+    tenantId: string
+  ): Promise<{ totalPending: number; requests: any[] }> {
     if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
     }
@@ -1454,13 +1457,11 @@ private groupAttendanceByEmployee(
       .lean()
       .exec();
 
-    // Filter by tenantId (from employeeId)
     const filtered = records.filter(r => {
       const emp: any = r.employeeId;
       return emp?.tenantId?.toString() === tenantId.toString();
     });
 
-    // Format output
     const formatted = filtered.map(r => {
       const emp: any = r.employeeId;
       const user = emp?.userId;
@@ -1476,7 +1477,10 @@ private groupAttendanceByEmployee(
       };
     });
 
-    return formatted;
+    return {
+      totalPending: formatted.length,
+      requests: formatted
+    };
   }
 
   private async getTodayLeaveRequests(tenantId: string) {
