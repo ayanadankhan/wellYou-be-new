@@ -592,30 +592,30 @@ export class EmployeesService {
         updateData.experiences = Array.from(experienceMap.values());
       }
 
-      // Merge documents array with deduplication
-      if (updateEmployeeDto.documents && Array.isArray(updateEmployeeDto.documents)) {
-        const existingDocuments = existingEmployee.documents || [];
-        const documentMap = new Map();
+      // // Merge documents array with deduplication
+      // if (updateEmployeeDto.documents && Array.isArray(updateEmployeeDto.documents)) {
+      //   const existingDocuments = existingEmployee.documents || [];
+      //   const documentMap = new Map();
         
-        // Add existing documents
-        existingDocuments.forEach(doc => {
-          const docDto = {
-            type: doc.type,
-            name: doc.name,
-            url: doc.url
-          };
-          const key = `${doc.type}-${doc.name}`;
-          documentMap.set(key, docDto);
-        });
+      //   // Add existing documents
+      //   existingDocuments.forEach(doc => {
+      //     const docDto = {
+      //       type: doc.type,
+      //       name: doc.name,
+      //       url: doc.url
+      //     };
+      //     const key = `${doc.type}-${doc.name}`;
+      //     documentMap.set(key, docDto);
+      //   });
         
-        // Add/update new documents
-        updateEmployeeDto.documents.forEach(doc => {
-          const key = `${doc.type}-${doc.name}`;
-          documentMap.set(key, doc);
-        });
+      //   // Add/update new documents
+      //   updateEmployeeDto.documents.forEach(doc => {
+      //     const key = `${doc.type}-${doc.name}`;
+      //     documentMap.set(key, doc);
+      //   });
         
-        updateData.documents = Array.from(documentMap.values());
-      }
+      //   updateData.documents = Array.from(documentMap.values());
+      // }
 
       // Merge dependent members array with deduplication and type conversion
       if (updateEmployeeDto.dependentMembers && Array.isArray(updateEmployeeDto.dependentMembers)) {
