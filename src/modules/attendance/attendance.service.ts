@@ -1606,7 +1606,22 @@ private groupAttendanceByEmployee(
       throw error;
     }
 
-    const totalDaysInPeriod = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const today = new Date();
+    const adjustedEndDate = endDate > today ? today : endDate;
+
+    const totalDays = Math.floor(
+      (adjustedEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+    let totalDaysInPeriod = 0;
+    for (let i = 0; i < totalDays; i++) {
+      const current = new Date(startDate);
+      current.setDate(startDate.getDate() + i);
+      
+      if (current.getDay() !== 0) {
+        totalDaysInPeriod++;
+      }
+    }
     this.logger.log(`Report period: ${startDate.toISOString()} to ${endDate.toISOString()} (${totalDaysInPeriod} days)`);
 
     // --- 2. Build the Aggregation Pipeline ---
