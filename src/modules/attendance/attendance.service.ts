@@ -1190,14 +1190,15 @@ private groupAttendanceByEmployee(
       date: { $gte: startDate, $lte: endDate }
     }).lean();
 
-    const trends: { date: string; attendancePercent: number }[] = [];
+    const trends: { date: string; day: string; attendancePercent: number }[] = [];
 
     for (
       let d = new Date(startDate);
       d <= endDate;
       d.setUTCDate(d.getUTCDate() + 1)
     ) {
-      const dateStr = d.toISOString().split('T')[0]; // "YYYY-MM-DD"
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
 
       const dayRecords = attendanceRecords.filter(a => {
         const recDate = new Date(a.date);
@@ -1214,7 +1215,8 @@ private groupAttendanceByEmployee(
         : 0;
 
       trends.push({ 
-        date: dateStr, 
+        date: dateStr,
+        day: dayName,
         attendancePercent 
       });
     }
