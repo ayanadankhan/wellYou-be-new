@@ -831,42 +831,59 @@ export class EmployeesService {
     };
   }
 
-  private calculateProfileCompletionStats(employees: any[]) {
-    const totalEmployees = employees.length;
+private calculateProfileCompletionStats(employees: any[]) {
+  const totalEmployees = employees.length;
 
-    if (totalEmployees === 0) {
-      return {
-        averageCompletion: 0,
-        incompleteProfiles: 0,
-        topProfiles: [],
-      };
-    }
-
-    const totalProgressSum = employees.reduce(
-      (sum, e) => sum + (e.progress?.totalProgress || 0),
-      0
-    );
-    const average = Math.round(totalProgressSum / totalEmployees);
-
-    const incomplete = employees.filter(
-      e => (e.progress?.totalProgress || 0) < 100
-    ).length;
-
-    const topProfiles = employees
-      .filter(e => typeof e.progress?.totalProgress === 'number')
-      .sort((a, b) => (b.progress?.totalProgress || 0) - (a.progress?.totalProgress || 0))
-      .slice(0, 3)
-      .map(e => ({
-        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-        progress: e.progress?.totalProgress || 0,
-      }));
-
+  if (totalEmployees === 0) {
     return {
-      averageCompletion: average,
-      incompleteProfiles: incomplete,
-      topProfiles,
+      averageCompletion: 0,
+      incompleteProfilesCount: 0,
+      incompleteProfiles: [],
+      topProfiles: [],
     };
   }
+
+  const totalProgressSum = employees.reduce(
+    (sum, e) => sum + (e.progress?.totalProgress || 0),
+    0
+  );
+  const average = Math.round(totalProgressSum / totalEmployees);
+
+  // Incomplete Profiles (less than 70% OR missing progress)
+  const incompleteProfilesArr = employees
+    .filter(
+      e =>
+        typeof e.progress?.totalProgress !== 'number' ||
+        e.progress.totalProgress < 70
+    )
+    .map(e => ({
+      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+      progress: e.progress?.totalProgress ?? 0,
+    }));
+
+  const incompleteProfilesCount = incompleteProfilesArr.length;
+
+  // Top Profiles (highest progress)
+  const topProfiles = employees
+    .filter(e => typeof e.progress?.totalProgress === 'number')
+    .sort(
+      (a, b) =>
+        (b.progress?.totalProgress || 0) - (a.progress?.totalProgress || 0)
+    )
+    .slice(0, 3)
+    .map(e => ({
+      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+      progress: e.progress?.totalProgress || 0,
+    }));
+
+  return {
+    averageCompletion: average,
+    incompleteProfilesCount,
+    incompleteProfiles: incompleteProfilesArr,
+    topProfiles,
+  };
+}
+
 
   private async getCurrentMonthHires(tenantId: string) {
     const currentDate = new Date();
