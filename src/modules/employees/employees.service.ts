@@ -161,14 +161,9 @@ export class EmployeesService {
               $round: [
                 {
                   $avg: [
-                    '$progress.basicInfo',
-                    '$progress.personalInfo',
-                    '$progress.education',
-                    '$progress.certification',
-                    '$progress.employment',
-                    '$progress.experience',
-                    '$progress.skills',
-                    '$progress.documents'
+                    { $ifNull: ["$progress.personalInfo", 0] },
+                    { $ifNull: ["$progress.education", 0] },
+                    { $ifNull: ["$progress.employment", 0] }
                   ]
                 },
                 0
@@ -318,6 +313,22 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
+                {
+          $addFields: {
+            'progress.totalProgress': {
+              $round: [
+                {
+                  $avg: [
+                    { $ifNull: ["$progress.personalInfo", 0] },
+                    { $ifNull: ["$progress.education", 0] },
+                    { $ifNull: ["$progress.employment", 0] }
+                  ]
+                },
+                0
+              ]
+            }
+          }
+        },
         { $project: { 'user.password': 0 } },
         { $limit: 1 }
       ]);
@@ -499,123 +510,6 @@ export class EmployeesService {
         
         updateData.skills = Array.from(skillMap.values());
       }
-
-      if (updateEmployeeDto.certifications && Array.isArray(updateEmployeeDto.certifications)) {
-        const existingCertifications = existingEmployee.certifications || [];
-        const certificationMap = new Map();
-        
-        existingCertifications.forEach(cert => {
-          const certDto = {
-            id: cert.id,
-            name: cert.name,
-            issuingOrganization: cert.issuingOrganization,
-            issueDate: cert.issueDate ? cert.issueDate.toISOString() : undefined,
-            expirationDate: cert.expirationDate ? cert.expirationDate.toISOString() : undefined,
-            credentialId: cert.credentialId,
-            verificationUrl: cert.verificationUrl,
-            hasNoExpiration: cert.hasNoExpiration,
-            description: cert.description
-          };
-          const key = cert.id || cert.name;
-          certificationMap.set(key, certDto);
-        });
-        
-        updateEmployeeDto.certifications.forEach(cert => {
-          const key = cert.id || cert.name;
-          certificationMap.set(key, cert);
-        });
-        
-        updateData.certifications = Array.from(certificationMap.values());
-      }
-
-      // Merge education array with deduplication and type conversion
-      if (updateEmployeeDto.education && Array.isArray(updateEmployeeDto.education)) {
-        const existingEducation = existingEmployee.education || [];
-        const educationMap = new Map();
-        
-        // Add existing education (convert Date to string)
-        existingEducation.forEach(edu => {
-          const eduDto = {
-            id: edu.id,
-            institution: edu.institution,
-            degree: edu.degree,
-            fieldOfStudy: edu.fieldOfStudy,
-            startDate: edu.startDate ? edu.startDate.toISOString() : undefined,
-            endDate: edu.endDate ? edu.endDate.toISOString() : undefined,
-            gpa: edu.gpa,
-            honors: edu.honors,
-            isEnrolled: edu.isEnrolled,
-            description: edu.description
-          };
-          const key = edu.id || `${edu.institution}-${edu.degree}`;
-          educationMap.set(key, eduDto);
-        });
-        
-        // Add/update new education
-        updateEmployeeDto.education.forEach(edu => {
-          const key = edu.id || `${edu.institution}-${edu.degree}`;
-          educationMap.set(key, edu);
-        });
-        
-        updateData.education = Array.from(educationMap.values());
-      }
-
-      // Merge experiences array with deduplication and type conversion
-      if (updateEmployeeDto.experiences && Array.isArray(updateEmployeeDto.experiences)) {
-        const existingExperiences = existingEmployee.experiences || [];
-        const experienceMap = new Map();
-        
-        // Add existing experiences (convert Date to string)
-        existingExperiences.forEach(exp => {
-          const expDto = {
-            id: exp.id,
-            companyName: exp.companyName,
-            position: exp.position,
-            startDate: exp.startDate ? exp.startDate.toISOString() : undefined,
-            endDate: exp.endDate ? exp.endDate.toISOString() : undefined,
-            isCurrentRole: exp.isCurrentRole,
-            description: exp.description,
-            location: exp.location,
-            employmentType: exp.employmentType,
-            achievements: exp.achievements
-          };
-          const key = exp.id || `${exp.companyName}-${exp.position}`;
-          experienceMap.set(key, expDto);
-        });
-        
-        // Add/update new experiences
-        updateEmployeeDto.experiences.forEach(exp => {
-          const key = exp.id || `${exp.companyName}-${exp.position}`;
-          experienceMap.set(key, exp);
-        });
-        
-        updateData.experiences = Array.from(experienceMap.values());
-      }
-
-      // // Merge documents array with deduplication
-      // if (updateEmployeeDto.documents && Array.isArray(updateEmployeeDto.documents)) {
-      //   const existingDocuments = existingEmployee.documents || [];
-      //   const documentMap = new Map();
-        
-      //   // Add existing documents
-      //   existingDocuments.forEach(doc => {
-      //     const docDto = {
-      //       type: doc.type,
-      //       name: doc.name,
-      //       url: doc.url
-      //     };
-      //     const key = `${doc.type}-${doc.name}`;
-      //     documentMap.set(key, docDto);
-      //   });
-        
-      //   // Add/update new documents
-      //   updateEmployeeDto.documents.forEach(doc => {
-      //     const key = `${doc.type}-${doc.name}`;
-      //     documentMap.set(key, doc);
-      //   });
-        
-      //   updateData.documents = Array.from(documentMap.values());
-      // }
 
       // Merge dependent members array with deduplication and type conversion
       if (updateEmployeeDto.dependentMembers && Array.isArray(updateEmployeeDto.dependentMembers)) {
@@ -831,55 +725,62 @@ export class EmployeesService {
     };
   }
 
-  private calculateProfileCompletionStats(employees: any[]) {
-    const totalEmployees = employees.length;
+private calculateProfileCompletionStats(employees: any[]) {
+  const totalEmployees = employees.length;
 
-    if (totalEmployees === 0) {
-      return {
-        averageCompletion: 0,
-        incompleteProfilesCount: 0,
-        incompleteProfiles: [],
-        topProfiles: [],
-      };
-    }
-
-    const totalProgressSum = employees.reduce(
-      (sum, e) => sum + (e.progress?.totalProgress || 0),
-      0
-    );
-    const average = Math.round(totalProgressSum / totalEmployees);
-    const incompleteProfilesArr = employees
-      .filter(
-        e =>
-          e.employmentStatus === 'ACTIVE' &&
-          (
-            typeof e.progress?.totalProgress !== 'number' ||
-            e.progress.totalProgress < 70
-          )
-      )
-      .map(e => ({
-        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-        progress: e.progress?.totalProgress ?? 0,
-      }));
-
-    const topProfiles = employees
-      .filter(e => typeof e.progress?.totalProgress === 'number')
-      .sort(
-        (a, b) =>
-          (b.progress?.totalProgress || 0) - (a.progress?.totalProgress || 0)
-      )
-      .slice(0, 3)
-      .map(e => ({
-        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-        progress: e.progress?.totalProgress || 0,
-      }));
-
+  if (totalEmployees === 0) {
     return {
-      averageCompletion: average,
-      incompleteProfiles: incompleteProfilesArr,
-      topProfiles,
+      averageCompletion: 0,
+      incompleteProfilesCount: 0,
+      incompleteProfiles: [],
+      topProfiles: [],
     };
   }
+
+  // ✅ helper to calculate totalProgress as average
+  const getTotalProgress = (e: any) => {
+    const personal = e.progress?.personalInfo || 0;
+    const education = e.progress?.education || 0;
+    const employment = e.progress?.employment || 0;
+
+    // take average of 3 fields
+    return Math.round((personal + education + employment) / 3);
+  };
+
+  const totalProgressSum = employees.reduce(
+    (sum, e) => sum + getTotalProgress(e),
+    0
+  );
+  const average = Math.round(totalProgressSum / totalEmployees);
+
+  const incompleteProfilesArr = employees
+    .filter(
+      e =>
+        e.employmentStatus === 'ACTIVE' &&
+        getTotalProgress(e) < 70
+    )
+    .map(e => ({
+      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+      progress: getTotalProgress(e),
+    }));
+
+  const topProfiles = employees
+    .sort((a, b) => getTotalProgress(b) - getTotalProgress(a))
+    .slice(0, 3)
+    .map(e => ({
+      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+      progress: getTotalProgress(e),
+    }));
+
+  return {
+    averageCompletion: average,
+    incompleteProfilesCount: incompleteProfilesArr.length,
+    incompleteProfiles: incompleteProfilesArr,
+    topProfiles,
+  };
+}
+
+
 
   private async getCurrentMonthHires(tenantId: string) {
     const currentDate = new Date();
