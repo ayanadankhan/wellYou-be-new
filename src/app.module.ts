@@ -25,6 +25,7 @@ import { CurrencyModule } from './modules/masterTables/currency/currency.module'
 import { PerformanceReviewModule } from './performance-review/performance-review.module';
 import { OffboardingModule } from './modules/offboarding/offboarding.module';
 import { HolidayModule } from './holiday/holiday.module';
+import { RecruitmentModule } from './recruitment/recruitment.module';
 
 
 
@@ -63,6 +64,7 @@ import { HolidayModule } from './holiday/holiday.module';
     PerformanceReviewModule,
     OffboardingModule,
     HolidayModule, 
+    RecruitmentModule,
     // DocumentModule,
     // ExpensesModule,
     // DocumentTypeModule
