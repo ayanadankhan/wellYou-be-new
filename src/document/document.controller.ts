@@ -1,27 +1,29 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { DocumentService } from './document.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { Public } from '@/common/decorators/public.decorator';
 import { Document } from './entities/document.entity';
-import { GetCompanyDto } from '@/modules/tenant/companies/dto/get-company.dto';
 import { GetDocumentDto } from './dto/get-document.dto';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface'; // ✅ same import as service
 
 @Controller('document')
 export class DocumentController {
   constructor(private readonly documentService: DocumentService) {}
 
   @Post()
-  @Public()
-  async create(@Body() createDocumentDto: CreateDocumentDto): Promise<Document> {
-    return await this.documentService.create(createDocumentDto);
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() createDocumentDto: CreateDocumentDto){
+    if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    return this.documentService.create(createDocumentDto, user);
   }
 
   @Get()
-  async findAll(@Query() getDto: GetDocumentDto) {
-    return await this.documentService.findAll(getDto);
+  async findAll(@Query() getDto: GetDocumentDto, @CurrentUser() user : AuthenticatedUser) {
+    return await this.documentService.findAll(getDto , user);
   }
 
+  
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Document | null> {
     return this.documentService.findOne(id);
