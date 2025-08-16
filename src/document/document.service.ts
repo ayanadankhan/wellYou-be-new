@@ -41,7 +41,7 @@ export class DocumentService {
               allowedTypes: savedDoc.allowedTypes || [],
               isDefault: savedDoc.isDefault || false,
               status: savedDoc.status,
-              requireApproval: savedDoc.requireApproval
+              requireApproval: savedDoc.requireApproval || false
             }
             },
           },

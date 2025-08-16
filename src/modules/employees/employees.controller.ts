@@ -81,6 +81,35 @@ export class EmployeesController {
       );
     }
   }
+  
+  @Get('/documents')
+  async findAllEmployeeDocuments(
+    @CurrentUser() user: User, 
+    @Query() getDto: GetEmployeeDto
+  ) {
+    try {
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        if (!user.tenantId) {
+          throw new HttpException(
+            'User does not have tenant access',
+            HttpStatus.FORBIDDEN
+          );
+        }
+        getDto.tenantId = new Types.ObjectId(user.tenantId);
+      }
+
+      return this.employeesService.findAllWithDocuments(getDto);
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee documents',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 
   @Get('user/:userId')
   async findByUserId(@Param('userId') userId: string): Promise<GetEmployeeDto> {

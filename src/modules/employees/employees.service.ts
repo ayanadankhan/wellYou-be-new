@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, PipelineStage, Types } from 'mongoose';
 import { Employee, EmployeeDocument } from './schemas/Employee.schema';
 import { CreateEmployeeDto } from './dto/create-Employee.dto';
 import { UpdateEmployeeDto } from './dto/update-Employee.dto';
@@ -13,6 +13,7 @@ import { UserService } from '../tenant/users/user.service';
 import { CreateUserDto } from '../tenant/users/dto/create-user.dto';
 import { Department } from '../departments/entities/department.entity';
 import { Designation } from '../designations/entities/designation.entity';
+import { GetEmployeeDocumentsDto } from './dto/get-EmployeeDocument.dto';
 
 @Injectable()
 export class EmployeesService {
@@ -209,6 +210,415 @@ export class EmployeesService {
       );
     }
   }
+async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
+  try {
+    this.logger.log(`🔍 Documents aggregation filter: ${JSON.stringify(getDto)}`);
+
+    const matchStage: any = {};
+
+    // Basic filters
+    if (getDto.tenantId) {
+      matchStage.tenantId = new Types.ObjectId(getDto.tenantId);
+    }
+
+    if (getDto.userId) {
+      matchStage.userId = new Types.ObjectId(getDto.userId);
+    }
+
+    if (getDto.departmentId) {
+      matchStage.departmentId = new Types.ObjectId(getDto.departmentId);
+    }
+
+    if (getDto.positionId) {
+      matchStage.positionId = new Types.ObjectId(getDto.positionId);
+    }
+
+    matchStage.employmentStatus = getDto.status || 'ACTIVE';
+
+    const pipeline: any[] = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Name filter (search in firstName, lastName, or full name)
+    if (getDto.name) {
+      const nameRegex = new RegExp(getDto.name, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { 'user.firstName': { $regex: nameRegex } },
+            { 'user.lastName': { $regex: nameRegex } },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+                  regex: nameRegex,
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    // Email filter
+    if (getDto.email) {
+      const emailRegex = new RegExp(getDto.email, 'i');
+      pipeline.push({
+        $match: {
+          'user.email': { $regex: emailRegex }
+        }
+      });
+    }
+
+    // Continue with lookups
+    const commonPipeline = [
+      ...pipeline,
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'departmentId',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'designations',
+          localField: 'positionId',
+          foreignField: '_id',
+          as: 'designation'
+        }
+      },
+      { $unwind: { path: '$designation', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Department filter
+    if (getDto.department) {
+      const deptRegex = new RegExp(getDto.department, 'i');
+      commonPipeline.push({
+        $match: {
+          'department.departmentName': { $regex: deptRegex }
+        }
+      });
+    }
+
+    // Designation filter
+    if (getDto.designation) {
+      const designationRegex = new RegExp(getDto.designation, 'i');
+      commonPipeline.push({
+        $match: {
+          'designation.title': { $regex: designationRegex }
+        }
+      });
+    }
+
+    // Project stage with document processing
+    commonPipeline.push({
+      $project: {
+        _id: 1,
+        name: {
+          $cond: {
+            if: { $and: ['$user.firstName', '$user.lastName'] },
+            then: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+            else: null
+          }
+        },
+        email: '$user.email',
+        profilePicture: '$user.profilePicture',
+        department: { $ifNull: ['$department.departmentName', ''] },
+        designation: { $ifNull: ['$designation.title', ''] },
+        documents: {
+          $cond: {
+            if: { $isArray: '$documents' },
+            then: {
+              $map: {
+                input: '$documents',
+                as: 'doc',
+                in: {
+                  _id: '$$doc._id',
+                  title: { $ifNull: ['$$doc.name', '$$doc.title'] },
+                  name: '$$doc.name',
+                  type: '$$doc.type',
+                  url: '$$doc.url',
+                  documentType: { $ifNull: ['$$doc.documentType', 'general'] },
+                  isDefault: { $ifNull: ['$$doc.isDefault', false] },
+                  requireApproval: { $ifNull: ['$$doc.requireApproval', false] },
+                  allowedTypes: { $ifNull: ['$$doc.allowedTypes', []] },
+                  status: {
+                    $cond: {
+                      if: { 
+                        $and: [
+                          '$$doc.url', 
+                          { $ne: ['$$doc.url', ''] },
+                          { $ne: ['$$doc.url', null] }
+                        ] 
+                      },
+                      then: {
+                        $cond: {
+                          if: { $eq: [{ $ifNull: ['$$doc.requireApproval', false] }, true] },
+                          then: 'uploaded',
+                          else: 'completed'
+                        }
+                      },
+                      else: 'pending'
+                    }
+                  }
+                }
+              }
+            },
+            else: []
+          }
+        }
+      }
+    });
+
+    // Document type filter
+    if (getDto.documentType) {
+      commonPipeline.push({
+        $match: {
+          'documents.documentType': getDto.documentType
+        }
+      });
+    }
+
+    // Document status filter
+    if (getDto.documentStatus) {
+      let filterCondition;
+      
+      if (getDto.documentStatus === 'pending') {
+        filterCondition = {
+          $or: [
+            { $eq: [{ $ifNull: ['$doc.url', ''] }, ''] },
+            { $eq: ['$doc.url', null] },
+            { $not: { $ifNull: ['$doc.url', false] } }
+          ]
+        };
+      } else if (getDto.documentStatus === 'uploaded') {
+        filterCondition = {
+          $and: [
+            { $ne: [{ $ifNull: ['$doc.url', ''] }, ''] },
+            { $ne: ['$doc.url', null] },
+            { $eq: [{ $ifNull: ['$doc.requireApproval', false] }, true] }
+          ]
+        };
+      } else if (getDto.documentStatus === 'completed') {
+        filterCondition = {
+          $and: [
+            { $ne: [{ $ifNull: ['$doc.url', ''] }, ''] },
+            { $ne: ['$doc.url', null] },
+            { $ne: [{ $ifNull: ['$doc.requireApproval', false] }, true] }
+          ]
+        };
+      }
+
+      if (filterCondition) {
+        commonPipeline.push({
+          $match: {
+            $expr: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: { $ifNull: ['$documents', []] },
+                      as: 'doc',
+                      cond: filterCondition
+                    }
+                  }
+                },
+                0
+              ]
+            }
+          }
+        });
+      }
+    }
+
+    // Sorting
+    if (getDto.sb) {
+      const sortDirection = getDto.sd === '1' ? 1 : -1;
+      commonPipeline.push({ $sort: { [getDto.sb]: sortDirection } });
+    }
+
+    // Pagination
+    const offset = Number(getDto.o) || 0;
+    const limit = Number(getDto.l) || 10;
+
+    const [list, countQuery] = await Promise.all([
+      this.employeeModel.aggregate([
+        ...commonPipeline,
+        { $skip: offset },
+        { $limit: limit }
+      ]).exec(),
+      this.employeeModel.aggregate([
+        ...commonPipeline,
+        { $count: 'total' }
+      ]).exec()
+    ]);
+
+    const total = countQuery[0]?.total || 0;
+
+    this.logger.log(`✅ Retrieved ${list.length} employees with documents via aggregation`);
+    
+    return {
+      count: total,
+      list: list || []
+    };
+  } catch (error) {
+    this.logger.error(`❌ Documents aggregation failed: ${error.message}`, error.stack);
+    throw new HttpException(
+      {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: 'Failed to fetch employee documents',
+        message: error.message,
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+  // Alternative method: Get flattened document list with employee info
+  async findAllDocumentsFlattened(getDto: GetEmployeeDocumentsDto) {
+    const {
+      o: offset = 0,
+      l: limit = 10,
+      name,
+      email,
+      department,
+      designation,
+      documentType,
+      status,
+      tenantId
+    } = getDto;
+
+    const matchConditions: any = {};
+    
+    if (tenantId) {
+      matchConditions.tenantId = tenantId;
+    }
+
+    if (name) {
+      matchConditions.name = { $regex: name, $options: 'i' };
+    }
+
+    if (email) {
+      matchConditions.email = { $regex: email, $options: 'i' };
+    }
+
+    if (department) {
+      matchConditions.department = { $regex: department, $options: 'i' };
+    }
+
+    if (designation) {
+      matchConditions.designation = { $regex: designation, $options: 'i' };
+    }
+
+    const pipeline: PipelineStage[] = [
+      { $match: matchConditions },
+      
+      // Only employees with documents
+      {
+        $match: {
+          documents: { $exists: true, $ne: [], $not: { $size: 0 } }
+        }
+      },
+
+      // Unwind documents
+      {
+        $unwind: {
+          path: '$documents',
+          preserveNullAndEmptyArrays: false
+        }
+      }
+    ];
+
+    // Add document type filter if provided
+    if (documentType) {
+      pipeline.push({
+        $match: {
+          'documents.documentType': { $regex: documentType, $options: 'i' }
+        }
+      });
+    }
+
+    // Add status filter if provided
+    if (status) {
+      pipeline.push({
+        $match: {
+          'documents.status': status
+        }
+      });
+    }
+
+    // Continue with projection and sorting
+    pipeline.push(
+      // Project final structure
+      {
+        $project: {
+          _id: '$documents._id',
+          documentTitle: '$documents.title',
+          fileName: '$documents.fileName',
+          fileUrl: '$documents.fileUrl',
+          documentType: '$documents.documentType',
+          status: '$documents.status',
+          uploadedAt: '$documents.uploadedAt',
+          // Employee info
+          employee: {
+            _id: '$_id',
+            name: '$name',
+            email: '$email',
+            profilePicture: '$profilePicture',
+            department: '$department',
+            designation: '$designation'
+          }
+        }
+      },
+
+      // Sort by upload date
+      {
+        $sort: { uploadedAt: -1 }
+      },
+
+      // Pagination
+      {
+        $facet: {
+          documents: [
+            { $skip: offset },
+            { $limit: limit }
+          ],
+          totalCount: [
+            { $count: 'count' }
+          ]
+        }
+      }
+    );
+
+    const result = await this.employeeModel.aggregate(pipeline);
+    
+    const documents = result[0]?.documents || [];
+    const totalCount = result[0]?.totalCount[0]?.count || 0;
+
+    return {
+      documents,
+      count: totalCount,
+      pagination: {
+        offset,
+        limit,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+        currentPage: Math.floor(offset / limit) + 1
+      }
+    };
+  }
+
 
   async findEmployeeIdByUserId(userId: string): Promise<string | null> {
     try {
