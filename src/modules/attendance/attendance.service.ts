@@ -1716,15 +1716,14 @@ private groupAttendanceByEmployee(
     return requests;
   }
 
-  async hrAttendanceReport(
+ async hrAttendanceReport(
     tenantId: string,
     month?: string,
     from?: string,
     to?: string,
   ): Promise<any[]> {
-    this.logger.log(`Starting hrAttendanceReport for tenant: ${tenantId} with filters: month=${month}, from=${from}, to=${to}`);
-    
-    // --- 1. Define the date range based on filters ---
+    this.logger.log(`📊 Starting hrAttendanceReport for tenant: ${tenantId} with filters: month=${month}, from=${from}, to=${to}`);
+    // --- 1. Date range setup ---
     let startDate: Date;
     let endDate: Date;
     const now = new Date();
@@ -1735,8 +1734,8 @@ private groupAttendanceByEmployee(
         if (isNaN(year) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
           throw new BadRequestException('Invalid month format. Please use YYYY-MM.');
         }
-        startDate = new Date(year, monthNum - 1, 1);
-        endDate = new Date(year, monthNum, 0, 23, 59, 59, 999);
+        startDate = new Date(Date.UTC(year, monthNum - 1, 1));
+        endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
       } else if (from && to) {
         startDate = new Date(from);
         endDate = new Date(to);
@@ -1746,47 +1745,39 @@ private groupAttendanceByEmployee(
         if (startDate > endDate) {
           throw new BadRequestException('`From` date cannot be after `To` date.');
         }
-        endDate.setHours(23, 59, 59, 999); // Include the entire end day
+        endDate.setHours(23, 59, 59, 999);
       } else {
-        // Default to current month if no filters are provided
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        startDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+        endDate = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));
       }
     } catch (error) {
-      this.logger.error(`Date filter validation failed: ${error.message}`);
+      this.logger.error(`❌ Date filter validation failed: ${error.message}`);
       throw error;
     }
 
     const today = new Date();
     const adjustedEndDate = endDate > today ? today : endDate;
 
-    const totalDays = Math.floor(
-      (adjustedEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
-
-    let totalDaysInPeriod = 0;
-    for (let i = 0; i < totalDays; i++) {
-      const current = new Date(startDate);
-      current.setDate(startDate.getDate() + i);
-      
-      if (current.getDay() !== 0) {
-        totalDaysInPeriod++;
+    let totalWorkingDays = 0;
+    const currentDate = new Date(startDate);
+    while (currentDate <= adjustedEndDate) {
+      if (currentDate.getDay() !== 0) {
+        totalWorkingDays++;
       }
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-    this.logger.log(`Report period: ${startDate.toISOString()} to ${endDate.toISOString()} (${totalDaysInPeriod} days)`);
+    
+    this.logger.log(`📅 Report period: ${startDate.toISOString()} to ${adjustedEndDate.toISOString()} (${totalWorkingDays} working days)`);
 
-    // --- 2. Build the Aggregation Pipeline ---
     try {
+      this.logger.log('Pipeline Stage 1: Aggregation starting...');
       const report = await this.employeeModel.aggregate([
-        // Stage 1: Filter employees by tenantId and employment status
         {
           $match: {
             tenantId: new Types.ObjectId(tenantId),
             employmentStatus: 'ACTIVE',
           },
         },
-        
-        // Stage 2: Look up user details
         {
           $lookup: {
             from: 'users',
@@ -1796,8 +1787,6 @@ private groupAttendanceByEmployee(
           },
         },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-
-        // Stage 3: Look up department details
         {
           $lookup: {
             from: 'departments',
@@ -1807,8 +1796,6 @@ private groupAttendanceByEmployee(
           },
         },
         { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-        
-        // Stage 4: Look up designation details
         {
           $lookup: {
             from: 'designations',
@@ -1818,28 +1805,15 @@ private groupAttendanceByEmployee(
           },
         },
         { $unwind: { path: '$designation', preserveNullAndEmptyArrays: true } },
-
-        // Stage 5: Look up reporting manager's name
-        {
-          $lookup: {
-            from: 'employees',
-            localField: 'managerId',
-            foreignField: '_id',
-            as: 'manager',
-          },
-        },
-        { $unwind: { path: '$manager', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: 'users',
-            localField: 'manager.userId',
+            localField: 'reportingTo',
             foreignField: '_id',
-            as: 'managerUser',
+            as: 'reportingToUser',
           },
         },
-        { $unwind: { path: '$managerUser', preserveNullAndEmptyArrays: true } },
-
-        // Stage 6: Look up attendance records for the period
+        { $unwind: { path: '$reportingToUser', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: 'attendances',
@@ -1851,7 +1825,9 @@ private groupAttendanceByEmployee(
                     $and: [
                       { $eq: ['$employeeId', '$$employeeId'] },
                       { $gte: ['$date', startDate] },
-                      { $lte: ['$date', endDate] },
+                      { $lte: ['$date', adjustedEndDate] },
+                      // ADDED: New condition to filter by status
+                      { $eq: ['$status', 'Present'] }
                     ],
                   },
                 },
@@ -1860,11 +1836,9 @@ private groupAttendanceByEmployee(
             as: 'attendanceRecords',
           },
         },
-
-        // Stage 7: Look up request records (leave & overtime) for the period
         {
           $lookup: {
-            from: 'requestmangments',
+            from: 'request_management',
             let: { employeeId: '$_id' },
             pipeline: [
               {
@@ -1873,13 +1847,7 @@ private groupAttendanceByEmployee(
                     $and: [
                       { $eq: ['$employeeId', '$$employeeId'] },
                       { $gte: ['$appliedDate', startDate] },
-                      { $lte: ['$appliedDate', endDate] },
-                      {
-                        $or: [
-                          { $eq: ['$type', RequestType.LEAVE] }, // Assuming you have a Leave enum
-                          { $eq: ['$type', RequestType.OVERTIME] }, // Assuming you have an Overtime enum
-                        ],
-                      },
+                      { $lte: ['$appliedDate', adjustedEndDate] },
                     ],
                   },
                 },
@@ -1888,57 +1856,82 @@ private groupAttendanceByEmployee(
             as: 'requestRecords',
           },
         },
-
-        // Stage 8: Group and calculate all metrics
         {
           $project: {
             _id: 0,
             employeeId: '$_id',
-            name: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
-            profilePicture: '$profilePicture',
-            department: '$department.departmentName',
-            designation: '$designation.title',
+            name: {
+              $trim: {
+                input: {
+                  $concat: [
+                    { $ifNull: ['$user.firstName', ''] },
+                    ' ',
+                    { $ifNull: ['$user.lastName', ''] }
+                  ]
+                }
+              }
+            },
+            profilePicture: { $ifNull: ['$profilePicture', ''] },
+            department: { $ifNull: ['$department.departmentName', 'N/A'] },
+            designation: { $ifNull: ['$designation.title', 'N/A'] },
             reportingTo: {
-              $concat: ['$managerUser.firstName', ' ', '$managerUser.lastName']
-            },
-            
-            // --- Attendance & Days Calculations ---
-            totalWorkingDays: totalDaysInPeriod,
-            presentDays: {
-              $size: {
-                $filter: {
-                  input: '$attendanceRecords',
-                  as: 'record',
-                  cond: { $eq: ['$$record.status', 'Present'] },
+              $cond: {
+                if: { $ne: ['$reportingToUser', null] },
+                then: {
+                  $trim: {
+                    input: {
+                      $concat: [
+                        { $ifNull: ['$reportingToUser.firstName', ''] },
+                        ' ',
+                        { $ifNull: ['$reportingToUser.lastName', ''] }
+                      ]
+                    }
+                  }
                 },
-              },
+                else: ''
+              }
             },
-            totalLateArrivals: {
-              $size: {
-                $filter: {
-                  input: '$attendanceRecords',
-                  as: 'record',
-                  cond: {
-                    $and: [
-                      { $eq: ['$$record.status', 'Present'] },
-                      { $gte: [{ $hour: '$$record.checkInTime' }, 9] },
-                      { $gte: [{ $minute: '$$record.checkInTime' }, 30] },
-                    ],
-                  },
-                },
-              },
-            },
+            totalWorkingDays: { $literal: totalWorkingDays },
+            presentDays: { $size: '$attendanceRecords' },
             avgCheckInTime: {
-              $avg: '$attendanceRecords.checkInTime',
+              $cond: [
+                { $eq: [{ $size: '$attendanceRecords' }, 0] },
+                null,
+                {
+                  $dateToString: {
+                    format: '%H:%M',
+                    date: {
+                      $toDate: {
+                        $avg: {
+                          $map: {
+                            input: '$attendanceRecords',
+                            as: 'record',
+                            in: {
+                              $cond: [
+                                { $ne: ['$$record.checkInTime', null] },
+                                { $toLong: '$$record.checkInTime' },
+                                null
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
             },
-            
-            // --- Leave & Absent Days ---
             leaveDays: {
               $size: {
                 $filter: {
                   input: '$requestRecords',
-                  as: 'request',
-                  cond: { $eq: ['$$request.type', RequestType.LEAVE] },
+                  as: 'req',
+                  cond: {
+                    $and: [
+                      { $eq: ['$$req.type', 'leave'] },
+                      { $eq: ['$$req.workflow.status', 'approved'] }
+                    ]
+                  },
                 },
               },
             },
@@ -1946,55 +1939,88 @@ private groupAttendanceByEmployee(
               $size: {
                 $filter: {
                   input: '$requestRecords',
-                  as: 'request',
-                  cond: { $eq: ['$$request.type', RequestType.OVERTIME] },
+                  as: 'req',
+                  cond: {
+                    $and: [
+                      { $eq: ['$$req.type', 'overtime'] },
+                      { $eq: ['$$req.workflow.status', 'approved'] }
+                    ]
+                  },
                 },
               },
             },
             totalOvertimeHours: {
               $sum: {
-                // $filter: {
-                //   input: '$requestRecords',
-                //   as: 'request',
-                //   // cond: { $eq: ['$$request.type', RequestType.OVERTIME'] }
-                //   then: '$$request.overtimeDetails.hours', // Assuming this field exists
-                //   else: 0,
-                // },
+                $map: {
+                  input: {
+                    $filter: {
+                      input: '$requestRecords',
+                      as: 'req',
+                      cond: {
+                        $and: [
+                          { $eq: ['$$req.type', 'overtime'] },
+                          { $eq: ['$$req.workflow.status', 'approved'] }
+                        ]
+                      },
+                    },
+                  },
+                  as: 'ot',
+                  in: { $ifNull: ['$$ot.overtimeDetails.hours', 0] },
+                },
               },
             },
           },
         },
-        
-        // Stage 9: Calculate derived fields
         {
           $addFields: {
             absentDays: {
               $subtract: [
                 '$totalWorkingDays',
-                {
-                  $sum: ['$presentDays', '$leaveDays'],
-                },
-              ],
+                { $add: ['$presentDays', '$leaveDays'] }
+              ]
             },
-          },
-        },
-        {
-          $addFields: {
             attendanceRate: {
               $cond: {
                 if: { $eq: ['$totalWorkingDays', 0] },
                 then: 0,
-                else: { $multiply: [{ $divide: ['$presentDays', '$totalWorkingDays'] }, 100] },
+                else: {
+                  $round: [
+                    { $multiply: [{ $divide: ['$presentDays', '$totalWorkingDays'] }, 100] },
+                    2
+                  ]
+                },
               },
             },
           },
         },
+        {
+          $project: {
+            employeeId: 1,
+            name: 1,
+            profilePicture: 1,
+            department: 1,
+            designation: 1,
+            reportingTo: 1,
+            totalWorkingDays: 1,
+            presentDays: 1,
+            absentDays: 1,
+            leaveDays: 1,
+            overtimeDays: 1,
+            totalOvertimeHours: 1,
+            attendanceRate: 1,
+            avgCheckInTime: 1,
+          },
+        },
+        { $sort: { attendanceRate: -1 } }
       ]);
-
-      this.logger.log(`HR attendance report generated with ${report.length} records.`);
+      this.logger.log(`✅ Aggregation pipeline executed. Records: ${report.length}`);
+      if (report.length > 0) {
+        this.logger.debug(`Sample record: ${JSON.stringify(report[0], null, 2)}`);
+      }
+      this.logger.log(`🎯 HR attendance report generated successfully.`);
       return report;
     } catch (error) {
-      this.logger.error(`Failed to generate HR attendance report due to aggregation error: ${error.message}`, error.stack);
+      this.logger.error(`❌ Failed to generate HR attendance report: ${error.message}`, error.stack);
       throw new HttpException(
         'Failed to generate HR attendance report',
         HttpStatus.INTERNAL_SERVER_ERROR,
