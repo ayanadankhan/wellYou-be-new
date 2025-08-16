@@ -27,6 +27,7 @@ import { DocumentModule } from './document/document.module';
 
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { DocumentTypeModule } from './modules/document-type/document-type.module';
+import { SurveyModule } from './modules/survey/survey.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { DocumentTypeModule } from './modules/document-type/document-type.module
     CurrencyModule,
     DocumentModule,
     ExpensesModule,
-    DocumentTypeModule
+    DocumentTypeModule,
+    SurveyModule
   ]
 })export class AppModule { }
