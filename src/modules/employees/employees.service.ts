@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, PipelineStage, Types } from 'mongoose';
 import { Employee, EmployeeDocument } from './schemas/Employee.schema';
 import { CreateEmployeeDto } from './dto/create-Employee.dto';
 import { UpdateEmployeeDto } from './dto/update-Employee.dto';
@@ -13,6 +13,7 @@ import { UserService } from '../tenant/users/user.service';
 import { CreateUserDto } from '../tenant/users/dto/create-user.dto';
 import { Department } from '../departments/entities/department.entity';
 import { Designation } from '../designations/entities/designation.entity';
+import { GetEmployeeDocumentsDto } from './dto/get-EmployeeDocument.dto';
 
 @Injectable()
 export class EmployeesService {
@@ -161,14 +162,9 @@ export class EmployeesService {
               $round: [
                 {
                   $avg: [
-                    '$progress.basicInfo',
-                    '$progress.personalInfo',
-                    '$progress.education',
-                    '$progress.certification',
-                    '$progress.employment',
-                    '$progress.experience',
-                    '$progress.skills',
-                    '$progress.documents'
+                    { $ifNull: ["$progress.personalInfo", 0] },
+                    { $ifNull: ["$progress.education", 0] },
+                    { $ifNull: ["$progress.employment", 0] }
                   ]
                 },
                 0
@@ -214,6 +210,415 @@ export class EmployeesService {
       );
     }
   }
+async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
+  try {
+    this.logger.log(`🔍 Documents aggregation filter: ${JSON.stringify(getDto)}`);
+
+    const matchStage: any = {};
+
+    // Basic filters
+    if (getDto.tenantId) {
+      matchStage.tenantId = new Types.ObjectId(getDto.tenantId);
+    }
+
+    if (getDto.userId) {
+      matchStage.userId = new Types.ObjectId(getDto.userId);
+    }
+
+    if (getDto.departmentId) {
+      matchStage.departmentId = new Types.ObjectId(getDto.departmentId);
+    }
+
+    if (getDto.positionId) {
+      matchStage.positionId = new Types.ObjectId(getDto.positionId);
+    }
+
+    matchStage.employmentStatus = getDto.status || 'ACTIVE';
+
+    const pipeline: any[] = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Name filter (search in firstName, lastName, or full name)
+    if (getDto.name) {
+      const nameRegex = new RegExp(getDto.name, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { 'user.firstName': { $regex: nameRegex } },
+            { 'user.lastName': { $regex: nameRegex } },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+                  regex: nameRegex,
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    // Email filter
+    if (getDto.email) {
+      const emailRegex = new RegExp(getDto.email, 'i');
+      pipeline.push({
+        $match: {
+          'user.email': { $regex: emailRegex }
+        }
+      });
+    }
+
+    // Continue with lookups
+    const commonPipeline = [
+      ...pipeline,
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'departmentId',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'designations',
+          localField: 'positionId',
+          foreignField: '_id',
+          as: 'designation'
+        }
+      },
+      { $unwind: { path: '$designation', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Department filter
+    if (getDto.department) {
+      const deptRegex = new RegExp(getDto.department, 'i');
+      commonPipeline.push({
+        $match: {
+          'department.departmentName': { $regex: deptRegex }
+        }
+      });
+    }
+
+    // Designation filter
+    if (getDto.designation) {
+      const designationRegex = new RegExp(getDto.designation, 'i');
+      commonPipeline.push({
+        $match: {
+          'designation.title': { $regex: designationRegex }
+        }
+      });
+    }
+
+    // Project stage with document processing
+    commonPipeline.push({
+      $project: {
+        _id: 1,
+        name: {
+          $cond: {
+            if: { $and: ['$user.firstName', '$user.lastName'] },
+            then: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+            else: null
+          }
+        },
+        email: '$user.email',
+        profilePicture: '$user.profilePicture',
+        department: { $ifNull: ['$department.departmentName', ''] },
+        designation: { $ifNull: ['$designation.title', ''] },
+        documents: {
+          $cond: {
+            if: { $isArray: '$documents' },
+            then: {
+              $map: {
+                input: '$documents',
+                as: 'doc',
+                in: {
+                  _id: '$$doc._id',
+                  title: { $ifNull: ['$$doc.name', '$$doc.title'] },
+                  name: '$$doc.name',
+                  type: '$$doc.type',
+                  url: '$$doc.url',
+                  documentType: { $ifNull: ['$$doc.documentType', 'general'] },
+                  isDefault: { $ifNull: ['$$doc.isDefault', false] },
+                  requireApproval: { $ifNull: ['$$doc.requireApproval', false] },
+                  allowedTypes: { $ifNull: ['$$doc.allowedTypes', []] },
+                  status: {
+                    $cond: {
+                      if: { 
+                        $and: [
+                          '$$doc.url', 
+                          { $ne: ['$$doc.url', ''] },
+                          { $ne: ['$$doc.url', null] }
+                        ] 
+                      },
+                      then: {
+                        $cond: {
+                          if: { $eq: [{ $ifNull: ['$$doc.requireApproval', false] }, true] },
+                          then: 'uploaded',
+                          else: 'completed'
+                        }
+                      },
+                      else: 'pending'
+                    }
+                  }
+                }
+              }
+            },
+            else: []
+          }
+        }
+      }
+    });
+
+    // Document type filter
+    if (getDto.documentType) {
+      commonPipeline.push({
+        $match: {
+          'documents.documentType': getDto.documentType
+        }
+      });
+    }
+
+    // Document status filter
+    if (getDto.documentStatus) {
+      let filterCondition;
+      
+      if (getDto.documentStatus === 'pending') {
+        filterCondition = {
+          $or: [
+            { $eq: [{ $ifNull: ['$doc.url', ''] }, ''] },
+            { $eq: ['$doc.url', null] },
+            { $not: { $ifNull: ['$doc.url', false] } }
+          ]
+        };
+      } else if (getDto.documentStatus === 'uploaded') {
+        filterCondition = {
+          $and: [
+            { $ne: [{ $ifNull: ['$doc.url', ''] }, ''] },
+            { $ne: ['$doc.url', null] },
+            { $eq: [{ $ifNull: ['$doc.requireApproval', false] }, true] }
+          ]
+        };
+      } else if (getDto.documentStatus === 'completed') {
+        filterCondition = {
+          $and: [
+            { $ne: [{ $ifNull: ['$doc.url', ''] }, ''] },
+            { $ne: ['$doc.url', null] },
+            { $ne: [{ $ifNull: ['$doc.requireApproval', false] }, true] }
+          ]
+        };
+      }
+
+      if (filterCondition) {
+        commonPipeline.push({
+          $match: {
+            $expr: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: { $ifNull: ['$documents', []] },
+                      as: 'doc',
+                      cond: filterCondition
+                    }
+                  }
+                },
+                0
+              ]
+            }
+          }
+        });
+      }
+    }
+
+    // Sorting
+    if (getDto.sb) {
+      const sortDirection = getDto.sd === '1' ? 1 : -1;
+      commonPipeline.push({ $sort: { [getDto.sb]: sortDirection } });
+    }
+
+    // Pagination
+    const offset = Number(getDto.o) || 0;
+    const limit = Number(getDto.l) || 10;
+
+    const [list, countQuery] = await Promise.all([
+      this.employeeModel.aggregate([
+        ...commonPipeline,
+        { $skip: offset },
+        { $limit: limit }
+      ]).exec(),
+      this.employeeModel.aggregate([
+        ...commonPipeline,
+        { $count: 'total' }
+      ]).exec()
+    ]);
+
+    const total = countQuery[0]?.total || 0;
+
+    this.logger.log(`✅ Retrieved ${list.length} employees with documents via aggregation`);
+    
+    return {
+      count: total,
+      list: list || []
+    };
+  } catch (error) {
+    this.logger.error(`❌ Documents aggregation failed: ${error.message}`, error.stack);
+    throw new HttpException(
+      {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: 'Failed to fetch employee documents',
+        message: error.message,
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+  // Alternative method: Get flattened document list with employee info
+  async findAllDocumentsFlattened(getDto: GetEmployeeDocumentsDto) {
+    const {
+      o: offset = 0,
+      l: limit = 10,
+      name,
+      email,
+      department,
+      designation,
+      documentType,
+      status,
+      tenantId
+    } = getDto;
+
+    const matchConditions: any = {};
+    
+    if (tenantId) {
+      matchConditions.tenantId = tenantId;
+    }
+
+    if (name) {
+      matchConditions.name = { $regex: name, $options: 'i' };
+    }
+
+    if (email) {
+      matchConditions.email = { $regex: email, $options: 'i' };
+    }
+
+    if (department) {
+      matchConditions.department = { $regex: department, $options: 'i' };
+    }
+
+    if (designation) {
+      matchConditions.designation = { $regex: designation, $options: 'i' };
+    }
+
+    const pipeline: PipelineStage[] = [
+      { $match: matchConditions },
+      
+      // Only employees with documents
+      {
+        $match: {
+          documents: { $exists: true, $ne: [], $not: { $size: 0 } }
+        }
+      },
+
+      // Unwind documents
+      {
+        $unwind: {
+          path: '$documents',
+          preserveNullAndEmptyArrays: false
+        }
+      }
+    ];
+
+    // Add document type filter if provided
+    if (documentType) {
+      pipeline.push({
+        $match: {
+          'documents.documentType': { $regex: documentType, $options: 'i' }
+        }
+      });
+    }
+
+    // Add status filter if provided
+    if (status) {
+      pipeline.push({
+        $match: {
+          'documents.status': status
+        }
+      });
+    }
+
+    // Continue with projection and sorting
+    pipeline.push(
+      // Project final structure
+      {
+        $project: {
+          _id: '$documents._id',
+          documentTitle: '$documents.title',
+          fileName: '$documents.fileName',
+          fileUrl: '$documents.fileUrl',
+          documentType: '$documents.documentType',
+          status: '$documents.status',
+          uploadedAt: '$documents.uploadedAt',
+          // Employee info
+          employee: {
+            _id: '$_id',
+            name: '$name',
+            email: '$email',
+            profilePicture: '$profilePicture',
+            department: '$department',
+            designation: '$designation'
+          }
+        }
+      },
+
+      // Sort by upload date
+      {
+        $sort: { uploadedAt: -1 }
+      },
+
+      // Pagination
+      {
+        $facet: {
+          documents: [
+            { $skip: offset },
+            { $limit: limit }
+          ],
+          totalCount: [
+            { $count: 'count' }
+          ]
+        }
+      }
+    );
+
+    const result = await this.employeeModel.aggregate(pipeline);
+    
+    const documents = result[0]?.documents || [];
+    const totalCount = result[0]?.totalCount[0]?.count || 0;
+
+    return {
+      documents,
+      count: totalCount,
+      pagination: {
+        offset,
+        limit,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+        currentPage: Math.floor(offset / limit) + 1
+      }
+    };
+  }
+
 
   async findEmployeeIdByUserId(userId: string): Promise<string | null> {
     try {
@@ -318,6 +723,22 @@ export class EmployeesService {
           },
         },
         { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
+                {
+          $addFields: {
+            'progress.totalProgress': {
+              $round: [
+                {
+                  $avg: [
+                    { $ifNull: ["$progress.personalInfo", 0] },
+                    { $ifNull: ["$progress.education", 0] },
+                    { $ifNull: ["$progress.employment", 0] }
+                  ]
+                },
+                0
+              ]
+            }
+          }
+        },
         { $project: { 'user.password': 0 } },
         { $limit: 1 }
       ]);
@@ -499,123 +920,6 @@ export class EmployeesService {
         
         updateData.skills = Array.from(skillMap.values());
       }
-
-      if (updateEmployeeDto.certifications && Array.isArray(updateEmployeeDto.certifications)) {
-        const existingCertifications = existingEmployee.certifications || [];
-        const certificationMap = new Map();
-        
-        existingCertifications.forEach(cert => {
-          const certDto = {
-            id: cert.id,
-            name: cert.name,
-            issuingOrganization: cert.issuingOrganization,
-            issueDate: cert.issueDate ? cert.issueDate.toISOString() : undefined,
-            expirationDate: cert.expirationDate ? cert.expirationDate.toISOString() : undefined,
-            credentialId: cert.credentialId,
-            verificationUrl: cert.verificationUrl,
-            hasNoExpiration: cert.hasNoExpiration,
-            description: cert.description
-          };
-          const key = cert.id || cert.name;
-          certificationMap.set(key, certDto);
-        });
-        
-        updateEmployeeDto.certifications.forEach(cert => {
-          const key = cert.id || cert.name;
-          certificationMap.set(key, cert);
-        });
-        
-        updateData.certifications = Array.from(certificationMap.values());
-      }
-
-      // Merge education array with deduplication and type conversion
-      if (updateEmployeeDto.education && Array.isArray(updateEmployeeDto.education)) {
-        const existingEducation = existingEmployee.education || [];
-        const educationMap = new Map();
-        
-        // Add existing education (convert Date to string)
-        existingEducation.forEach(edu => {
-          const eduDto = {
-            id: edu.id,
-            institution: edu.institution,
-            degree: edu.degree,
-            fieldOfStudy: edu.fieldOfStudy,
-            startDate: edu.startDate ? edu.startDate.toISOString() : undefined,
-            endDate: edu.endDate ? edu.endDate.toISOString() : undefined,
-            gpa: edu.gpa,
-            honors: edu.honors,
-            isEnrolled: edu.isEnrolled,
-            description: edu.description
-          };
-          const key = edu.id || `${edu.institution}-${edu.degree}`;
-          educationMap.set(key, eduDto);
-        });
-        
-        // Add/update new education
-        updateEmployeeDto.education.forEach(edu => {
-          const key = edu.id || `${edu.institution}-${edu.degree}`;
-          educationMap.set(key, edu);
-        });
-        
-        updateData.education = Array.from(educationMap.values());
-      }
-
-      // Merge experiences array with deduplication and type conversion
-      if (updateEmployeeDto.experiences && Array.isArray(updateEmployeeDto.experiences)) {
-        const existingExperiences = existingEmployee.experiences || [];
-        const experienceMap = new Map();
-        
-        // Add existing experiences (convert Date to string)
-        existingExperiences.forEach(exp => {
-          const expDto = {
-            id: exp.id,
-            companyName: exp.companyName,
-            position: exp.position,
-            startDate: exp.startDate ? exp.startDate.toISOString() : undefined,
-            endDate: exp.endDate ? exp.endDate.toISOString() : undefined,
-            isCurrentRole: exp.isCurrentRole,
-            description: exp.description,
-            location: exp.location,
-            employmentType: exp.employmentType,
-            achievements: exp.achievements
-          };
-          const key = exp.id || `${exp.companyName}-${exp.position}`;
-          experienceMap.set(key, expDto);
-        });
-        
-        // Add/update new experiences
-        updateEmployeeDto.experiences.forEach(exp => {
-          const key = exp.id || `${exp.companyName}-${exp.position}`;
-          experienceMap.set(key, exp);
-        });
-        
-        updateData.experiences = Array.from(experienceMap.values());
-      }
-
-      // // Merge documents array with deduplication
-      // if (updateEmployeeDto.documents && Array.isArray(updateEmployeeDto.documents)) {
-      //   const existingDocuments = existingEmployee.documents || [];
-      //   const documentMap = new Map();
-        
-      //   // Add existing documents
-      //   existingDocuments.forEach(doc => {
-      //     const docDto = {
-      //       type: doc.type,
-      //       name: doc.name,
-      //       url: doc.url
-      //     };
-      //     const key = `${doc.type}-${doc.name}`;
-      //     documentMap.set(key, docDto);
-      //   });
-        
-      //   // Add/update new documents
-      //   updateEmployeeDto.documents.forEach(doc => {
-      //     const key = `${doc.type}-${doc.name}`;
-      //     documentMap.set(key, doc);
-      //   });
-        
-      //   updateData.documents = Array.from(documentMap.values());
-      // }
 
       // Merge dependent members array with deduplication and type conversion
       if (updateEmployeeDto.dependentMembers && Array.isArray(updateEmployeeDto.dependentMembers)) {
@@ -831,55 +1135,62 @@ export class EmployeesService {
     };
   }
 
-  private calculateProfileCompletionStats(employees: any[]) {
-    const totalEmployees = employees.length;
+private calculateProfileCompletionStats(employees: any[]) {
+  const totalEmployees = employees.length;
 
-    if (totalEmployees === 0) {
-      return {
-        averageCompletion: 0,
-        incompleteProfilesCount: 0,
-        incompleteProfiles: [],
-        topProfiles: [],
-      };
-    }
-
-    const totalProgressSum = employees.reduce(
-      (sum, e) => sum + (e.progress?.totalProgress || 0),
-      0
-    );
-    const average = Math.round(totalProgressSum / totalEmployees);
-    const incompleteProfilesArr = employees
-      .filter(
-        e =>
-          e.employmentStatus === 'ACTIVE' &&
-          (
-            typeof e.progress?.totalProgress !== 'number' ||
-            e.progress.totalProgress < 70
-          )
-      )
-      .map(e => ({
-        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-        progress: e.progress?.totalProgress ?? 0,
-      }));
-
-    const topProfiles = employees
-      .filter(e => typeof e.progress?.totalProgress === 'number')
-      .sort(
-        (a, b) =>
-          (b.progress?.totalProgress || 0) - (a.progress?.totalProgress || 0)
-      )
-      .slice(0, 3)
-      .map(e => ({
-        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-        progress: e.progress?.totalProgress || 0,
-      }));
-
+  if (totalEmployees === 0) {
     return {
-      averageCompletion: average,
-      incompleteProfiles: incompleteProfilesArr,
-      topProfiles,
+      averageCompletion: 0,
+      incompleteProfilesCount: 0,
+      incompleteProfiles: [],
+      topProfiles: [],
     };
   }
+
+  // ✅ helper to calculate totalProgress as average
+  const getTotalProgress = (e: any) => {
+    const personal = e.progress?.personalInfo || 0;
+    const education = e.progress?.education || 0;
+    const employment = e.progress?.employment || 0;
+
+    // take average of 3 fields
+    return Math.round((personal + education + employment) / 3);
+  };
+
+  const totalProgressSum = employees.reduce(
+    (sum, e) => sum + getTotalProgress(e),
+    0
+  );
+  const average = Math.round(totalProgressSum / totalEmployees);
+
+  const incompleteProfilesArr = employees
+    .filter(
+      e =>
+        e.employmentStatus === 'ACTIVE' &&
+        getTotalProgress(e) < 70
+    )
+    .map(e => ({
+      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+      progress: getTotalProgress(e),
+    }));
+
+  const topProfiles = employees
+    .sort((a, b) => getTotalProgress(b) - getTotalProgress(a))
+    .slice(0, 3)
+    .map(e => ({
+      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+      progress: getTotalProgress(e),
+    }));
+
+  return {
+    averageCompletion: average,
+    incompleteProfilesCount: incompleteProfilesArr.length,
+    incompleteProfiles: incompleteProfilesArr,
+    topProfiles,
+  };
+}
+
+
 
   private async getCurrentMonthHires(tenantId: string) {
     const currentDate = new Date();

@@ -227,6 +227,10 @@ class DocumentDto {
 
   @IsBoolean()
   @IsOptional()
+  requireApproval: boolean;  
+
+  @IsBoolean()
+  @IsOptional()
   status: boolean; 
   
   @IsArray()

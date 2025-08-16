@@ -1144,6 +1144,10 @@ private groupAttendanceByEmployee(
         filterStart,
         filterEnd
       );
+
+      const todayDepartmentWiseAttendance = await this.getTodayDepartmentWiseAttendance(tenantId);
+
+      const tenantMonthToDateAttendance = await this.getTenantMonthlyAttendanceSummary(tenantId);
       
       const currentMonthLateCheckIns = await this.getCurrentMonthLateCheckIns(
         tenantId,
@@ -1160,7 +1164,9 @@ private groupAttendanceByEmployee(
         todayAttendanceRate,
         MTDAttendanceRate,
         monthlyAttendanceTrends,
+        tenantMonthToDateAttendance,
         departmentWiseAttendance,
+        todayDepartmentWiseAttendance,
         currentMonthLateCheckIns,
         recentCorrectionAttendanceRequests,
         todayLeaveRequests
@@ -1222,6 +1228,74 @@ private groupAttendanceByEmployee(
     }
 
     return trends;
+  }
+
+  private async getTenantMonthlyAttendanceSummary(tenantId: string) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const today = new Date();
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+    let workingDays = 0;
+    const current = new Date(start);
+    while (current <= end) {
+      if (current.getUTCDay() !== 0) {
+        workingDays++;
+      }
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    const employees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) }).select('_id').lean();
+    const totalEmployees = employees.length;
+
+    if (totalEmployees === 0) {
+      return {
+        totalEmployees: 0,
+        totalPresent: 0,
+        totalAbsent: 0,
+        attendanceRate: 0,
+        workingDays
+      };
+    }
+
+    const employeeIds = employees.map(e => e._id);
+
+    // Attendance aggregate for whole month till today
+    const markedAttendance = await this.attendanceModel.aggregate([
+      {
+        $match: {
+          employeeId: { $in: employeeIds },
+          date: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          presentCount: {
+            $sum: { $cond: [{ $eq: [{ $toLower: "$status" }, "present"] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const totalPresent = markedAttendance.length > 0 ? markedAttendance[0].presentCount : 0;
+
+    const totalPossible = totalEmployees * workingDays;
+    const totalAbsent = Math.max(0, totalPossible - totalPresent);
+
+    const attendanceRate = totalPossible > 0
+      ? parseFloat(((totalPresent / totalPossible) * 100).toFixed(2))
+      : 0;
+
+    return {
+      totalEmployees,
+      workingDays,
+      totalPresent,
+      totalAbsent,
+      attendanceRate
+    };
   }
 
   private async getDepartmentWiseAttendance(
@@ -1332,6 +1406,83 @@ private groupAttendanceByEmployee(
         totalEmployees: dept.totalEmployees,
         presentCount: present,
         absentCount,
+        attendanceRate
+      };
+    });
+  }
+
+  private async getTodayDepartmentWiseAttendance(tenantId: string) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const today = new Date();
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0, 0));
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+
+    const markedAttendance = await this.attendanceModel.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "employeeId",
+          foreignField: "_id",
+          as: "employee"
+        }
+      },
+      { $unwind: "$employee" },
+      { $match: { "employee.tenantId": new Types.ObjectId(tenantId) } },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "employee.departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          presentCount: {
+            $sum: { $cond: [{ $eq: [{ $toLower: "$status" }, "present"] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const employeesByDept = await this.employeeModel.aggregate([
+      { $match: { tenantId: new Types.ObjectId(tenantId) } },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          totalEmployees: { $sum: 1 }
+        }
+      }
+    ]);
+
+    return employeesByDept.map(dept => {
+      const present = (markedAttendance.find(m => m._id === dept._id)?.presentCount) ?? 0;
+      const absent = Math.max(0, dept.totalEmployees - present);
+
+      const attendanceRate = dept.totalEmployees > 0
+        ? parseFloat(((present / dept.totalEmployees) * 100).toFixed(2))
+        : 0;
+
+      return {
+        department: dept._id || 'Unassigned',
+        totalEmployees: dept.totalEmployees,
+        presentCount: present,
+        absentCount: absent,
         attendanceRate
       };
     });

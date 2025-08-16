@@ -25,6 +25,9 @@ class Document {
   @Prop({ type: Boolean, default: false })
   isDefault: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  requireApproval: boolean;
+
   @Prop({ type: String, enum: Status, default: Status.PENDING })
   status: Status;
 
