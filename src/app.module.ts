@@ -28,6 +28,8 @@ import { DocumentModule } from './document/document.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { DocumentTypeModule } from './modules/document-type/document-type.module';
 import { SurveyModule } from './modules/survey/survey.module';
+import { QuestionSurveyModule } from './modules/question-survey/question-survey.module';
+import { AnswerSurveyModule } from './modules/answer-survey/answer-survey.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { SurveyModule } from './modules/survey/survey.module';
     DocumentModule,
     ExpensesModule,
     DocumentTypeModule,
-    SurveyModule
+    SurveyModule,
+    QuestionSurveyModule,
+    AnswerSurveyModule
   ]
 })export class AppModule { }
