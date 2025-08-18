@@ -26,7 +26,7 @@ export class GetEmployeeDocumentsDto extends GetApiDto {
 
   @IsOptional()
   @IsString()
-  documentStatus?: string; // 'pending', 'uploaded', 'completed'
+  documentStatus?: string;
 
   @IsOptional()
   @IsString()

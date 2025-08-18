@@ -33,14 +33,10 @@ export class GetDocumentDto extends GetApiDto {
     @IsOptional()
     isDefault?: boolean;
 
-    @IsBoolean()
     @IsOptional()
-    @Type(() => Boolean)
-    isExpiry: boolean;
+    isExpiry?: boolean;
 
-    @IsBoolean()
     @IsOptional()
-    @Type(() => Boolean)
     requireApproval?: boolean;
 
     @IsArray()
