@@ -77,6 +77,21 @@ export class RequestMangmentController {
     );
   }
 
+  @Get('overTime/report')
+  async getOverTimeReport(
+    @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('month') month?: string
+  ) {
+    return this.requestMangmentervice.getCurrentMonthOverTimeReport(
+      user?.tenantId.toString(),
+      from,
+      to,
+      month
+    );
+  }
+
   @Get(':id')
   async findOne(
     @Param('id') id: string,
