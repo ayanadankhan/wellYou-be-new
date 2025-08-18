@@ -13,7 +13,7 @@ export class Survey extends Document {
   departmentName: string;
 
   @Prop({ required: true })
-  description: string;
+  instruction: string;
 }
 
 export const SurveySchema = SchemaFactory.createForClass(Survey);

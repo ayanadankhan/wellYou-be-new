@@ -1016,4 +1016,185 @@ export class requestMangmentervice {
       { $limit: 5 }
     ]);
   }
+
+  async getCurrentMonthOverTimeReport(
+    tenantId: string,
+    from?: string,
+    to?: string,
+    month?: string
+  ) {
+    this.logger.log(`📌 TenantId received for overtime: ${tenantId}`);
+
+    const { startDate, endDate } = this.getDateRangeFromFilters(from, to, month);
+
+    const overtimeSummary = await this.RequestMangmentModel.aggregate([
+      {
+        $match: {
+          type: 'overtime',
+          appliedDate: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employee'
+        }
+      },
+      { $unwind: '$employee' },
+      {
+        $match: { 'employee.tenantId': new Types.ObjectId(tenantId) }
+      },
+      {
+        $group: {
+          _id: null,
+          totalOverTimeApplicants: { $addToSet: '$employeeId' },
+          totalOverTimeHours: { $sum: '$overtimeDetails.totalHour' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalOverTimeApplicants: { $size: '$totalOverTimeApplicants' },
+          totalOverTimeHours: 1,
+          totalOvertimeAmount: { $literal: 0 }
+        }
+      }
+    ]);
+
+    const departmentOvertime = await this.RequestMangmentModel.aggregate([
+      {
+        $match: {
+          type: 'overtime',
+          appliedDate: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'emp'
+        }
+      },
+      { $unwind: '$emp' },
+      {
+        $match: { 'emp.tenantId': new Types.ObjectId(tenantId) }
+      },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'emp.departmentId',
+          foreignField: '_id',
+          as: 'dept'
+        }
+      },
+      { $unwind: '$dept' },
+      {
+        $group: {
+          _id: '$dept.departmentName',
+          overtimeHours: { $sum: '$overtimeDetails.totalHour' },
+          totalApplicants: { $addToSet: '$employeeId' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          department: '$_id',
+          overtimeHours: 1,
+          totalApplicants: { $size: '$totalApplicants' },
+          totalOvertimeAmount: { $literal: 0 }
+        }
+      },
+      { $sort: { overtimeHours: -1 } }
+    ]);
+
+    const recentOvertimeAgg = await this.RequestMangmentModel.aggregate([
+      {
+        $match: { 
+          type: 'overtime',
+          'workflow.status': 'pending',
+          appliedDate: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'emp'
+        }
+      },
+      { $unwind: '$emp' },
+      {
+        $match: { 'emp.tenantId': new Types.ObjectId(tenantId) }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'emp.userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'emp.departmentId',
+          foreignField: '_id',
+          as: 'dept'
+        }
+      },
+      { $unwind: '$dept' },
+      {
+        $addFields: {
+          employeeName: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+          department: '$dept.departmentName',
+          overtimeDate: '$appliedDate',
+          overtimeReason: '$overtimeDetails.reason'
+        }
+      },
+      {
+        $project: {
+          emp: 0,
+          user: 0,
+          dept: 0
+        }
+      },
+      {
+        $facet: {
+          totalCount: [{ $count: "count" }],
+          latestRequests: [
+            { $sort: { appliedDate: -1 } },
+            { $limit: 3 }
+          ]
+        }
+      },
+      {
+        $project: {
+          totalCount: { $arrayElemAt: ["$totalCount.count", 0] },
+          latestRequests: 1
+        }
+      }
+    ]);
+
+    const recentOvertime = {
+      totalCount: recentOvertimeAgg[0]?.totalCount || 0,
+      latestRequests: recentOvertimeAgg[0]?.latestRequests || []
+    };
+
+    return {
+      employeeOvertimeData: {
+        ...(overtimeSummary[0] || {
+          totalOverTimeApplicants: 0,
+          totalOverTimeHours: 0,
+          totalOvertimeAmount: 0
+        }),
+        departmentOvertime,
+        recentOvertime,
+      }
+    };
+  }
 }

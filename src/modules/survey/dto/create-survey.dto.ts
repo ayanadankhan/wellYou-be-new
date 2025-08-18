@@ -11,5 +11,5 @@ export class CreateSurveyDto {
 
   @IsString()
   @IsNotEmpty()
-  description: string;
+  instruction: string;
 }
