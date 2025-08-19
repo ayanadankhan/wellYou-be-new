@@ -1,18 +1,24 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateAnswerSurveyDto {
   @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
   surveyId: string;
 
-  @ApiProperty({
-    type: [Object],
-    example: [{ questionId: 'questionId1', answer: '4' }],
-  })
-  answers: {
-    questionId: string;
-    answer: string;
-  }[];
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  questionId: string;
 
   @ApiProperty()
-  token: string;
+  @IsNotEmpty()
+  @IsString()
+  answer: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  userId: string; // Used for token generation but won't be stored
 }

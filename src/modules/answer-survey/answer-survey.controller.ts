@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { AnswerSurveyService } from './answer-survey.service';
 import { CreateAnswerSurveyDto } from './dto/create-answer-survey.dto';
@@ -29,6 +30,22 @@ export class AnswerSurveyController {
   @Get('survey/:surveyId')
   findBySurveyId(@Param('surveyId') surveyId: string) {
     return this.answerSurveyService.findBySurveyId(surveyId);
+  }
+
+  @Get('stats/:surveyId')
+  getSurveyStats(@Param('surveyId') surveyId: string) {
+    return this.answerSurveyService.getSurveyAnswerStats(surveyId);
+  }
+
+  @Get('user/:userId')
+  findUserAnswers(
+    @Param('userId') userId: string,
+    @Query('surveyId') surveyId: string
+  ) {
+    if (!surveyId) {
+      throw new BadRequestException('surveyId query parameter is required');
+    }
+    return this.answerSurveyService.findUserAnswers(surveyId, userId);
   }
 
   @Get('token/:token')
