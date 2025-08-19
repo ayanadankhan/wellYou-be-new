@@ -27,6 +27,10 @@ export class CreateDocumentDto {
 
   @IsString()
   @IsOptional()
+  instruction: string;
+
+  @IsString()
+  @IsOptional()
   templateUrl: string;
 
   @IsBoolean()
