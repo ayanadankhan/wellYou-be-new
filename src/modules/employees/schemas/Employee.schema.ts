@@ -22,6 +22,9 @@ class Document {
   @Prop({ type: String, required: false })
   title: string;
 
+  @Prop({ type: String, required: false })
+  instruction: string;
+
   @Prop({ type: Boolean, default: false })
   isDefault: boolean;
 

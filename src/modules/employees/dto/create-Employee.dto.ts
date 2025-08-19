@@ -221,6 +221,10 @@ class DocumentDto {
   @IsOptional()
   title: string;
 
+  @IsString()
+  @IsOptional()
+  instruction: string;
+
   @IsBoolean()
   @IsOptional()
   isDefault: boolean;
