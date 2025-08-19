@@ -38,6 +38,7 @@ export class DocumentService {
               documentId: savedDoc._id,
               name: savedDoc.title,
               documentType: savedDoc.documentType,
+              instruction: savedDoc.instruction,
               allowedTypes: savedDoc.allowedTypes || [],
               isDefault: savedDoc.isDefault || false,
               status: savedDoc.status,
@@ -113,7 +114,7 @@ export class DocumentService {
       throw new BadRequestException('Failed to retrieve companies');
     }
   }
-
+  
 
   async findOne(id: string): Promise<Document | null> {
     return this.docRequestModel.findById(id).exec();
@@ -134,24 +135,40 @@ export class DocumentService {
       // Sirf same tenant ke employees nikalna
       const employees = await this.employeeModel.find({ tenantId });
 
-      const bulkOps = employees.map((emp: any) => ({
-        updateOne: {
-          filter: { _id: emp._id, tenantId },
-          update: {
-            $addToSet: {
-              documents: {
-                documentId: updatedDoc._id,
-                name: updatedDoc.title,
-                documentType: updatedDoc.documentType,
-                allowedTypes: updatedDoc.allowedTypes || [],
-                isDefault: updatedDoc.isDefault || false,
-                status: updatedDoc.status,
-                requireApproval: updatedDoc.requireApproval || false,
-              },
-            },
-          },
+      // Pehle existing documents ko remove karo, phir nayi add karo
+      const bulkOps = employees.flatMap((emp: any) => [
+        // Remove existing document if it exists
+        {
+          updateOne: {
+            filter: { _id: emp._id, tenantId },
+            update: {
+              $pull: {
+                documents: { documentId: updatedDoc._id }
+              }
+            }
+          }
         },
-      }));
+        // Add updated document
+        {
+          updateOne: {
+            filter: { _id: emp._id, tenantId },
+            update: {
+              $push: {
+                documents: {
+                  documentId: updatedDoc._id,
+                  name: updatedDoc.title,
+                  instruction: updatedDoc.instruction,
+                  documentType: updatedDoc.documentType,
+                  allowedTypes: updatedDoc.allowedTypes || [],
+                  isDefault: updatedDoc.isDefault || false,
+                  status: updatedDoc.status,
+                  requireApproval: updatedDoc.requireApproval || false,
+                }
+              }
+            }
+          }
+        }
+      ]);
 
       if (bulkOps.length > 0) {
         await this.employeeModel.bulkWrite(bulkOps);
@@ -159,11 +176,7 @@ export class DocumentService {
     }
 
     return updatedDoc;
-  }
-
-  // async update(id: string, updateDto: UpdateDocumentDto): Promise<Document | null> {
-  //   return this.docRequestModel.findByIdAndUpdate(id, updateDto, { new: true }).exec();
-  // }
+}
 
   async remove(id: string): Promise<Document | null> {
     return this.docRequestModel.findByIdAndDelete(id).exec();
