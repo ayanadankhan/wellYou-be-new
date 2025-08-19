@@ -25,47 +25,47 @@ export class EmployeesService {
     @InjectModel(Department.name) private readonly departmentModel: Model<Department>,
     @InjectModel(Designation.name) private readonly designationModel: Model<Designation>,
     private userService: UserService,
-  ) {}
+  ) { }
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<GetEmployeeDto> {
-      try {
-          this.logger.log(`Creating employee with data: ${JSON.stringify(createEmployeeDto)}`);
+    try {
+      this.logger.log(`Creating employee with data: ${JSON.stringify(createEmployeeDto)}`);
 
-          const createUserDto = new CreateUserDto();
-          createUserDto.firstName = createEmployeeDto.firstName;
-          createUserDto.lastName = createEmployeeDto.lastName;
-          createUserDto.email = createEmployeeDto.email;
-          createUserDto.password = createEmployeeDto.password;
-          createUserDto.role = createEmployeeDto.role;
-          createUserDto.tenantId = createEmployeeDto.tenantId.toString();
-          createUserDto.permissions = createEmployeeDto.permissions;
+      const createUserDto = new CreateUserDto();
+      createUserDto.firstName = createEmployeeDto.firstName;
+      createUserDto.lastName = createEmployeeDto.lastName;
+      createUserDto.email = createEmployeeDto.email;
+      createUserDto.password = createEmployeeDto.password;
+      createUserDto.role = createEmployeeDto.role;
+      createUserDto.tenantId = createEmployeeDto.tenantId.toString();
+      createUserDto.permissions = createEmployeeDto.permissions;
 
-          const createdUser : any = await this.userService.create(createUserDto);
-          this.logger.log(`User created with ID: ${createdUser._id}`);
+      const createdUser: any = await this.userService.create(createUserDto);
+      this.logger.log(`User created with ID: ${createdUser._id}`);
 
-          const employeeData = {
-              ...createEmployeeDto,
-              userId: createdUser._id.toString()
-          };
+      const employeeData = {
+        ...createEmployeeDto,
+        userId: createdUser._id.toString()
+      };
 
-          const employee = new this.employeeModel(employeeData);
-          const savedEmployee = await employee.save();
+      const employee = new this.employeeModel(employeeData);
+      const savedEmployee = await employee.save();
 
-          return plainToClass(GetEmployeeDto, savedEmployee.toObject());
-      } catch (error) {
-          this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-          throw new HttpException(
-              {
-                  status: HttpStatus.BAD_REQUEST,
-                  error: 'Failed to create employee',
-                  message: error.message,
-              },
-              HttpStatus.BAD_REQUEST,
-          );
-      }
+      return plainToClass(GetEmployeeDto, savedEmployee.toObject());
+    } catch (error) {
+      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Failed to create employee',
+          message: error.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  async findAll (getDto: GetEmployeeDto): Promise<{ count: number; list: GetEmployeeDto[] }> {
+  async findAll(getDto: GetEmployeeDto): Promise<{ count: number; list: GetEmployeeDto[] }> {
     try {
       this.logger.log(`🔍 Aggregation filter: ${JSON.stringify(getDto)}`);
 
@@ -194,10 +194,10 @@ export class EmployeesService {
       ]);
 
       this.logger.log(`✅ Retrieved ${list.length} employees via aggregation`);
-        return {
-          count: countQuery[0]?.total || 0,
-          list: list || [],
-        };
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
     } catch (error) {
       this.logger.error(`❌ Aggregation failed: ${error.message}`, error.stack);
       throw new HttpException(
@@ -210,281 +210,61 @@ export class EmployeesService {
       );
     }
   }
-async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
-  try {
-    this.logger.log(`🔍 Documents aggregation filter: ${JSON.stringify(getDto)}`);
 
-    const matchStage: any = {};
+  async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
+    try {
+      const matchStage: any = {};
 
-    // Basic filters
-    if (getDto.tenantId) {
-      matchStage.tenantId = new Types.ObjectId(getDto.tenantId);
-    }
-
-    if (getDto.userId) {
-      matchStage.userId = new Types.ObjectId(getDto.userId);
-    }
-
-    if (getDto.departmentId) {
-      matchStage.departmentId = new Types.ObjectId(getDto.departmentId);
-    }
-
-    if (getDto.positionId) {
-      matchStage.positionId = new Types.ObjectId(getDto.positionId);
-    }
-
-    matchStage.employmentStatus = getDto.status || 'ACTIVE';
-
-    const pipeline: any[] = [
-      { $match: matchStage },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
-    ];
-
-    // Name filter (search in firstName, lastName, or full name)
-    if (getDto.name) {
-      const nameRegex = new RegExp(getDto.name, 'i');
-      pipeline.push({
-        $match: {
-          $or: [
-            { 'user.firstName': { $regex: nameRegex } },
-            { 'user.lastName': { $regex: nameRegex } },
-            {
-              $expr: {
-                $regexMatch: {
-                  input: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
-                  regex: nameRegex,
-                },
-              },
+      const [list, count] = await Promise.all([
+        this.employeeModel.aggregate([
+          {
+            $lookup: {
+              from: "users",
+              localField: "userId",
+              foreignField: "_id",
+              as: "user",
             },
-          ],
-        },
-      });
-    }
-
-    // Email filter
-    if (getDto.email) {
-      const emailRegex = new RegExp(getDto.email, 'i');
-      pipeline.push({
-        $match: {
-          'user.email': { $regex: emailRegex }
-        }
-      });
-    }
-
-    // Continue with lookups
-    const commonPipeline = [
-      ...pipeline,
-      {
-        $lookup: {
-          from: 'departments',
-          localField: 'departmentId',
-          foreignField: '_id',
-          as: 'department'
-        }
-      },
-      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: 'designations',
-          localField: 'positionId',
-          foreignField: '_id',
-          as: 'designation'
-        }
-      },
-      { $unwind: { path: '$designation', preserveNullAndEmptyArrays: true } }
-    ];
-
-    // Department filter
-    if (getDto.department) {
-      const deptRegex = new RegExp(getDto.department, 'i');
-      commonPipeline.push({
-        $match: {
-          'department.departmentName': { $regex: deptRegex }
-        }
-      });
-    }
-
-    // Designation filter
-    if (getDto.designation) {
-      const designationRegex = new RegExp(getDto.designation, 'i');
-      commonPipeline.push({
-        $match: {
-          'designation.title': { $regex: designationRegex }
-        }
-      });
-    }
-
-    // Project stage with document processing
-    commonPipeline.push({
-      $project: {
-        _id: 1,
-        name: {
-          $cond: {
-            if: { $and: ['$user.firstName', '$user.lastName'] },
-            then: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
-            else: null
-          }
-        },
-        email: '$user.email',
-        profilePicture: '$user.profilePicture',
-        department: { $ifNull: ['$department.departmentName', ''] },
-        designation: { $ifNull: ['$designation.title', ''] },
-        documents: {
-          $cond: {
-            if: { $isArray: '$documents' },
-            then: {
-              $map: {
-                input: '$documents',
-                as: 'doc',
-                in: {
-                  _id: '$$doc._id',
-                  title: { $ifNull: ['$$doc.name', '$$doc.title'] },
-                  name: '$$doc.name',
-                  type: '$$doc.type',
-                  url: '$$doc.url',
-                  documentType: { $ifNull: ['$$doc.documentType', 'general'] },
-                  isDefault: { $ifNull: ['$$doc.isDefault', false] },
-                  requireApproval: { $ifNull: ['$$doc.requireApproval', false] },
-                  allowedTypes: { $ifNull: ['$$doc.allowedTypes', []] },
-                  status: {
-                    $cond: {
-                      if: { 
-                        $and: [
-                          '$$doc.url', 
-                          { $ne: ['$$doc.url', ''] },
-                          { $ne: ['$$doc.url', null] }
-                        ] 
-                      },
-                      then: {
-                        $cond: {
-                          if: { $eq: [{ $ifNull: ['$$doc.requireApproval', false] }, true] },
-                          then: 'uploaded',
-                          else: 'completed'
-                        }
-                      },
-                      else: 'pending'
-                    }
-                  }
-                }
-              }
+          },
+          { $unwind: "$user" },
+          {
+            $project: {
+              _id: 1,
+              userId: 1,
+              name: { $concat: ["$user.firstName", " ", "$user.lastName"] },
+              email: "$user.email",
+              gender: 1,
+              phoneNumber: 1,
+              location: 1,
+              employmentStatus: 1,
+              profilePicture: 1,
+              documents: 1,
             },
-            else: []
-          }
-        }
-      }
-    });
+          },
+          { $skip: Number(getDto.o) || 0 },
+          { $limit: Number(getDto.l) || 10 },
+        ]).exec(),
 
-    // Document type filter
-    if (getDto.documentType) {
-      commonPipeline.push({
-        $match: {
-          'documents.documentType': getDto.documentType
-        }
-      });
+        this.employeeModel.countDocuments().exec(),
+      ]);
+
+      return {
+        list,
+        count,
+      };
+
+
+    } catch (error) {
+      this.logger.error(`❌ Documents aggregation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee documents',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-
-    // Document status filter
-    if (getDto.documentStatus) {
-      let filterCondition;
-      
-      if (getDto.documentStatus === 'pending') {
-        filterCondition = {
-          $or: [
-            { $eq: [{ $ifNull: ['$doc.url', ''] }, ''] },
-            { $eq: ['$doc.url', null] },
-            { $not: { $ifNull: ['$doc.url', false] } }
-          ]
-        };
-      } else if (getDto.documentStatus === 'uploaded') {
-        filterCondition = {
-          $and: [
-            { $ne: [{ $ifNull: ['$doc.url', ''] }, ''] },
-            { $ne: ['$doc.url', null] },
-            { $eq: [{ $ifNull: ['$doc.requireApproval', false] }, true] }
-          ]
-        };
-      } else if (getDto.documentStatus === 'completed') {
-        filterCondition = {
-          $and: [
-            { $ne: [{ $ifNull: ['$doc.url', ''] }, ''] },
-            { $ne: ['$doc.url', null] },
-            { $ne: [{ $ifNull: ['$doc.requireApproval', false] }, true] }
-          ]
-        };
-      }
-
-      if (filterCondition) {
-        commonPipeline.push({
-          $match: {
-            $expr: {
-              $gt: [
-                {
-                  $size: {
-                    $filter: {
-                      input: { $ifNull: ['$documents', []] },
-                      as: 'doc',
-                      cond: filterCondition
-                    }
-                  }
-                },
-                0
-              ]
-            }
-          }
-        });
-      }
-    }
-
-    // Sorting
-    if (getDto.sb) {
-      const sortDirection = getDto.sd === '1' ? 1 : -1;
-      commonPipeline.push({ $sort: { [getDto.sb]: sortDirection } });
-    }
-
-    // Pagination
-    const offset = Number(getDto.o) || 0;
-    const limit = Number(getDto.l) || 10;
-
-    const [list, countQuery] = await Promise.all([
-      this.employeeModel.aggregate([
-        ...commonPipeline,
-        { $skip: offset },
-        { $limit: limit }
-      ]).exec(),
-      this.employeeModel.aggregate([
-        ...commonPipeline,
-        { $count: 'total' }
-      ]).exec()
-    ]);
-
-    const total = countQuery[0]?.total || 0;
-
-    this.logger.log(`✅ Retrieved ${list.length} employees with documents via aggregation`);
-    
-    return {
-      count: total,
-      list: list || []
-    };
-  } catch (error) {
-    this.logger.error(`❌ Documents aggregation failed: ${error.message}`, error.stack);
-    throw new HttpException(
-      {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        error: 'Failed to fetch employee documents',
-        message: error.message,
-      },
-      HttpStatus.INTERNAL_SERVER_ERROR
-    );
   }
-}
   // Alternative method: Get flattened document list with employee info
   async findAllDocumentsFlattened(getDto: GetEmployeeDocumentsDto) {
     const {
@@ -500,7 +280,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
     } = getDto;
 
     const matchConditions: any = {};
-    
+
     if (tenantId) {
       matchConditions.tenantId = tenantId;
     }
@@ -523,7 +303,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
 
     const pipeline: PipelineStage[] = [
       { $match: matchConditions },
-      
+
       // Only employees with documents
       {
         $match: {
@@ -602,7 +382,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
     );
 
     const result = await this.employeeModel.aggregate(pipeline);
-    
+
     const documents = result[0]?.documents || [];
     const totalCount = result[0]?.totalCount[0]?.count || 0;
 
@@ -626,49 +406,49 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
       this.logger.log(`UserId type: ${typeof userId}, length: ${userId.length}`);
 
       const mongoose = require('mongoose');
-    
+
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-      this.logger.warn(`Invalid ObjectId format: ${userId}`);
-      return null;
+        this.logger.warn(`Invalid ObjectId format: ${userId}`);
+        return null;
       }
-    
+
       const userObjectId = new mongoose.Types.ObjectId(userId);
       this.logger.log(`Converted userId to ObjectId: ${userObjectId}`);
 
-      const employee = await this.employeeModel.findOne({ 
-      userId: userObjectId 
-    }).select('_id userId');
-    
-    if (!employee) {
-      this.logger.warn(`No employee found with userId: ${userId}`);
-      
-      // Debug: Let's check what employees exist
-      const totalEmployees = await this.employeeModel.countDocuments();
-      this.logger.log(`Total employees in collection: ${totalEmployees}`);
-      
-      if (totalEmployees > 0) {
-        // Get a sample employee to see the data structure
-        const sampleEmployee = await this.employeeModel.findOne().select('_id userId');
-        
-        // Check if any employee has this userId (even with different types)
-        const employeeWithStringUserId = await this.employeeModel.findOne({ 
-          userId: userId // Try as string
-        }).select('_id userId');
-        
-        this.logger.log(`Employee found with string userId: ${employeeWithStringUserId ? 'Yes' : 'No'}`);
+      const employee = await this.employeeModel.findOne({
+        userId: userObjectId
+      }).select('_id userId');
+
+      if (!employee) {
+        this.logger.warn(`No employee found with userId: ${userId}`);
+
+        // Debug: Let's check what employees exist
+        const totalEmployees = await this.employeeModel.countDocuments();
+        this.logger.log(`Total employees in collection: ${totalEmployees}`);
+
+        if (totalEmployees > 0) {
+          // Get a sample employee to see the data structure
+          const sampleEmployee = await this.employeeModel.findOne().select('_id userId');
+
+          // Check if any employee has this userId (even with different types)
+          const employeeWithStringUserId = await this.employeeModel.findOne({
+            userId: userId // Try as string
+          }).select('_id userId');
+
+          this.logger.log(`Employee found with string userId: ${employeeWithStringUserId ? 'Yes' : 'No'}`);
+        }
+
+        return null;
       }
-      
-      return null;
+
+      this.logger.log(`Employee found - _id: ${employee._id}, userId: ${employee.userId}`);
+      return employee._id.toString();
+
+    } catch (error) {
+      this.logger.error(`Error finding employee ID for userId ${userId}: ${error.message}`, error.stack);
+      throw error;
     }
-    
-    this.logger.log(`Employee found - _id: ${employee._id}, userId: ${employee.userId}`);
-    return employee._id.toString();
-    
-  } catch (error) {
-    this.logger.error(`Error finding employee ID for userId ${userId}: ${error.message}`, error.stack);
-    throw error;
   }
-}
 
   async findOne(id: string): Promise<GetEmployeeDto> {
     try {
@@ -684,7 +464,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
         );
       }
       this.logger.log(`Fetching employee with ID: ${id}`);
-      
+
       const employee = await this.employeeModel.aggregate([
         { $match: { _id: new Types.ObjectId(id) } },
         {
@@ -723,7 +503,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
           },
         },
         { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
-                {
+        {
           $addFields: {
             'progress.totalProgress': {
               $round: [
@@ -773,88 +553,88 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
   }
 
   async findByUserId(userId: string): Promise<GetEmployeeDto> {
-      try {
-        this.logger.log(`Fetching employee with userId: ${userId}`);
-        
-        const employee = await this.employeeModel.aggregate([
-          { $match: { userId: new Types.ObjectId(userId) } },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'userId',
-              foreignField: '_id',
-              as: 'user',
-            },
-          },
-          { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'departments',
-              localField: 'departmentId',
-              foreignField: '_id',
-              as: 'department',
-            },
-          },
-          { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'designations',
-              localField: 'positionId',
-              foreignField: '_id',
-              as: 'position',
-            },
-          },
-          { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'reportingTo',
-              foreignField: '_id',
-              as: 'reportingTo',
-            },
-          },
-          { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
-          {
-            $lookup: {
-              from: 'salaries',
-              localField: '_id',
-              foreignField: 'employeesId',
-              as: 'salary',
-            },
-          },
-          { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
-          { $project: { 'user.password': 0 } },
-          { $limit: 1 }
-        ]);
+    try {
+      this.logger.log(`Fetching employee with userId: ${userId}`);
 
-        if (!employee || employee.length === 0) {
-          this.logger.warn(`Employee with userId ${userId} not found`);
-          throw new HttpException(
-            {
-              status: HttpStatus.NOT_FOUND,
-              error: 'Employee not found',
-              message: `Employee with userId ${userId} does not exist`,
-            },
-            HttpStatus.NOT_FOUND,
-          );
-        }
-        this.logger.log(`Employee with userId ${userId} retrieved successfully`);
-        return plainToClass(GetEmployeeDto, employee[0]);
-      } catch (error) {
-        this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
-        if (error instanceof HttpException) {
-          throw error;
-        }
+      const employee = await this.employeeModel.aggregate([
+        { $match: { userId: new Types.ObjectId(userId) } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'departments',
+            localField: 'departmentId',
+            foreignField: '_id',
+            as: 'department',
+          },
+        },
+        { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'designations',
+            localField: 'positionId',
+            foreignField: '_id',
+            as: 'position',
+          },
+        },
+        { $unwind: { path: '$position', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'reportingTo',
+            foreignField: '_id',
+            as: 'reportingTo',
+          },
+        },
+        { $unwind: { path: '$reportingTo', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'salaries',
+            localField: '_id',
+            foreignField: 'employeesId',
+            as: 'salary',
+          },
+        },
+        { $unwind: { path: '$salary', preserveNullAndEmptyArrays: true } },
+        { $project: { 'user.password': 0 } },
+        { $limit: 1 }
+      ]);
+
+      if (!employee || employee.length === 0) {
+        this.logger.warn(`Employee with userId ${userId} not found`);
         throw new HttpException(
           {
-            status: HttpStatus.INTERNAL_SERVER_ERROR,
-            error: 'Failed to fetch employee',
-            message: error.message,
+            status: HttpStatus.NOT_FOUND,
+            error: 'Employee not found',
+            message: `Employee with userId ${userId} does not exist`,
           },
-          HttpStatus.INTERNAL_SERVER_ERROR,
+          HttpStatus.NOT_FOUND,
         );
       }
+      this.logger.log(`Employee with userId ${userId} retrieved successfully`);
+      return plainToClass(GetEmployeeDto, employee[0]);
+    } catch (error) {
+      this.logger.error(`Failed to fetch employee with userId ${userId}: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch employee',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<GetEmployeeDto> {
     try {
@@ -905,7 +685,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
       if (updateEmployeeDto.skills && Array.isArray(updateEmployeeDto.skills)) {
         const existingSkills = existingEmployee.skills || [];
         const skillMap = new Map();
-        
+
         existingSkills.forEach(skill => {
           const skillDto = {
             name: skill.name,
@@ -913,11 +693,11 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
           };
           skillMap.set(skill.name, skillDto);
         });
-        
+
         updateEmployeeDto.skills.forEach(skill => {
           skillMap.set(skill.name, skill);
         });
-        
+
         updateData.skills = Array.from(skillMap.values());
       }
 
@@ -925,7 +705,7 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
       if (updateEmployeeDto.dependentMembers && Array.isArray(updateEmployeeDto.dependentMembers)) {
         const existingDependents = existingEmployee.dependentMembers || [];
         const dependentMap = new Map();
-        
+
         // Add existing dependents (convert Date to string)
         existingDependents.forEach(dep => {
           const depDto = {
@@ -936,13 +716,13 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
           const key = `${dep.name}-${dep.relation}`;
           dependentMap.set(key, depDto);
         });
-        
+
         // Add/update new dependents
         updateEmployeeDto.dependentMembers.forEach(dep => {
           const key = `${dep.name}-${dep.relation}`;
           dependentMap.set(key, dep);
         });
-        
+
         updateData.dependentMembers = Array.from(dependentMap.values());
       }
 
@@ -1017,10 +797,10 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
   }
 
   async generateEmployeeReport(tenantId: string) {
-  const employees = await this.employeeModel
-    .find({ tenantId })
-    .populate('userId', 'firstName lastName')
-    .lean();
+    const employees = await this.employeeModel
+      .find({ tenantId })
+      .populate('userId', 'firstName lastName')
+      .lean();
 
     const departments = await this.departmentModel.find().lean();
     const designations = await this.designationModel.find().lean();
@@ -1075,35 +855,35 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
         dob.getMonth() === currentDate.getMonth() &&
         dob.getDate() >= currentDate.getDate()
       ) {
-      upcomingBirthdays.push({
-        name:
-          (employee.userId?.firstName || '') +
-          ' ' +
-          (employee.userId?.lastName || 'Unnamed'),
-        date: dob.toISOString().split('T')[0],
-      });
+        upcomingBirthdays.push({
+          name:
+            (employee.userId?.firstName || '') +
+            ' ' +
+            (employee.userId?.lastName || 'Unnamed'),
+          date: dob.toISOString().split('T')[0],
+        });
       }
     });
 
-      const next30Days = new Date();
-      next30Days.setDate(currentDate.getDate() + 30);
+    const next30Days = new Date();
+    next30Days.setDate(currentDate.getDate() + 30);
 
-      const certificationsExpiringSoon: any[] = [];
+    const certificationsExpiringSoon: any[] = [];
 
-      employees.forEach((employee: any) => {
-        (employee.certifications || []).forEach((cert: any) => {
-          const expiry = new Date(cert.expirationDate);
+    employees.forEach((employee: any) => {
+      (employee.certifications || []).forEach((cert: any) => {
+        const expiry = new Date(cert.expirationDate);
 
-          // Check if expiry is within the next 30 days
-          if (expiry >= currentDate && expiry <= next30Days) {
-            certificationsExpiringSoon.push({
-              employeeName: `${employee.userId?.firstName || ''} ${employee.userId?.lastName || ''}`.trim() || 'Unnamed',
-              certName: cert.name || 'No Certification Name',
-              expirationDate: expiry.toISOString().split('T')[0], // YYYY-MM-DD
-            });
-          }
-        });
+        // Check if expiry is within the next 30 days
+        if (expiry >= currentDate && expiry <= next30Days) {
+          certificationsExpiringSoon.push({
+            employeeName: `${employee.userId?.firstName || ''} ${employee.userId?.lastName || ''}`.trim() || 'Unnamed',
+            certName: cert.name || 'No Certification Name',
+            expirationDate: expiry.toISOString().split('T')[0], // YYYY-MM-DD
+          });
+        }
       });
+    });
 
     const profileStats = await this.calculateProfileCompletionStats(employees);
 
@@ -1135,60 +915,60 @@ async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
     };
   }
 
-private calculateProfileCompletionStats(employees: any[]) {
-  const totalEmployees = employees.length;
+  private calculateProfileCompletionStats(employees: any[]) {
+    const totalEmployees = employees.length;
 
-  if (totalEmployees === 0) {
+    if (totalEmployees === 0) {
+      return {
+        averageCompletion: 0,
+        incompleteProfilesCount: 0,
+        incompleteProfiles: [],
+        topProfiles: [],
+      };
+    }
+
+    // ✅ helper to calculate totalProgress as average
+    const getTotalProgress = (e: any) => {
+      const personal = e.progress?.personalInfo || 0;
+      const education = e.progress?.education || 0;
+      const employment = e.progress?.employment || 0;
+
+      // take average of 3 fields
+      return Math.round((personal + education + employment) / 3);
+    };
+
+    const totalProgressSum = employees.reduce(
+      (sum, e) => sum + getTotalProgress(e),
+      0
+    );
+    const average = Math.round(totalProgressSum / totalEmployees);
+
+    const incompleteProfilesArr = employees
+      .filter(
+        e =>
+          e.employmentStatus === 'ACTIVE' &&
+          getTotalProgress(e) < 70
+      )
+      .map(e => ({
+        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+        progress: getTotalProgress(e),
+      }));
+
+    const topProfiles = employees
+      .sort((a, b) => getTotalProgress(b) - getTotalProgress(a))
+      .slice(0, 3)
+      .map(e => ({
+        name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
+        progress: getTotalProgress(e),
+      }));
+
     return {
-      averageCompletion: 0,
-      incompleteProfilesCount: 0,
-      incompleteProfiles: [],
-      topProfiles: [],
+      averageCompletion: average,
+      incompleteProfilesCount: incompleteProfilesArr.length,
+      incompleteProfiles: incompleteProfilesArr,
+      topProfiles,
     };
   }
-
-  // ✅ helper to calculate totalProgress as average
-  const getTotalProgress = (e: any) => {
-    const personal = e.progress?.personalInfo || 0;
-    const education = e.progress?.education || 0;
-    const employment = e.progress?.employment || 0;
-
-    // take average of 3 fields
-    return Math.round((personal + education + employment) / 3);
-  };
-
-  const totalProgressSum = employees.reduce(
-    (sum, e) => sum + getTotalProgress(e),
-    0
-  );
-  const average = Math.round(totalProgressSum / totalEmployees);
-
-  const incompleteProfilesArr = employees
-    .filter(
-      e =>
-        e.employmentStatus === 'ACTIVE' &&
-        getTotalProgress(e) < 70
-    )
-    .map(e => ({
-      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-      progress: getTotalProgress(e),
-    }));
-
-  const topProfiles = employees
-    .sort((a, b) => getTotalProgress(b) - getTotalProgress(a))
-    .slice(0, 3)
-    .map(e => ({
-      name: `${e.userId?.firstName || ''} ${e.userId?.lastName || 'Unnamed'}`.trim(),
-      progress: getTotalProgress(e),
-    }));
-
-  return {
-    averageCompletion: average,
-    incompleteProfilesCount: incompleteProfilesArr.length,
-    incompleteProfiles: incompleteProfilesArr,
-    topProfiles,
-  };
-}
 
 
 

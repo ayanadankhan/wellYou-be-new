@@ -17,6 +17,9 @@ export class Document extends MongooseDocument {
   @Prop({ type: String, required: true })
   title: string;
 
+  @Prop({ type: String})
+  instruction: string;
+
   @Prop({ type: String, required: false })
   templateUrl: string;
 

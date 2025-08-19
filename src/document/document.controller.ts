@@ -5,7 +5,7 @@ import { UpdateDocumentDto } from './dto/update-document.dto';
 import { Public } from '@/common/decorators/public.decorator';
 import { Document } from './entities/document.entity';
 import { GetDocumentDto } from './dto/get-document.dto';
-import { CurrentUser } from '@/common/decorators/user.decorator';
+import { CurrentUser, User } from '@/common/decorators/user.decorator';
 import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface'; // ✅ same import as service
 
 @Controller('document')
@@ -30,8 +30,12 @@ export class DocumentController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateDocumentDto: UpdateDocumentDto): Promise<Document | null> {
-    return this.documentService.update(id, updateDocumentDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateDocumentDto: UpdateDocumentDto,
+    @User() user: AuthenticatedUser,  // JWT guard se aa raha user
+  ): Promise<Document | null> {
+    return this.documentService.update(id, updateDocumentDto, user);
   }
 
   @Delete(':id')

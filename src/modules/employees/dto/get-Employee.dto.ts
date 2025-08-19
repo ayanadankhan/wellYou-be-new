@@ -30,9 +30,10 @@ export class GetEmployeeDto extends GetApiDto {
   @IsOptional()
   employmentStatus: string;
 
-   @IsOptional()
+  @IsOptional()
   @IsEnum(DocumentStatus)
   documentStatus?: DocumentStatus;
+  
   constructor() {
     super();
     this.sb = 'createdAt';
