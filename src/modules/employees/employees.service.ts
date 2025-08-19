@@ -215,7 +215,18 @@ export class EmployeesService {
     try {
       const matchStage: any = {};
 
-      const [list, count] = await Promise.all([
+      if (getDto.name) {
+        matchStage.$or = [
+          { "user.firstName": { $regex: getDto.name, $options: "i" } },
+          { "user.lastName": { $regex: getDto.name, $options: "i" } },
+        ];
+      }
+
+      if (getDto.documentStatus) {
+        matchStage["documents.status"] = getDto.documentStatus;
+      }
+
+      const [list, countResult] = await Promise.all([
         this.employeeModel.aggregate([
           {
             $lookup: {
@@ -226,6 +237,11 @@ export class EmployeesService {
             },
           },
           { $unwind: "$user" },
+
+          { $unwind: "$documents" },
+
+          ...(Object.keys(matchStage).length ? [{ $match: matchStage }] : []),
+
           {
             $project: {
               _id: 1,
@@ -237,15 +253,23 @@ export class EmployeesService {
               location: 1,
               employmentStatus: 1,
               profilePicture: 1,
-              documents: 1,
+              document: "$documents",
             },
           },
+
+          // Pagination on documents
           { $skip: Number(getDto.o) || 0 },
           { $limit: Number(getDto.l) || 10 },
         ]).exec(),
 
-        this.employeeModel.countDocuments().exec(),
+        // Count total documents (not employees)
+        this.employeeModel.aggregate([
+          { $unwind: "$documents" },
+          { $count: "totalDocuments" },
+        ]).exec(),
       ]);
+
+      const count = countResult[0]?.totalDocuments || 0;
 
       return {
         list,
@@ -265,139 +289,139 @@ export class EmployeesService {
       );
     }
   }
-  // Alternative method: Get flattened document list with employee info
-  async findAllDocumentsFlattened(getDto: GetEmployeeDocumentsDto) {
-    const {
-      o: offset = 0,
-      l: limit = 10,
-      name,
-      email,
-      department,
-      designation,
-      documentType,
-      status,
-      tenantId
-    } = getDto;
+  // // Alternative method: Get flattened document list with employee info
+  // async findAllDocumentsFlattened(getDto: GetEmployeeDocumentsDto) {
+  //   const {
+  //     o: offset = 0,
+  //     l: limit = 10,
+  //     name,
+  //     email,
+  //     department,
+  //     designation,
+  //     documentType,
+  //     status,
+  //     tenantId
+  //   } = getDto;
 
-    const matchConditions: any = {};
+  //   const matchConditions: any = {};
 
-    if (tenantId) {
-      matchConditions.tenantId = tenantId;
-    }
+  //   if (tenantId) {
+  //     matchConditions.tenantId = tenantId;
+  //   }
 
-    if (name) {
-      matchConditions.name = { $regex: name, $options: 'i' };
-    }
+  //   if (name) {
+  //     matchConditions.name = { $regex: name, $options: 'i' };
+  //   }
 
-    if (email) {
-      matchConditions.email = { $regex: email, $options: 'i' };
-    }
+  //   if (email) {
+  //     matchConditions.email = { $regex: email, $options: 'i' };
+  //   }
 
-    if (department) {
-      matchConditions.department = { $regex: department, $options: 'i' };
-    }
+  //   if (department) {
+  //     matchConditions.department = { $regex: department, $options: 'i' };
+  //   }
 
-    if (designation) {
-      matchConditions.designation = { $regex: designation, $options: 'i' };
-    }
+  //   if (designation) {
+  //     matchConditions.designation = { $regex: designation, $options: 'i' };
+  //   }
 
-    const pipeline: PipelineStage[] = [
-      { $match: matchConditions },
+  //   const pipeline: PipelineStage[] = [
+  //     { $match: matchConditions },
 
-      // Only employees with documents
-      {
-        $match: {
-          documents: { $exists: true, $ne: [], $not: { $size: 0 } }
-        }
-      },
+  //     // Only employees with documents
+  //     {
+  //       $match: {
+  //         documents: { $exists: true, $ne: [], $not: { $size: 0 } }
+  //       }
+  //     },
 
-      // Unwind documents
-      {
-        $unwind: {
-          path: '$documents',
-          preserveNullAndEmptyArrays: false
-        }
-      }
-    ];
+  //     // Unwind documents
+  //     {
+  //       $unwind: {
+  //         path: '$documents',
+  //         preserveNullAndEmptyArrays: false
+  //       }
+  //     }
+  //   ];
 
-    // Add document type filter if provided
-    if (documentType) {
-      pipeline.push({
-        $match: {
-          'documents.documentType': { $regex: documentType, $options: 'i' }
-        }
-      });
-    }
+  //   // Add document type filter if provided
+  //   if (documentType) {
+  //     pipeline.push({
+  //       $match: {
+  //         'documents.documentType': { $regex: documentType, $options: 'i' }
+  //       }
+  //     });
+  //   }
 
-    // Add status filter if provided
-    if (status) {
-      pipeline.push({
-        $match: {
-          'documents.status': status
-        }
-      });
-    }
+  //   // Add status filter if provided
+  //   if (status) {
+  //     pipeline.push({
+  //       $match: {
+  //         'documents.status': status
+  //       }
+  //     });
+  //   }
 
-    // Continue with projection and sorting
-    pipeline.push(
-      // Project final structure
-      {
-        $project: {
-          _id: '$documents._id',
-          documentTitle: '$documents.title',
-          fileName: '$documents.fileName',
-          fileUrl: '$documents.fileUrl',
-          documentType: '$documents.documentType',
-          status: '$documents.status',
-          uploadedAt: '$documents.uploadedAt',
-          // Employee info
-          employee: {
-            _id: '$_id',
-            name: '$name',
-            email: '$email',
-            profilePicture: '$profilePicture',
-            department: '$department',
-            designation: '$designation'
-          }
-        }
-      },
+  //   // Continue with projection and sorting
+  //   pipeline.push(
+  //     // Project final structure
+  //     {
+  //       $project: {
+  //         _id: '$documents._id',
+  //         documentTitle: '$documents.title',
+  //         fileName: '$documents.fileName',
+  //         fileUrl: '$documents.fileUrl',
+  //         documentType: '$documents.documentType',
+  //         status: '$documents.status',
+  //         uploadedAt: '$documents.uploadedAt',
+  //         // Employee info
+  //         employee: {
+  //           _id: '$_id',
+  //           name: '$name',
+  //           email: '$email',
+  //           profilePicture: '$profilePicture',
+  //           department: '$department',
+  //           designation: '$designation'
+  //         }
+  //       }
+  //     },
 
-      // Sort by upload date
-      {
-        $sort: { uploadedAt: -1 }
-      },
+  //     // Sort by upload date
+  //     {
+  //       $sort: { uploadedAt: -1 }
+  //     },
 
-      // Pagination
-      {
-        $facet: {
-          documents: [
-            { $skip: offset },
-            { $limit: limit }
-          ],
-          totalCount: [
-            { $count: 'count' }
-          ]
-        }
-      }
-    );
+  //     // Pagination
+  //     {
+  //       $facet: {
+  //         documents: [
+  //           { $skip: offset },
+  //           { $limit: limit }
+  //         ],
+  //         totalCount: [
+  //           { $count: 'count' }
+  //         ]
+  //       }
+  //     }
+  //   );
 
-    const result = await this.employeeModel.aggregate(pipeline);
+  //   const result = await this.employeeModel.aggregate(pipeline);
 
-    const documents = result[0]?.documents || [];
-    const totalCount = result[0]?.totalCount[0]?.count || 0;
+  //   const documents = result[0]?.documents || [];
+  //   const totalCount = result[0]?.totalCount[0]?.count || 0;
 
-    return {
-      documents,
-      count: totalCount,
-      pagination: {
-        offset,
-        limit,
-        total: totalCount,
-        pages: Math.ceil(totalCount / limit),
-        currentPage: Math.floor(offset / limit) + 1
-      }
-    };
-  }
+  //   return {
+  //     documents,
+  //     count: totalCount,
+  //     pagination: {
+  //       offset,
+  //       limit,
+  //       total: totalCount,
+  //       pages: Math.ceil(totalCount / limit),
+  //       currentPage: Math.floor(offset / limit) + 1
+  //     }
+  //   };
+  // }
 
 
   async findEmployeeIdByUserId(userId: string): Promise<string | null> {

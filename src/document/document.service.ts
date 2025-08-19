@@ -38,6 +38,7 @@ export class DocumentService {
               documentId: savedDoc._id,
               name: savedDoc.title,
               documentType: savedDoc.documentType,
+              instruction: savedDoc.instruction,
               allowedTypes: savedDoc.allowedTypes || [],
               isDefault: savedDoc.isDefault || false,
               status: savedDoc.status,
@@ -142,6 +143,7 @@ export class DocumentService {
               documents: {
                 documentId: updatedDoc._id,
                 name: updatedDoc.title,
+                instruction: updatedDoc.instruction,
                 documentType: updatedDoc.documentType,
                 allowedTypes: updatedDoc.allowedTypes || [],
                 isDefault: updatedDoc.isDefault || false,

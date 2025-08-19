@@ -22,7 +22,6 @@ export class DocumentController {
   async findAll(@Query() getDto: GetDocumentDto, @CurrentUser() user : AuthenticatedUser) {
     return await this.documentService.findAll(getDto , user);
   }
-
   
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Document | null> {
