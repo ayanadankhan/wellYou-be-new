@@ -423,7 +423,6 @@ export class EmployeesService {
   //   };
   // }
 
-
   async findEmployeeIdByUserId(userId: string): Promise<string | null> {
     try {
       this.logger.log(`Searching for employee ID with userId: ${userId}`);
