@@ -3,11 +3,9 @@ import { AppModule } from '@/app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as nodeCrypto from 'crypto';
+// import * as crypto from 'crypto';
 
-if (!globalThis.crypto) {
-  (globalThis as any).crypto = nodeCrypto;
-}
+// (globalThis as any).crypto = crypto;
 
 async function bootstrap() {
   try {
