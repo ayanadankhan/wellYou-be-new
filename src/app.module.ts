@@ -22,14 +22,17 @@ import { SkillsModule } from './modules/masterTables/skills/skills.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CurrencyModule } from './modules/masterTables/currency/currency.module';
-import { ChatModule } from './modules/chat/chat.module';
-import { DocumentModule } from './document/document.module';
+import { PerformanceReviewModule } from './performance-review/performance-review.module';
+import { OffboardingModule } from './modules/offboarding/offboarding.module';
+import { HolidayModule } from './holiday/holiday.module';
+
 
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { DocumentTypeModule } from './modules/document-type/document-type.module';
 import { SurveyModule } from './modules/survey/survey.module';
 import { QuestionSurveyModule } from './modules/question-survey/question-survey.module';
 import { AnswerSurveyModule } from './modules/answer-survey/answer-survey.module';
+import { DocumentModule } from './document/document.module';
 
 @Module({
   imports: [
@@ -59,15 +62,18 @@ import { AnswerSurveyModule } from './modules/answer-survey/answer-survey.module
     AuditModule,
     SkillsModule,
     FeedbackModule,
-    ChatModule,
+    // ChatModule,
     // ScheduleModule.forRoot(),
     ScheduleModule.forRoot(),
     CurrencyModule,
     DocumentModule,
     ExpensesModule,
-    DocumentTypeModule,
     SurveyModule,
     QuestionSurveyModule,
-    AnswerSurveyModule
+    AnswerSurveyModule,
+    PerformanceReviewModule,
+    OffboardingModule,
+    HolidayModule,
+
   ]
 })export class AppModule { }
