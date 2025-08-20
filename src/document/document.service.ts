@@ -23,7 +23,7 @@ export class DocumentService {
     tenantId: new Types.ObjectId(user.tenantId)
   });
     const savedDoc = await createdDoc.save();
-    if (dto.isDefault && dto.documentType === 'user') {
+    if (dto.isDefault) {
       const tenantId = user.tenantId;
 
       // Sirf same tenant ke employees nikalna
@@ -38,8 +38,12 @@ export class DocumentService {
               documentId: savedDoc._id,
               name: savedDoc.title,
               documentType: savedDoc.documentType,
+              categoryId: savedDoc.categoryId,
+              templateUrl: savedDoc.templateUrl,
+              instruction: savedDoc.instruction,
               allowedTypes: savedDoc.allowedTypes || [],
               isDefault: savedDoc.isDefault || false,
+              isExpiry: savedDoc.isExpiry || false,
               status: savedDoc.status,
               requireApproval: savedDoc.requireApproval || false
             }
@@ -72,12 +76,26 @@ export class DocumentService {
       if (getDto.documentType) {
         pipeline.push({ $match: { documentType: new RegExp(getDto.documentType, 'i') } });
       }
-      if (getDto.isExpiry !== undefined) {
-        pipeline.push({ $match: { isExpiry: getDto.isExpiry } });
+ 
+      const isExpiry =
+        typeof getDto.isExpiry === "string"
+          ? getDto.isExpiry === "true"
+          : getDto.isExpiry;
+
+      const requireApproval =
+        typeof getDto.requireApproval === "string"
+          ? getDto.requireApproval === "true"
+          : getDto.requireApproval;
+
+      // Apply filters
+      if (isExpiry !== undefined) {
+        pipeline.push({ $match: { isExpiry } });
       }
-      if (getDto.requireApproval !== undefined) {
-        pipeline.push({ $match: { requireApproval: getDto.requireApproval } });
+
+      if (requireApproval !== undefined) {
+        pipeline.push({ $match: { requireApproval } });
       }
+
 
       const [list, countQuery] = await Promise.all([
         this.docRequestModel
@@ -99,58 +117,72 @@ export class DocumentService {
       throw new BadRequestException('Failed to retrieve companies');
     }
   }
-
-//   async findAll(getDto: GetDocumentDto, tenantId: string) {
-//   try {
-//     const pipeline: any[] = [];
-
-//     // Pehle tenant ID ka filter add karo - yeh must hai
-//     if (tenantId) {
-//       pipeline.push({ $match: { tenantId: tenantId } });
-//     }
-
-//     // Baaki filters
-//     if (getDto.title) {
-//       pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
-//     }
-//     if (getDto.documentType) {
-//       pipeline.push({ $match: { documentType: new RegExp(getDto.documentType, 'i') } });
-//     }
-//     if (getDto.isExpiry !== undefined) {
-//       pipeline.push({ $match: { isExpiry: getDto.isExpiry } });
-//     }
-//     if (getDto.requireApproval !== undefined) {
-//       pipeline.push({ $match: { requireApproval: getDto.requireApproval } });
-//     }
-
-//     const [list, countQuery] = await Promise.all([
-//       this.docRequestModel
-//         .aggregate([
-//           ...pipeline,
-//           { $sort: { [getDto.sb]: getDto.sd === '1' ? 1 : -1 } },
-//           { $skip: Number(getDto.o || 0) },
-//           { $limit: Number(getDto.l || 10) },
-//         ])
-//         .exec(),
-//       this.docRequestModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
-//     ]);
-
-//     return {
-//       count: countQuery[0]?.total || 0,
-//       list: list || [],
-//     };
-//   } catch (error) {
-//     throw new BadRequestException('Failed to retrieve documents');
-//   }
-// }
+  
 
   async findOne(id: string): Promise<Document | null> {
     return this.docRequestModel.findById(id).exec();
   }
 
-  async update(id: string, updateDto: UpdateDocumentDto): Promise<Document | null> {
-    return this.docRequestModel.findByIdAndUpdate(id, updateDto, { new: true }).exec();
-  }
+  async update(id: string, updateDto: UpdateDocumentDto, user: AuthenticatedUser): Promise<Document | null> {
+    // Update the document
+    const updatedDoc = await this.docRequestModel
+      .findByIdAndUpdate(id, updateDto, { new: true })
+      .exec();
+
+    if (!updatedDoc) return null;
+
+    // Agar isDefault true aur documentType 'user' hai
+    if (updatedDoc.isDefault) {
+      const tenantId = user.tenantId;
+
+      // Sirf same tenant ke employees nikalna
+      const employees = await this.employeeModel.find({ tenantId });
+
+      // Pehle existing documents ko remove karo, phir nayi add karo
+      const bulkOps = employees.flatMap((emp: any) => [
+        // Remove existing document if it exists
+        {
+          updateOne: {
+            filter: { _id: emp._id, tenantId },
+            update: {
+              $pull: {
+                documents: { documentId: updatedDoc._id }
+              }
+            }
+          }
+        },
+        // Add updated document
+        {
+          updateOne: {
+            filter: { _id: emp._id, tenantId },
+            update: {
+              $push: {
+                documents: {
+                  documentId: updatedDoc._id,
+                  name: updatedDoc.title,
+                  instruction: updatedDoc.instruction,
+                  categoryId: updatedDoc.categoryId,
+                  documentType: updatedDoc.documentType,
+                  templateUrl: updatedDoc.templateUrl,
+                  allowedTypes: updatedDoc.allowedTypes || [],
+                  isDefault: updatedDoc.isDefault || false,
+                  isExpiry: updatedDoc.isExpiry || false,
+                  status: updatedDoc.status,
+                  requireApproval: updatedDoc.requireApproval || false,
+                }
+              }
+            }
+          }
+        }
+      ]);
+
+      if (bulkOps.length > 0) {
+        await this.employeeModel.bulkWrite(bulkOps);
+      }
+    }
+
+    return updatedDoc;
+}
 
   async remove(id: string): Promise<Document | null> {
     return this.docRequestModel.findByIdAndDelete(id).exec();

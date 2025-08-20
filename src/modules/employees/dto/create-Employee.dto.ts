@@ -215,15 +215,27 @@ class DocumentDto {
 
   @IsString()
   @IsOptional()
+  templateUrl: string;
+
+  @IsString()
+  @IsOptional()
   documentType: string; // Form, Agreement, ID Proof
 
   @IsString()
   @IsOptional()
   title: string;
 
+  @IsString()
+  @IsOptional()
+  instruction: string;
+
   @IsBoolean()
   @IsOptional()
   isDefault: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isExpiry: boolean;
 
   @IsBoolean()
   @IsOptional()

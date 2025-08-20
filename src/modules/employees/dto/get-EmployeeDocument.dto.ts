@@ -8,6 +8,10 @@ export class GetEmployeeDocumentsDto extends GetApiDto {
   @IsString()
   name?: string;
 
+  @IsString()
+  @IsOptional()
+  instruction: string;
+  
   @IsOptional()
   @IsString()
   email?: string;
@@ -26,11 +30,11 @@ export class GetEmployeeDocumentsDto extends GetApiDto {
 
   @IsOptional()
   @IsString()
-  documentStatus?: string; // 'pending', 'uploaded', 'completed'
+  documentStatus?: string;
 
   @IsOptional()
   @IsString()
-  status?: string; // employment status
+  status?: string;
 
   @IsOptional()
   @Transform(({ value }) => value ? new Types.ObjectId(value) : undefined)

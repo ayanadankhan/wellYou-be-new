@@ -3,14 +3,18 @@ import { GetApiDto } from '../../shared/dto/get-api.dto';
 import { Types } from 'mongoose';
 
 export enum DocumentStatus {
-  PENDING = 'pending',
-  UPLOADED = 'uploaded',
-  COMPLETED = 'completed'
+  PENDING = 'PENDING',
+  UPLOADED = 'UPLOADED',
+  COMPLETED = 'COMPLETED'
 }
 export class GetEmployeeDto extends GetApiDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsString()
+  @IsOptional()
+  instruction: string;
 
   @IsOptional()
   tenantId: Types.ObjectId;
@@ -30,9 +34,10 @@ export class GetEmployeeDto extends GetApiDto {
   @IsOptional()
   employmentStatus: string;
 
-   @IsOptional()
+  @IsOptional()
   @IsEnum(DocumentStatus)
   documentStatus?: DocumentStatus;
+  
   constructor() {
     super();
     this.sb = 'createdAt';
