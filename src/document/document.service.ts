@@ -38,9 +38,12 @@ export class DocumentService {
               documentId: savedDoc._id,
               name: savedDoc.title,
               documentType: savedDoc.documentType,
+              categoryId: savedDoc.categoryId,
+              templateUrl: savedDoc.templateUrl,
               instruction: savedDoc.instruction,
               allowedTypes: savedDoc.allowedTypes || [],
               isDefault: savedDoc.isDefault || false,
+              isExpiry: savedDoc.isExpiry || false,
               status: savedDoc.status,
               requireApproval: savedDoc.requireApproval || false
             }
@@ -158,9 +161,12 @@ export class DocumentService {
                   documentId: updatedDoc._id,
                   name: updatedDoc.title,
                   instruction: updatedDoc.instruction,
+                  categoryId: updatedDoc.categoryId,
                   documentType: updatedDoc.documentType,
+                  templateUrl: updatedDoc.templateUrl,
                   allowedTypes: updatedDoc.allowedTypes || [],
                   isDefault: updatedDoc.isDefault || false,
+                  isExpiry: updatedDoc.isExpiry || false,
                   status: updatedDoc.status,
                   requireApproval: updatedDoc.requireApproval || false,
                 }
