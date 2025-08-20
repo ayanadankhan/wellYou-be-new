@@ -42,7 +42,7 @@ async function bootstrap() {
     app.enableCors({
       origin: process.env.NODE_ENV === 'production' 
         ? 
-        ['https://your-frontend-domain.com','https://localhost:3001.com'] // Replace with your actual frontend URL
+        ['https://hrms.bitsbuffer.com','https://localhost:3001.com'] // Replace with your actual frontend URL
          // Replace with your actual frontend URL
         : true, // Allow all origins in development
       credentials: true,
