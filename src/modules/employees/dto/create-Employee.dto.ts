@@ -215,6 +215,10 @@ class DocumentDto {
 
   @IsString()
   @IsOptional()
+  templateUrl: string;
+
+  @IsString()
+  @IsOptional()
   documentType: string; // Form, Agreement, ID Proof
 
   @IsString()
@@ -228,6 +232,10 @@ class DocumentDto {
   @IsBoolean()
   @IsOptional()
   isDefault: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isExpiry: boolean;
 
   @IsBoolean()
   @IsOptional()
