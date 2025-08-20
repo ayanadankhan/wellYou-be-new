@@ -25,11 +25,17 @@ class Document {
   @Prop({ type: String, required: false })
   instruction: string;
 
+  @Prop({ type: String, required: false })
+  templateUrl: string;
+
   @Prop({ type: Boolean, default: false })
   isDefault: boolean;
 
   @Prop({ type: Boolean, default: false })
   requireApproval: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isExpiry: boolean;
 
   @Prop({ type: String, enum: Status, default: Status.PENDING })
   status: Status;
