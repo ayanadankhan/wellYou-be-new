@@ -1147,8 +1147,12 @@ private groupAttendanceByEmployee(
 
       const todayDepartmentWiseAttendance = await this.getTodayDepartmentWiseAttendance(tenantId);
 
-      const tenantMonthToDateAttendance = await this.getTenantMonthlyAttendanceSummary(tenantId);
-      
+      const tenantMonthToDateAttendance = await this.getTenantMonthlyAttendanceSummary(
+        tenantId,
+        filterStart,
+        filterEnd
+      );
+            
       const currentMonthLateCheckIns = await this.getCurrentMonthLateCheckIns(
         tenantId,
         filterStart,
@@ -1230,17 +1234,17 @@ private groupAttendanceByEmployee(
     return trends;
   }
 
-  private async getTenantMonthlyAttendanceSummary(tenantId: string) {
+  private async getTenantMonthlyAttendanceSummary(tenantId: string,
+    filterStart: Date,
+    filterEnd: Date
+  ) {
     if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
     }
 
-    const today = new Date();
-    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1, 0, 0, 0, 0));
-    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
     let workingDays = 0;
-    const current = new Date(start);
-    while (current <= end) {
+    const current = new Date(filterStart);
+    while (current <= filterEnd) {
       if (current.getUTCDay() !== 0) {
         workingDays++;
       }
@@ -1262,12 +1266,11 @@ private groupAttendanceByEmployee(
 
     const employeeIds = employees.map(e => e._id);
 
-    // Attendance aggregate for whole month till today
     const markedAttendance = await this.attendanceModel.aggregate([
       {
         $match: {
           employeeId: { $in: employeeIds },
-          date: { $gte: start, $lte: end }
+          date: { $gte: filterStart, $lte: filterEnd }
         }
       },
       {
