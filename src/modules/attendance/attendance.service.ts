@@ -1070,7 +1070,7 @@ private groupAttendanceByEmployee(
       } else {
         const now = new Date();
         filterStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        filterEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+        filterEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999 ));
       }
       const filter: any = {
         tenantId: new Types.ObjectId(tenantId),
@@ -1128,8 +1128,17 @@ private groupAttendanceByEmployee(
       }).lean();
 
       const presentCount = attendanceRecordsInRange.filter(a => a.status?.toLowerCase() === 'present').length;
-      const daysInRange = Math.ceil((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      const totalPossibleAttendances = totalEmployees * daysInRange;
+      let workingDays = 0;
+        for (
+          let d = new Date(filterStart);
+          d <= filterEnd;
+          d.setUTCDate(d.getUTCDate() + 1)
+        ) {
+          if (d.getUTCDay() !== 0) {
+            workingDays++;
+          }
+        }
+      const totalPossibleAttendances = totalEmployees * workingDays;
       const MTDAttendanceRate = totalPossibleAttendances > 0
         ? parseFloat(((presentCount / totalPossibleAttendances) * 100).toFixed(2))
         : 0;

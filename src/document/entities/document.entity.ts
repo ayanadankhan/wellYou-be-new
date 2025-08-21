@@ -5,8 +5,7 @@ import { Status } from '../dto/create-document.dto';
 
 @Schema({ timestamps: true })
 export class Document extends MongooseDocument {
-  @Prop({ type: String, required: true, ref: 'Category' })
-  categoryId: string;
+  @Prop({ type: Types.ObjectId, required: true, ref: 'DocumentType' }) categoryId: Types.ObjectId; 
 
   @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
   tenantId: Types.ObjectId;

@@ -74,6 +74,7 @@ import { DocumentModule } from './document/document.module';
     PerformanceReviewModule,
     OffboardingModule,
     HolidayModule,
+    DocumentTypeModule
 
   ]
 })export class AppModule { }
