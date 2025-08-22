@@ -1043,7 +1043,8 @@ export class AttendanceService {
     tenantId: string,
     month?: string,
     fromDate?: string,
-    toDate?: string
+    toDate?: string,
+    departmentId?: string
   ) {
     try {
       let filterStart: Date;
@@ -1069,11 +1070,20 @@ export class AttendanceService {
       } else {
         const now = new Date();
         filterStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        filterEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+        filterEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999 ));
       }
-      const employees = await this.employeeModel.find({
-        tenantId: new Types.ObjectId(tenantId)
-      }).select('_id').lean();
+      const filter: any = {
+        tenantId: new Types.ObjectId(tenantId),
+      };
+
+      if (departmentId && Types.ObjectId.isValid(departmentId)) {
+        filter.departmentId = new Types.ObjectId(departmentId);
+      }
+
+      const employees = await this.employeeModel
+        .find(filter)
+        .select('_id')
+        .lean();
 
       const totalEmployees = employees.length;
       if (totalEmployees === 0) {
@@ -1118,8 +1128,17 @@ export class AttendanceService {
       }).lean();
 
       const presentCount = attendanceRecordsInRange.filter(a => a.status?.toLowerCase() === 'present').length;
-      const daysInRange = Math.ceil((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      const totalPossibleAttendances = totalEmployees * daysInRange;
+      let workingDays = 0;
+        for (
+          let d = new Date(filterStart);
+          d <= filterEnd;
+          d.setUTCDate(d.getUTCDate() + 1)
+        ) {
+          if (d.getUTCDay() !== 0) {
+            workingDays++;
+          }
+        }
+      const totalPossibleAttendances = totalEmployees * workingDays;
       const MTDAttendanceRate = totalPossibleAttendances > 0
         ? parseFloat(((presentCount / totalPossibleAttendances) * 100).toFixed(2))
         : 0;
@@ -1134,6 +1153,7 @@ export class AttendanceService {
         filterStart,
         filterEnd
       );
+
 
       const currentMonthLateCheckIns = await this.getCurrentMonthLateCheckIns(
         tenantId,
@@ -1150,7 +1170,9 @@ export class AttendanceService {
         todayAttendanceRate,
         MTDAttendanceRate,
         monthlyAttendanceTrends,
+        tenantMonthToDateAttendance,
         departmentWiseAttendance,
+        todayDepartmentWiseAttendance,
         currentMonthLateCheckIns,
         recentCorrectionAttendanceRequests,
         todayLeaveRequests
@@ -1180,14 +1202,15 @@ export class AttendanceService {
       date: { $gte: startDate, $lte: endDate }
     }).lean();
 
-    const trends: { date: string; attendancePercent: number }[] = [];
+    const trends: { date: string; day: string; attendancePercent: number }[] = [];
 
     for (
       let d = new Date(startDate);
       d <= endDate;
       d.setUTCDate(d.getUTCDate() + 1)
     ) {
-      const dateStr = d.toISOString().split('T')[0]; // "YYYY-MM-DD"
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
 
       const dayRecords = attendanceRecords.filter(a => {
         const recDate = new Date(a.date);
@@ -1203,13 +1226,84 @@ export class AttendanceService {
         ? Math.round((presentCount / totalEmployees) * 100)
         : 0;
 
-      trends.push({
+
+
+      trends.push({ 
         date: dateStr,
-        attendancePercent
+        day: dayName,
+        attendancePercent 
+
       });
     }
 
     return trends;
+  }
+
+  private async getTenantMonthlyAttendanceSummary(tenantId: string,
+    filterStart: Date,
+    filterEnd: Date
+  ) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    let workingDays = 0;
+    const current = new Date(filterStart);
+    while (current <= filterEnd) {
+      if (current.getUTCDay() !== 0) {
+        workingDays++;
+      }
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    const employees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) }).select('_id').lean();
+    const totalEmployees = employees.length;
+
+    if (totalEmployees === 0) {
+      return {
+        totalEmployees: 0,
+        totalPresent: 0,
+        totalAbsent: 0,
+        attendanceRate: 0,
+        workingDays
+      };
+    }
+
+    const employeeIds = employees.map(e => e._id);
+
+    const markedAttendance = await this.attendanceModel.aggregate([
+      {
+        $match: {
+          employeeId: { $in: employeeIds },
+          date: { $gte: filterStart, $lte: filterEnd }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          presentCount: {
+            $sum: { $cond: [{ $eq: [{ $toLower: "$status" }, "present"] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const totalPresent = markedAttendance.length > 0 ? markedAttendance[0].presentCount : 0;
+
+    const totalPossible = totalEmployees * workingDays;
+    const totalAbsent = Math.max(0, totalPossible - totalPresent);
+
+    const attendanceRate = totalPossible > 0
+      ? parseFloat(((totalPresent / totalPossible) * 100).toFixed(2))
+      : 0;
+
+    return {
+      totalEmployees,
+      workingDays,
+      totalPresent,
+      totalAbsent,
+      attendanceRate
+    };
   }
 
   private async getDepartmentWiseAttendance(
@@ -1221,12 +1315,40 @@ export class AttendanceService {
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
     }
 
+    const start = new Date(Date.UTC(
+      startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), 0, 0, 0, 0
+    ));
+    const end = new Date(Date.UTC(
+      endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate(), 23, 59, 59, 999
+    ));
+
+    const today = new Date();
+    const todayUTC = new Date(Date.UTC(
+      today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999
+    ));
+
+    const effectiveEndForAbsent = end < todayUTC ? end : todayUTC;
+
+    let workingDays = 0;
+    const current = new Date(start);
+    while (current <= end) {
+      if (current.getUTCDay() !== 0) { 
+        workingDays++;
+      }
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    let workingDaysForAbsent = 0;
+    const currentForAbsent = new Date(start);
+    while (currentForAbsent <= effectiveEndForAbsent) {
+      if (currentForAbsent.getUTCDay() !== 0) { 
+        workingDaysForAbsent++;
+      }
+      currentForAbsent.setUTCDate(currentForAbsent.getUTCDate() + 1);
+    }
+
     const markedAttendance = await this.attendanceModel.aggregate([
-      {
-        $match: {
-          date: { $gte: startDate, $lte: endDate }
-        }
-      },
+      { $match: { date: { $gte: start, $lte: end } } },
       {
         $lookup: {
           from: "employees",
@@ -1236,11 +1358,7 @@ export class AttendanceService {
         }
       },
       { $unwind: "$employee" },
-      {
-        $match: {
-          "employee.tenantId": new Types.ObjectId(tenantId)
-        }
-      },
+      { $match: { "employee.tenantId": new Types.ObjectId(tenantId) } },
       {
         $lookup: {
           from: "departments",
@@ -1254,13 +1372,7 @@ export class AttendanceService {
         $group: {
           _id: "$department.departmentName",
           presentCount: {
-            $sum: {
-              $cond: [
-                { $eq: [{ $toLower: "$status" }, "present"] },
-                1,
-                0
-              ]
-            }
+            $sum: { $cond: [{ $eq: [{ $toLower: "$status" }, "present"] }, 1, 0] }
           }
         }
       }
@@ -1285,19 +1397,100 @@ export class AttendanceService {
       }
     ]);
 
-    // Merge results
     return employeesByDept.map(dept => {
-      const attendance = markedAttendance.find(m => m._id === dept._id) || { presentCount: 0 };
-      const absentCount = dept.totalEmployees - attendance.presentCount;
-      const attendanceRate = dept.totalEmployees > 0
-        ? parseFloat(((attendance.presentCount / dept.totalEmployees) * 100).toFixed(2))
+      const present = (markedAttendance.find(m => m._id === dept._id)?.presentCount) ?? 0;
+
+      const totalPossible = dept.totalEmployees * workingDaysForAbsent;      
+
+      const totalPossibleForAbsent = dept.totalEmployees * workingDaysForAbsent;
+      const absentCount = Math.max(0, totalPossibleForAbsent - present);
+
+      const attendanceRate = totalPossible > 0
+        ? parseFloat(((present / totalPossible) * 100).toFixed(2))
         : 0;
 
       return {
         department: dept._id || 'Unassigned',
         totalEmployees: dept.totalEmployees,
-        presentCount: attendance.presentCount,
+        presentCount: present,
         absentCount,
+        attendanceRate
+      };
+    });
+  }
+
+  private async getTodayDepartmentWiseAttendance(tenantId: string) {
+    if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
+      throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
+    }
+
+    const today = new Date();
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0, 0));
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+
+    const markedAttendance = await this.attendanceModel.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      {
+        $lookup: {
+          from: "employees",
+          localField: "employeeId",
+          foreignField: "_id",
+          as: "employee"
+        }
+      },
+      { $unwind: "$employee" },
+      { $match: { "employee.tenantId": new Types.ObjectId(tenantId) } },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "employee.departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          presentCount: {
+            $sum: { $cond: [{ $eq: [{ $toLower: "$status" }, "present"] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const employeesByDept = await this.employeeModel.aggregate([
+      { $match: { tenantId: new Types.ObjectId(tenantId) } },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$department.departmentName",
+          totalEmployees: { $sum: 1 }
+        }
+      }
+    ]);
+
+    return employeesByDept.map(dept => {
+      const present = (markedAttendance.find(m => m._id === dept._id)?.presentCount) ?? 0;
+      const absent = Math.max(0, dept.totalEmployees - present);
+
+      const attendanceRate = dept.totalEmployees > 0
+        ? parseFloat(((present / dept.totalEmployees) * 100).toFixed(2))
+        : 0;
+
+      return {
+        department: dept._id || 'Unassigned',
+        totalEmployees: dept.totalEmployees,
+        presentCount: present,
+        absentCount: absent,
         attendanceRate
       };
     });
@@ -1328,7 +1521,6 @@ export class AttendanceService {
           ]
         }
       },
-
       {
         $lookup: {
           from: 'employees',
@@ -1399,7 +1591,9 @@ export class AttendanceService {
     return lateCheckIns;
   }
 
-  private async getRecentCorrectionAttendanceRequests(tenantId: string): Promise<any[]> {
+  private async getRecentCorrectionAttendanceRequests(
+    tenantId: string
+  ): Promise<{ totalPending: number; requests: any[] }> {
     if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
     }
@@ -1422,13 +1616,11 @@ export class AttendanceService {
       .lean()
       .exec();
 
-    // Filter by tenantId (from employeeId)
     const filtered = records.filter(r => {
       const emp: any = r.employeeId;
       return emp?.tenantId?.toString() === tenantId.toString();
     });
 
-    // Format output
     const formatted = filtered.map(r => {
       const emp: any = r.employeeId;
       const user = emp?.userId;
@@ -1444,7 +1636,10 @@ export class AttendanceService {
       };
     });
 
-    return formatted;
+    return {
+      totalPending: formatted.length,
+      requests: formatted
+    };
   }
 
   private async getTodayLeaveRequests(tenantId: string) {

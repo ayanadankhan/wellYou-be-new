@@ -29,18 +29,13 @@ export class GetDocumentDto extends GetApiDto {
     @IsOptional()
     templateUrl?: string;
 
-    @IsBoolean()
     @IsOptional()
     isDefault?: boolean;
 
-    @IsBoolean()
     @IsOptional()
-    @Type(() => Boolean)
-    isExpiry: boolean;
+    isExpiry?: boolean;
 
-    @IsBoolean()
     @IsOptional()
-    @Type(() => Boolean)
     requireApproval?: boolean;
 
     @IsArray()

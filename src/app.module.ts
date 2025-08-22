@@ -28,6 +28,12 @@ import { HolidayModule } from './holiday/holiday.module';
 import { RecruitmentModule } from './recruitment/recruitment.module';
 
 
+import { ExpensesModule } from './modules/expenses/expenses.module';
+import { DocumentTypeModule } from './modules/document-type/document-type.module';
+import { SurveyModule } from './modules/survey/survey.module';
+import { QuestionSurveyModule } from './modules/question-survey/question-survey.module';
+import { AnswerSurveyModule } from './modules/answer-survey/answer-survey.module';
+import { DocumentModule } from './document/document.module';
 
 @Module({
   imports: [
@@ -61,12 +67,19 @@ import { RecruitmentModule } from './recruitment/recruitment.module';
     // ScheduleModule.forRoot(),
     ScheduleModule.forRoot(),
     CurrencyModule,
+    DocumentModule,
+    ExpensesModule,
+    SurveyModule,
+    QuestionSurveyModule,
+    AnswerSurveyModule,
     PerformanceReviewModule,
     OffboardingModule,
+
     HolidayModule, 
     RecruitmentModule,
-    // DocumentModule,
+    DocumentModule,
     // ExpensesModule,
-    // DocumentTypeModule
+    DocumentTypeModule
+
   ]
 })export class AppModule { }
