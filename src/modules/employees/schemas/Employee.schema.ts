@@ -14,10 +14,17 @@ class Document {
   name: string;
 
   @Prop({ required: false, type: String })
+  rejectionReason: string;
+
+  @Prop({ required: false, type: String })
   url: string;
 
   @Prop({ type: String, required: false })
   documentType: string;
+
+  @Prop({ type: Types.ObjectId, required: true, ref: 'DocumentType' })
+  categoryId: Types.ObjectId; 
+  
 
   @Prop({ type: String, required: false })
   title: string;
@@ -30,6 +37,9 @@ class Document {
 
   @Prop({ type: Boolean, default: false })
   isDefault: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isRejected: boolean;
 
   @Prop({ type: Boolean, default: false })
   requireApproval: boolean;
