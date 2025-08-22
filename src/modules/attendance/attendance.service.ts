@@ -13,6 +13,7 @@ import { EmployeesService } from '../employees/employees.service';
 import { GetEmployeeDto } from '../employees/dto/get-Employee.dto';
 import { RequestMangment, RequestMangmentDocument } from '../request-mangment/entities/request-mangment.entity';
 import { RequestType } from '../request-mangment/dto/create-request-mangment.dto';
+import { CreateBulkAttendanceDto } from './dto/create-bulk-attendance.dto';
 
 interface AttendanceResponse {
   success: boolean;
@@ -941,25 +942,40 @@ export class AttendanceService {
     return Math.round(totalHours * 100) / 100; // Round to 2 decimal places
   }
 
-  // Create attendance manually (for admin use)
-  async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
-    try {
-      this.logger.log('Creating manual attendance record');
 
-      const attendanceData = {
-        ...createAttendanceDto,
-        employeeId: new Types.ObjectId(createAttendanceDto.employeeId),
-        date: new Date(),
-        checkInTime: createAttendanceDto.checkInTime ? new Date(createAttendanceDto.checkInTime) : new Date(),
-      };
 
-      const newAttendance = new this.attendanceModel(attendanceData);
-      return await newAttendance.save();
-    } catch (error) {
-      this.logger.error('Create attendance failed:', error.message);
-      throw error;
-    }
+// services/attendance.service.ts
+
+// New method for bulk creation
+async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> {
+  try {
+    this.logger.log(`Creating manual attendance records for ${createBulkDto.employeeIds.length} employees`);
+
+    const { employeeIds, checkInTime, checkOutTime, ...otherAttendanceData } = createBulkDto;
+
+    // Set the date to the start of the day of the provided checkInTime
+    // This makes the record retrievable by date, just like auto-generated records
+    const attendanceDate = checkInTime ? new Date(new Date(checkInTime).setUTCHours(0, 0, 0, 0)) : new Date(new Date().setUTCHours(0, 0, 0, 0));
+
+    const attendanceRecords = employeeIds.map(employeeId => ({
+      ...otherAttendanceData,
+      employeeId: new Types.ObjectId(employeeId),
+      date: attendanceDate, // The corrected date field
+      checkInTime: checkInTime ? new Date(checkInTime) : null,
+      checkOutTime: checkOutTime ? new Date(checkOutTime) : null,
+      isManual: true,
+    }));
+
+    const results = await this.attendanceModel.insertMany(attendanceRecords);
+
+    this.logger.log(`Successfully created ${results.length} attendance records`);
+    return results as Attendance[];
+
+  } catch (error) {
+    this.logger.error('Create bulk attendance failed:', error.message);
+    throw error;
   }
+}
 
   // Update attendance (for admin use)
   async update(id: string, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
