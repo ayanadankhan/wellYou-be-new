@@ -52,7 +52,7 @@ export class DocumentService {
                 documentId: savedDoc._id,
                 name: savedDoc.title,
                 documentType: savedDoc.documentType,
-                categoryId: categoryDoc, // ✅ complete object
+                categoryId: categoryDoc,
                 templateUrl: savedDoc.templateUrl,
                 instruction: savedDoc.instruction,
                 allowedTypes: savedDoc.allowedTypes || [],

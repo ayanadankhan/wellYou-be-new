@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
+import { IsOptional, IsString, IsNumber, Min, IsMongoId } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Types } from 'mongoose';
 import { GetApiDto } from '../../shared/dto/get-api.dto';
