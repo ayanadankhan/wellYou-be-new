@@ -1,14 +1,11 @@
-// src/modules/holiday/entities/holiday.entity.ts
-// This file defines the MongoDB schema for a Holiday.
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-
-// Define the enum-like types for the new fields
-type HolidayType = 'national' | 'religious' | 'cultural' | 'regional' | 'company' | 'festival' | 'memorial' | 'bank';
-type RecurringPattern = 'yearly' | 'monthly' | 'weekly' | 'custom';
-type EmployeeType = 'full_time' | 'part_time' | 'contract' | 'intern' | 'consultant';
-type CompensationPolicy = 'paid' | 'unpaid' | 'optional_work' | 'premium_pay' | 'comp_off';
+import {
+  HolidayType,
+  RecurringPattern,
+  EmployeeType,
+  DayOfWeek,
+} from '../dto/create-holiday.dto';
 
 export type HolidayDocument = Holiday & Document;
 
@@ -27,14 +24,28 @@ export class Holiday {
   @Prop({ required: true, trim: true, maxlength: 100 })
   name: string;
 
-  @Prop({ required: true, trim: true, enum: ['national', 'religious', 'cultural', 'regional', 'company', 'festival', 'memorial', 'bank'] })
+  @Prop({
+    required: true,
+    trim: true,
+    enum: [
+      'national',
+      'religious',
+      'cultural',
+      'regional',
+      'company',
+      'festival',
+      'memorial',
+      'bank',
+      'weekend',
+    ],
+  })
   type: HolidayType;
 
   @Prop({ trim: true, maxlength: 500 })
   description?: string;
 
-  @Prop({ required: true })
-  date: Date;
+  @Prop({ required: false })
+  date?: Date;
 
   @Prop({ default: false })
   isRecurring: boolean;
@@ -42,20 +53,33 @@ export class Holiday {
   @Prop({ required: false, enum: ['yearly', 'monthly', 'weekly', 'custom'] })
   recurringPattern?: RecurringPattern;
 
-  @Prop({ default: false })
-  isOptional: boolean;
+  @Prop({ type: [String], default: [] })
+  location: string[];
 
-  @Prop({ required: true, trim: true, enum: ['paid', 'unpaid', 'optional_work', 'premium_pay', 'comp_off'] })
-  compensationPolicy: CompensationPolicy;
-
-  @Prop({ type: [String] })
-  applicableLocations: string[];
-
-  @Prop({ type: [String] })
+  @Prop({ type: [String], default: [] })
   applicableDepartments: string[];
 
-  @Prop({ type: [String], index: true, enum: ['full_time', 'part_time', 'contract', 'intern', 'consultant'] })
+  @Prop({
+    type: [String],
+    enum: ['full_time', 'part_time', 'contract', 'intern', 'consultant'],
+    default: [],
+  })
   applicableEmployeeTypes: EmployeeType[];
+
+  @Prop({
+    type: [String],
+    enum: [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ],
+    default: [],
+  })
+  days?: DayOfWeek[];
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   createdBy: Types.ObjectId;
@@ -66,5 +90,3 @@ export class Holiday {
 
 export const HolidaySchema = SchemaFactory.createForClass(Holiday);
 
-// Compound index for efficient querying
-HolidaySchema.index({ date: 1, 'applicableLocations': 1, 'applicableDepartments': 1 });
