@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { Document } from './entities/document.entity';
@@ -7,26 +7,40 @@ import { Model, Types } from 'mongoose';
 import { GetDocumentDto } from './dto/get-document.dto';
 import { Employee } from '@/modules/employees/schemas/Employee.schema';
 import { User } from '@/modules/tenant/users/schemas/user.schema';
-import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface'; // ✅ same type as controller
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { DocumentType } from '@/modules/document-type/entities/document-type.entity';
 
 @Injectable()
 export class DocumentService {
   constructor(
     @InjectModel(Document.name) private docRequestModel: Model<Document>,
     @InjectModel(Employee.name) private employeeModel: Model<Employee>,
-    @InjectModel(User.name) private userModel: Model<User>
-  ) {}
+    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(DocumentType.name) private documentTypeModel: Model<DocumentType>
+  ) { }
 
-  async create(dto: CreateDocumentDto, user: AuthenticatedUser): Promise<Document> {
-  const createdDoc = new this.docRequestModel({
-    ...dto,
-    tenantId: new Types.ObjectId(user.tenantId)
-  });
+  async create(dto: CreateDocumentDto, user: AuthenticatedUser): Promise<any> { // ✅ any type use kar rahe hain temporarily
+    // 1. Save with ObjectId
+    const createdDoc = new this.docRequestModel({
+      ...dto,
+      tenantId: new Types.ObjectId(user.tenantId),
+      categoryId: new Types.ObjectId(dto.categoryId),
+    });
+
     const savedDoc = await createdDoc.save();
+
+    // 2. Manual populate using separate query
+    const categoryDoc = await this.documentTypeModel.findById(savedDoc.categoryId).exec();
+
+    // 3. Create response object manually
+    const responseDoc = {
+      ...savedDoc.toObject(),
+      categoryId: categoryDoc, // ✅ manual populate
+    };
+
+    // 4. If isDefault -> push to employees
     if (dto.isDefault) {
       const tenantId = user.tenantId;
-
-      // Sirf same tenant ke employees nikalna
       const employees = await this.employeeModel.find({ tenantId });
 
       const bulkOps = employees.map((emp: any) => ({
@@ -34,19 +48,19 @@ export class DocumentService {
           filter: { _id: emp._id, tenantId },
           update: {
             $addToSet: {
-             documents: {
-              documentId: savedDoc._id,
-              name: savedDoc.title,
-              documentType: savedDoc.documentType,
-              categoryId: savedDoc.categoryId,
-              templateUrl: savedDoc.templateUrl,
-              instruction: savedDoc.instruction,
-              allowedTypes: savedDoc.allowedTypes || [],
-              isDefault: savedDoc.isDefault || false,
-              isExpiry: savedDoc.isExpiry || false,
-              status: savedDoc.status,
-              requireApproval: savedDoc.requireApproval || false
-            }
+              documents: {
+                documentId: savedDoc._id,
+                name: savedDoc.title,
+                documentType: savedDoc.documentType,
+                categoryId: categoryDoc,
+                templateUrl: savedDoc.templateUrl,
+                instruction: savedDoc.instruction,
+                allowedTypes: savedDoc.allowedTypes || [],
+                isDefault: savedDoc.isDefault || false,
+                isExpiry: savedDoc.isExpiry || false,
+                status: savedDoc.status,
+                requireApproval: savedDoc.requireApproval || false,
+              },
             },
           },
         },
@@ -57,37 +71,60 @@ export class DocumentService {
       }
     }
 
-    return savedDoc;
-    }
+    return responseDoc;
+  }
 
-  async findAll(getDto: GetDocumentDto , user: AuthenticatedUser) {
+  async findAll(getDto: GetDocumentDto, user: AuthenticatedUser) {
     try {
       const pipeline: any[] = [];
 
+      // Tenant filter
       if (user?.tenantId) {
-          pipeline.push({
-            $match: { tenantId: new Types.ObjectId(user.tenantId) }
-          });
-        }
+        pipeline.push({
+          $match: { tenantId: new Types.ObjectId(user.tenantId) },
+        });
+      }
 
+      // Title filter
       if (getDto.title) {
-        pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
+        pipeline.push({
+          $match: { title: new RegExp(getDto.title, 'i') },
+        });
       }
+
       if (getDto.documentType) {
-        pipeline.push({ $match: { documentType: new RegExp(getDto.documentType, 'i') } });
+        pipeline.push({
+          $match: { documentType: new RegExp(getDto.documentType, 'i') },
+        });
       }
- 
+
+      // Document Type filter
+      if (getDto.categoryId) {
+        pipeline.push({
+          $match: { categoryId: new Types.ObjectId(getDto.categoryId) },
+        });
+      }
+
+      // Boolean filters
       const isExpiry =
-        typeof getDto.isExpiry === "string"
-          ? getDto.isExpiry === "true"
+        typeof getDto.isExpiry === 'string'
+          ? getDto.isExpiry === 'true'
           : getDto.isExpiry;
 
       const requireApproval =
-        typeof getDto.requireApproval === "string"
-          ? getDto.requireApproval === "true"
+        typeof getDto.requireApproval === 'string'
+          ? getDto.requireApproval === 'true'
           : getDto.requireApproval;
 
-      // Apply filters
+      const isDefault =
+        typeof getDto.isDefault === 'string'
+          ? getDto.isDefault === 'true'
+          : getDto.isDefault;
+
+      if (isDefault !== undefined) {
+        pipeline.push({ $match: { isDefault } });
+      }
+
       if (isExpiry !== undefined) {
         pipeline.push({ $match: { isExpiry } });
       }
@@ -96,17 +133,40 @@ export class DocumentService {
         pipeline.push({ $match: { requireApproval } });
       }
 
+      // Category Lookup - collection name check karo
+      pipeline.push(
+        {
+          $lookup: {
+            from: this.documentTypeModel.collection.name, // ✅ dynamic collection name
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'categoryId',
+          },
+        },
+        {
+          $unwind: {
+            path: '$categoryId',
+            preserveNullAndEmptyArrays: true,
+          },
+        }
+      );
 
+      // Sorting, Pagination and Count
       const [list, countQuery] = await Promise.all([
         this.docRequestModel
           .aggregate([
             ...pipeline,
-            { $sort: { [getDto.sb]: getDto.sd === '1' ? 1 : -1 } },
+            { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
             { $skip: Number(getDto.o || 0) },
             { $limit: Number(getDto.l || 10) },
           ])
           .exec(),
-        this.docRequestModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+        this.docRequestModel
+          .aggregate([
+            ...pipeline,
+            { $count: 'total' },
+          ])
+          .exec(),
       ]);
 
       return {
@@ -114,77 +174,115 @@ export class DocumentService {
         list: list || [],
       };
     } catch (error) {
-      throw new BadRequestException('Failed to retrieve companies');
+      console.error(error);
+      throw new BadRequestException('Failed to retrieve documents');
     }
   }
-  
 
   async findOne(id: string): Promise<Document | null> {
-    return this.docRequestModel.findById(id).exec();
+    // ✅ findOne me bhi populate karte hain
+    return this.docRequestModel
+      .findById(id)
+      .populate('categoryId') // categoryId ko complete object ke saath return karega
+      .exec();
   }
 
-  async update(id: string, updateDto: UpdateDocumentDto, user: AuthenticatedUser): Promise<Document | null> {
-    // Update the document
+  async update(id: string, updateDto: UpdateDocumentDto, user: AuthenticatedUser): Promise<any> {
     const updatedDoc = await this.docRequestModel
       .findByIdAndUpdate(id, updateDto, { new: true })
       .exec();
 
     if (!updatedDoc) return null;
 
-    // Agar isDefault true aur documentType 'user' hai
+    // Manual populate
+    const categoryDoc = await this.documentTypeModel.findById(updatedDoc.categoryId).exec();
+    const responseDoc = {
+      ...updatedDoc.toObject(),
+      categoryId: categoryDoc, // ✅ Complete object (not just categoryId)
+    };
+
+    // Agar isDefault true hai
     if (updatedDoc.isDefault) {
       const tenantId = user.tenantId;
-
-      // Sirf same tenant ke employees nikalna
       const employees = await this.employeeModel.find({ tenantId });
 
-      // Pehle existing documents ko remove karo, phir nayi add karo
-      const bulkOps = employees.flatMap((emp: any) => [
-        // Remove existing document if it exists
-        {
-          updateOne: {
-            filter: { _id: emp._id, tenantId },
-            update: {
-              $pull: {
-                documents: { documentId: updatedDoc._id }
-              }
-            }
-          }
-        },
-        // Add updated document
-        {
-          updateOne: {
-            filter: { _id: emp._id, tenantId },
-            update: {
-              $push: {
-                documents: {
-                  documentId: updatedDoc._id,
-                  name: updatedDoc.title,
-                  instruction: updatedDoc.instruction,
-                  categoryId: updatedDoc.categoryId,
-                  documentType: updatedDoc.documentType,
-                  templateUrl: updatedDoc.templateUrl,
-                  allowedTypes: updatedDoc.allowedTypes || [],
-                  isDefault: updatedDoc.isDefault || false,
-                  isExpiry: updatedDoc.isExpiry || false,
-                  status: updatedDoc.status,
-                  requireApproval: updatedDoc.requireApproval || false,
-                }
+      // ✅ Single atomic operation - replace existing document
+      const bulkOps = employees.map((emp: any) => ({
+        updateOne: {
+          filter: {
+            _id: emp._id,
+            tenantId,
+            'documents.documentId': updatedDoc._id
+          },
+          update: {
+            $set: {
+              'documents.$': {
+                documentId: updatedDoc._id,
+                name: updatedDoc.title,
+                instruction: updatedDoc.instruction,
+                categoryId: categoryDoc, // ✅ Complete object like create
+                documentType: updatedDoc.documentType,
+                templateUrl: updatedDoc.templateUrl,
+                allowedTypes: updatedDoc.allowedTypes || [],
+                isDefault: updatedDoc.isDefault || false,
+                isExpiry: updatedDoc.isExpiry || false,
+                status: updatedDoc.status,
+                requireApproval: updatedDoc.requireApproval || false,
               }
             }
           }
         }
-      ]);
+      }));
 
-      if (bulkOps.length > 0) {
-        await this.employeeModel.bulkWrite(bulkOps);
+      // ✅ Add operation for employees who don't have this document yet
+      const addOps = employees.map((emp: any) => ({
+        updateOne: {
+          filter: {
+            _id: emp._id,
+            tenantId,
+            'documents.documentId': { $ne: updatedDoc._id }
+          },
+          update: {
+            $addToSet: {
+              documents: {
+                documentId: updatedDoc._id,
+                name: updatedDoc.title,
+                instruction: updatedDoc.instruction,
+                categoryId: categoryDoc, // ✅ Complete object like create
+                documentType: updatedDoc.documentType,
+                templateUrl: updatedDoc.templateUrl,
+                allowedTypes: updatedDoc.allowedTypes || [],
+                isDefault: updatedDoc.isDefault || false,
+                isExpiry: updatedDoc.isExpiry || false,
+                status: updatedDoc.status,
+                requireApproval: updatedDoc.requireApproval || false,
+              }
+            }
+          }
+        }
+      }));
+
+      const allOps = [...bulkOps, ...addOps];
+      if (allOps.length > 0) {
+        await this.employeeModel.bulkWrite(allOps);
       }
     }
 
-    return updatedDoc;
-}
+    return responseDoc;
+  }
+
 
   async remove(id: string): Promise<Document | null> {
-    return this.docRequestModel.findByIdAndDelete(id).exec();
+    // ✅ delete karne se pehle populated object return karte hain
+    const docToDelete = await this.docRequestModel
+      .findById(id)
+      .populate('categoryId')
+      .exec();
+
+    if (docToDelete) {
+      await this.docRequestModel.findByIdAndDelete(id).exec();
+    }
+
+    return docToDelete;
   }
 }

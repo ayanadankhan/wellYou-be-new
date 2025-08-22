@@ -10,7 +10,8 @@ import {
   ValidateNested,
   IsEnum, 
   IsObject,
-  IsDate
+  IsDate,
+  IsMongoId
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
@@ -244,6 +245,14 @@ class DocumentDto {
   @IsBoolean()
   @IsOptional()
   status: boolean; 
+
+  @IsBoolean()
+  @IsOptional()
+  isRejected: boolean; 
+  
+  @IsString()
+  @IsOptional()
+  rejectionReason: string;
   
   @IsArray()
   @IsString({ each: true })
@@ -258,6 +267,10 @@ class DocumentDto {
   @IsString()
   @IsOptional()
   documentId: string;
+
+  @IsMongoId()
+  @IsOptional()
+  categoryId: string;
 }
 
 export class DependentMemberDto {
