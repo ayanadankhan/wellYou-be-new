@@ -2,7 +2,7 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
-import { Application, IApplicationDocument } from 'src/recruitment/application/schemas/application.schema';
+import { Application, IApplicationDocument } from '../application/schemas/application.schema';
 import { Interview, IInterviewDocument } from 'src/recruitment/interview/schemas/interview.schema';
 import { JobPosition, IJobPositionDocument } from 'src/recruitment/job-position/schemas/job-position.schema';
 import { RecruitmentMetricsQueryDto } from './dto/recruitment-metrics-query.dto';

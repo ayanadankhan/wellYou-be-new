@@ -1,117 +1,90 @@
 // src/recruitment/application/dto/update-application.dto.ts
+
 import {
   IsString,
   IsNotEmpty,
-  IsEmail,
   IsOptional,
-  IsNumber,
-  Min,
   IsArray,
-  ArrayMinSize,
   IsEnum,
-  Matches,
   ValidateIf,
+  IsDateString,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { ApplicationStatus } from 'src/recruitment/shared/enums';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApplicationStatus } from '../../shared/enums'; // Ensure path is correct
 
 export class UpdateApplicationDto {
-  @ApiProperty({
-    description: 'Full name of the candidate',
-    example: 'Johnathan Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  candidateName?: string;
-
-  @ApiProperty({
-    description: 'Email address of the candidate',
-    example: 'john.doe.updated@example.com',
-    required: false,
-  })
-  @IsOptional()
-  @IsEmail()
-  @IsNotEmpty()
-  candidateEmail?: string;
-
-  @ApiProperty({
-    description: 'Phone number of the candidate (optional)',
-    example: '+9876543210',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @Matches(/^\+?[1-9]\d{1,14}$/, { message: 'candidatePhone must be a valid international phone number' })
-  candidatePhone?: string;
-
-  @ApiProperty({
-    description: 'Current status of the application',
+  @ApiPropertyOptional({
+    description: 'Current status of the application.',
     enum: ApplicationStatus,
-    example: ApplicationStatus.SCREENING,
-    required: false,
+    example: ApplicationStatus.SCREENED,
   })
   @IsOptional()
   @IsEnum(ApplicationStatus)
   status?: ApplicationStatus;
 
-  @ApiProperty({
-    description: 'Reason for rejection (required if status is REJECTED)',
-    example: 'Not a good fit for the role',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Reason for rejection (required if status is REJECTED).',
+    example: 'Not a good fit for the team culture.',
   })
   @ValidateIf(o => o.status === ApplicationStatus.REJECTED)
   @IsString()
-  @IsNotEmpty({ message: 'rejectionReason is required if status is REJECTED' })
+  @IsNotEmpty({ message: 'rejectionReason is required if status is REJECTED.' })
   rejectionReason?: string;
 
-  @ApiProperty({
-    description: 'List of skills of the candidate',
-    example: ['Node.js', 'React', 'TypeScript'],
-    required: false,
+  @ApiPropertyOptional({
+    description: 'List of skills the candidate is highlighting for THIS specific job (optional).',
+    example: ['REST API', 'GraphQL'],
   })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @ArrayMinSize(1)
   skills?: string[];
 
-  @ApiProperty({
-    description: 'Years of professional experience',
-    example: 6,
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  experienceYears?: number;
-
-  @ApiProperty({
-    description: 'Highest education level of the candidate',
-    enum: ['High School', 'Associate Degree', 'Bachelor\'s Degree', 'Master\'s Degree', 'PhD'],
-    example: 'Master\'s Degree',
-    required: false,
-  })
-  @IsOptional()
-  @IsEnum(['High School', 'Associate Degree', 'Bachelor\'s Degree', 'Master\'s Degree', 'PhD'])
-  educationLevel?: 'High School' | 'Associate Degree' | 'Bachelor\'s Degree' | 'Master\'s Degree' | 'PhD';
-
-  @ApiProperty({
-    description: 'Any additional notes about the application (optional)',
-    example: 'Updated contact details',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Any additional notes about this specific application (optional).',
+    example: 'Followed up with candidate, awaiting response.',
   })
   @IsOptional()
   @IsString()
   notes?: string;
 
-  @ApiProperty({
-    description: 'Source from which the application was received (optional)',
-    example: 'Referral',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Source from which THIS specific application was received (optional).',
+    example: 'Referral by existing employee.',
   })
   @IsOptional()
   @IsString()
   source?: string;
+
+  @ApiPropertyOptional({
+    description: 'Date when the application was screened (ISO string).',
+    type: 'string', format: 'date-time',
+  })
+  @IsOptional()
+  @IsDateString()
+  screeningDate?: Date;
+
+  @ApiPropertyOptional({
+    description: 'Date of the current/next interview for this application (ISO string).',
+    type: 'string', format: 'date-time',
+  })
+  @IsOptional()
+  @IsDateString()
+  interviewDate?: Date;
+
+  @ApiPropertyOptional({
+    description: 'Date when the application was rejected (ISO string).',
+    type: 'string', format: 'date-time',
+  })
+  @IsOptional()
+  @IsDateString()
+  rejectionDate?: Date;
+
+  @ApiPropertyOptional({
+    description: 'Date when the candidate was hired for this position (ISO string).',
+    type: 'string', format: 'date-time',
+  })
+  @IsOptional()
+  @IsDateString()
+  hireDate?: Date;
 }

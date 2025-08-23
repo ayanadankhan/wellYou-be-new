@@ -1,7 +1,7 @@
 // src/recruitment/job-position/interfaces/job-position.interface.ts
 import { Document, Types } from 'mongoose';
 import { IBaseDocument, IPaginationQuery } from 'src/recruitment/shared/interfaces';
-import { JobStatus } from 'src/recruitment/shared/enums';
+import { ExperienceLevel, JobStatus, JobType } from 'src/recruitment/shared/enums';
 
 export interface IJobPosition extends IBaseDocument {
   title: string;
@@ -18,6 +18,8 @@ export interface IJobPosition extends IBaseDocument {
   benefits?: string[];
   postedDate?: Date;
   closingDate?: Date;
+  jobType: JobType;
+  experienceLevel: ExperienceLevel;
   // Audit fields from IBaseDocument: createdAt, updatedAt, createdBy, updatedBy, isDeleted, deletedAt, deletedBy
 }
 
