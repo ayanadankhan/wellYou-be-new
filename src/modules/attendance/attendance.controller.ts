@@ -26,6 +26,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '../tenant/users/schemas/user.schema';
 import { Public } from '@/common/decorators/public.decorator';
+import { CreateBulkAttendanceDto } from './dto/create-bulk-attendance.dto';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -222,16 +223,19 @@ export class AttendanceController {
   }
 
   // Admin endpoints for manual attendance management
-  @Post()
-  async create(@Body() createAttendanceDto: CreateAttendanceDto) {
+ @Post()
+  async create(@Body() createAttendanceDto: CreateBulkAttendanceDto) {
+
     try {
       this.logger.log('Manual attendance creation request');
-      const result = await this.attendanceService.create(createAttendanceDto);
+      
+      const results = await this.attendanceService.createBulk(createAttendanceDto);
+
 
       return {
         success: true,
-        message: 'Attendance record created successfully',
-        data: result,
+        message: 'Attendance records created successfully',
+        data: results,
       };
     } catch (error) {
       this.logger.error('Create attendance failed:', error.message);

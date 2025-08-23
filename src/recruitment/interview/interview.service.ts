@@ -13,7 +13,7 @@ import { Interview, IInterviewDocument} from './schemas/interview.schema';
 import { CreateInterviewDto, CreateInterviewerDto } from './dto/create-interview.dto';
 import { InterviewQueryDto } from './dto/interview-query.dto';
 import { IPaginatedResponse } from 'src/recruitment/shared/interfaces';
-import { ApplicationService } from 'src/recruitment/application/job-application.service'; // Dependency
+import { JobApplicationService } from '../application/job-application.service';
 import { JobPositionService } from 'src/recruitment/job-position/job-position.service'; // Dependency
 import { ApplicationStatus } from 'src/recruitment/shared/enums'; // For updating application status
 import { IInterviewer } from './interfaces/interview.interface';
@@ -25,7 +25,7 @@ export class InterviewService {
 
   constructor(
     @InjectModel(Interview.name) private readonly interviewModel: Model<IInterviewDocument>,
-    private readonly applicationService: ApplicationService,
+    private readonly jobApplicationService: JobApplicationService,
     private readonly jobPositionService: JobPositionService,
   ) {}
 
@@ -42,7 +42,7 @@ async createInterview(
     this.logger.log(`Received request to create interview for application ${createInterviewDto.applicationId} and job position ${createInterviewDto.jobPositionId}.`);
     try {
       // 1. Validate Application and Job Position exist
-      const application = await this.applicationService.getApplicationById(createInterviewDto.applicationId);
+      const application = await this.jobApplicationService.getApplicationById(createInterviewDto.applicationId);
       this.logger.log(`Creating interview for application ${createInterviewDto.applicationId} and job position ${createInterviewDto.jobPositionId}`);
       if (!application) {
         throw new NotFoundException(`Application with ID ${createInterviewDto.applicationId} not found.`); // Add message
@@ -100,10 +100,10 @@ async createInterview(
       const savedInterview = await newInterview.save();
 
       // 4. Update Application Status
-      // Use applicationService.updateApplicationStatus as defined previously,
+      // Use jobApplicationService.updateApplicationStatus as defined previously,
       // or ensure your updateApplication method can handle status-only updates.
       // Assuming you have a dedicated updateApplicationStatus or the general updateApplication handles it.
-      await this.applicationService.updateApplication(
+      await this.jobApplicationService.updateApplication(
         createInterviewDto.applicationId,
         { status: ApplicationStatus.INTERVIEW_SCHEDULED },
         createdBy // Pass who made the update
@@ -222,11 +222,13 @@ if (search) {
       
 
       return {
-        data: interviews,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+       data: interviews,
+    totalDocs: total, // Change 'total' to 'totalDocs' to match the interface
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+    hasNextPage: page * limit < total, // Add these for a complete IPaginatedResponse
+    hasPrevPage: page > 1,  
       };
     } catch (error) {
       

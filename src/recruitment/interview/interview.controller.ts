@@ -13,6 +13,7 @@ import {
   UsePipes,
   ValidationPipe,
   Logger,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { InterviewService } from './interview.service';
@@ -81,7 +82,7 @@ export class InterviewController {
     return this.interviewService.getInterviews(queryDto);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an interview by ID' })
   @ApiParam({ name: 'id', description: 'The ID of the interview', type: String })

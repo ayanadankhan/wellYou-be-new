@@ -31,6 +31,11 @@ export class Attendance {
   @Prop({ type: Boolean, default: false })
   isAutoCheckout: boolean;
 
+   @Prop({ default: false })
+  isManual: boolean;
+
+
+
   @Prop({ type: String, default: '' })
   remarks: string;
 }

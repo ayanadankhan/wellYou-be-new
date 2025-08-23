@@ -30,3 +30,18 @@ export enum FileType {
   DOC = 'application/msword',
   DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 }
+
+export enum JobType {
+  FULL_TIME = 'FULL_TIME',
+  PART_TIME = 'PART_TIME',
+  CONTRACT = 'CONTRACT',
+  TEMPORARY = 'TEMPORARY',
+  INTERNSHIP = 'INTERNSHIP',
+}
+
+export enum ExperienceLevel {
+  ENTRY_LEVEL = 'ENTRY_LEVEL',
+  MID_LEVEL = 'MID_LEVEL',
+  SENIOR = 'SENIOR',
+  EXECUTIVE = 'EXECUTIVE',
+}
