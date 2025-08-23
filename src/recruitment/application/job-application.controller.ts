@@ -1,164 +1,119 @@
 // src/recruitment/application/job-application.controller.ts
+
 import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Body,
   Param,
   Query,
   HttpCode,
   HttpStatus,
+  Logger,
+  NotFoundException,
   UsePipes,
   ValidationPipe,
-  Logger,
   Request,
-  UseInterceptors,
-  UploadedFile,
-  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiConsumes, ApiQuery } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { ApplicationService } from './job-application.service';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+
+import { JobApplicationService } from './job-application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { ApplicationQueryDto } from './dto/application-query.dto';
 import { IApplicationDocument } from './interfaces/application.interface';
-import { IPaginatedResponse } from 'src/recruitment/shared/interfaces';
-import { ApplicationStatus, FileType } from 'src/recruitment/shared/enums';
+import { IPaginatedResponse } from '../shared/interfaces';
+import { ApplicationStatus } from '../shared/enums';
 
 @ApiTags('Applications')
 @Controller('applications')
-@UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+@UsePipes(new ValidationPipe({ whitelist: true, transform: true })) // Apply globally to controller
 export class ApplicationController {
   private readonly logger = new Logger(ApplicationController.name);
 
-  constructor(private readonly applicationService: ApplicationService) {}
+  constructor(private readonly applicationService: JobApplicationService) {}
 
-@Post()
+  @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new job application (resume file temporarily optional for testing)' })
-  // NO @ApiConsumes('multipart/form-data') anymore
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        // ... (your existing properties)
-        resumePath: { type: 'string', example: 'https://example.com/resumes/dummy_resume.pdf' }, // <-- Make sure this is here
-      },
-      required: ['jobPositionId', 'candidateName', 'candidateEmail', 'resumePath', 'skills', 'experienceYears', 'educationLevel'], // <-- And here
-    },
-  })
-  // NO @UseInterceptors(FileInterceptor(...)) anymore
+  @ApiOperation({ summary: 'Create a new job application and its associated candidate profile (if not already existing).' })
+  @ApiBody({ type: CreateApplicationDto, description: 'Data for creating a new job application, including full candidate profile details.' })
+  @ApiResponse({ status: 201, description: 'Application successfully created.', type: 'object' /* Consider a more specific response DTO */ })
+  @ApiResponse({ status: 400, description: 'Bad Request (Validation error, invalid ID, or failed candidate profile creation).' })
+  @ApiResponse({ status: 404, description: 'Not Found (Job Position not found).' })
+  @ApiResponse({ status: 409, description: 'Conflict (Duplicate application or candidate profile email/phone).' })
   async create(
     @Body() createApplicationDto: CreateApplicationDto,
-    // REMOVED @UploadedFile() resume: Express.Multer.File,
-    @Request() req: Request, // Keep this if you want to pass createdBy
+    @Request() req: Request, // Use @Request() for accessing user from auth middleware
   ): Promise<IApplicationDocument> {
-    this.logger.log(`Received request to create application for job ${createApplicationDto.jobPositionId} by ${createApplicationDto.candidateEmail}.`);
-    // REMOVED if (!resume) { ... } // This check is no longer relevant
-
-    // Pass createApplicationDto.resumePath directly to the service
-    return this.applicationService.createApplication(createApplicationDto, createApplicationDto.resumePath);
+    this.logger.log(`Received request to create application for Job ID: ${createApplicationDto.jobPositionId}`);
+    // Assuming `req.user.id` is populated by an authentication guard/middleware
+    const createdBy = (req as any).user ? (req as any).user.id : undefined;
+    return this.applicationService.createApplication(createApplicationDto, createdBy);
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get an application by ID' })
   @ApiParam({ name: 'id', description: 'The ID of the application', type: String })
-  @ApiResponse({ status: 200, description: 'The application found.', type: CreateApplicationDto })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
+  @ApiResponse({ status: 200, description: 'The application found.', type: 'object' /* Specific DTO for response if needed */ })
+  @ApiResponse({ status: 400, description: 'Bad Request (Invalid ID format).' })
+  @ApiResponse({ status: 404, description: 'Not Found.' })
   async findOne(@Param('id') id: string): Promise<IApplicationDocument> {
-    
-    return this.applicationService.getApplicationById(id);
+    this.logger.log(`Fetching application with ID: ${id}`);
+    const application = await this.applicationService.getApplicationById(id);
+    if (!application) {
+      throw new NotFoundException(`Application with ID '${id}' not found.`);
+    }
+    return application;
   }
 
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get all applications with filters and pagination' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'sortBy', required: false, type: String })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
-  @ApiQuery({ name: 'jobPositionId', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ApplicationStatus })
-  @ApiQuery({ name: 'candidateName', required: false, type: String })
-  @ApiQuery({ name: 'candidateEmail', required: false, type: String })
-  @ApiQuery({ name: 'skills', required: false, type: String, description: 'Comma-separated skills' })
-  @ApiQuery({ name: 'minExperience', required: false, type: Number })
-  @ApiQuery({ name: 'educationLevel', required: false, enum: ['High School', 'Associate Degree', 'Bachelor\'s Degree', 'Master\'s Degree', 'PhD'] })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'General keyword search' })
-  @ApiQuery({ name: 'appliedDateFrom', required: false, type: String,  description: 'Filter by minimum applied date (ISO string)' })
-  @ApiQuery({ name: 'appliedDateTo', required: false, type: String,  description: 'Filter by maximum applied date (ISO string)' })
-  @ApiResponse({ status: 200, description: 'A paginated list of applications.', type: [CreateApplicationDto] })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
+  // ApiQuery definitions are now automatically derived from ApplicationQueryDto
+  // due to @UsePipes(new ValidationPipe({ transform: true })) and @Query() queryDto: ApplicationQueryDto
+  // However, explicit ApiQuery for complex nested filters can be useful for Swagger clarity if needed.
+  @ApiResponse({ status: 200, description: 'A paginated list of applications.', type: 'object' /* Adjust to reflect IPaginatedResponse<IApplicationDocument> */ })
+  @ApiResponse({ status: 400, description: 'Bad Request (Validation error).' })
   async findAll(@Query() queryDto: ApplicationQueryDto): Promise<IPaginatedResponse<IApplicationDocument>> {
     this.logger.log('Received request to get all applications with filters.');
+    this.logger.debug(`Query: ${JSON.stringify(queryDto)}`);
     return this.applicationService.getApplications(queryDto);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an application by ID' })
   @ApiParam({ name: 'id', description: 'The ID of the application', type: String })
-  @ApiResponse({ status: 200, description: 'The application has been successfully updated.', type: UpdateApplicationDto })
-  @ApiResponse({ status: 400, description: 'Bad Request (Validation Error or invalid status transition)' })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
+  @ApiBody({ type: UpdateApplicationDto, description: 'Partial data for updating a job application' })
+  @ApiResponse({ status: 200, description: 'The application has been successfully updated.', type: 'object' })
+  @ApiResponse({ status: 400, description: 'Bad Request (Validation Error or invalid status transition).' })
+  @ApiResponse({ status: 404, description: 'Not Found.' })
   async update(
     @Param('id') id: string,
     @Body() updateApplicationDto: UpdateApplicationDto,
-    // @Request() req // Uncomment and use for getting user ID for updatedBy
+    @Request() req: Request,
   ): Promise<IApplicationDocument> {
-    
-    // In a real app, get user ID from request (e.g., req.user.id)
-    return this.applicationService.updateApplication(id, updateApplicationDto /*, req.user.id*/);
+    this.logger.log(`Received request to update application with ID: ${id}`);
+    const updatedBy = (req as any).user ? (req as any).user.id : undefined;
+    return this.applicationService.updateApplication(id, updateApplicationDto, updatedBy);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.NO_CONTENT) // Use 204 for successful deletion with no content
   @ApiOperation({ summary: 'Soft delete an application by ID' })
   @ApiParam({ name: 'id', description: 'The ID of the application', type: String })
-  @ApiResponse({ status: 204, description: 'The application has been successfully soft-deleted.' })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
+  @ApiResponse({ status: 204, description: 'Application successfully soft-deleted.' })
+  @ApiResponse({ status: 400, description: 'Bad Request (Invalid ID format).' })
+  @ApiResponse({ status: 404, description: 'Not Found.' })
   async remove(
     @Param('id') id: string,
-    // @Request() req // Uncomment and use for getting user ID for deletedBy
+    @Request() req: Request,
   ): Promise<void> {
-    
-    // In a real app, get user ID from request (e.g., req.user.id)
-    await this.applicationService.deleteApplication(id /*, req.user.id*/);
-  }
-
-  @Put(':id/restore')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Restore a soft-deleted application by ID' })
-  @ApiParam({ name: 'id', description: 'The ID of the application to restore', type: String })
-  @ApiResponse({ status: 200, description: 'The application has been successfully restored.', type: CreateApplicationDto })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async restore(
-    @Param('id') id: string,
-    // @Request() req
-  ): Promise<IApplicationDocument> {
-    
-    return this.applicationService.restoreApplication(id /*, req.user.id*/);
-  }
-
-  @Delete(':id/hard-delete')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Hard delete an application by ID (irreversible, deletes resume file)' })
-  @ApiParam({ name: 'id', description: 'The ID of the application to hard delete', type: String })
-  @ApiResponse({ status: 204, description: 'The application has been successfully hard-deleted along with its resume file.' })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async hardRemove(@Param('id') id: string): Promise<void> {
-    
-    await this.applicationService.hardDeleteApplication(id);
+    this.logger.log(`Received request to soft delete application with ID: ${id}`);
+    const deletedBy = (req as any).user ? (req as any).user.id : undefined;
+    await this.applicationService.removeApplication(id, deletedBy);
   }
 }

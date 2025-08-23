@@ -1,23 +1,17 @@
 // src/recruitment/shared/interfaces.ts
+
 import { Types } from 'mongoose';
 
-/**
- * Base interface for all Mongoose documents to include common audit fields.
- */
 export interface IBaseDocument {
-
   createdAt?: Date;
   updatedAt?: Date;
-  createdBy?: Types.ObjectId | string; // Assuming user ID or name
-  updatedBy?: Types.ObjectId | string; // Assuming user ID or name
-  isDeleted?: boolean; // Soft delete flag
+  createdBy?: Types.ObjectId;
+  updatedBy?: Types.ObjectId;
+  isDeleted?: boolean;
   deletedAt?: Date;
-  deletedBy?: Types.ObjectId | string;
+  deletedBy?: Types.ObjectId;
 }
 
-/**
- * Interface for pagination query parameters.
- */
 export interface IPaginationQuery {
   page?: number;
   limit?: number;
@@ -25,13 +19,12 @@ export interface IPaginationQuery {
   sortOrder?: 'asc' | 'desc';
 }
 
-/**
- * Standard response structure for paginated lists.
- */
 export interface IPaginatedResponse<T> {
   data: T[];
-  total: number;
-  page: number;
+  totalDocs: number;
   limit: number;
+  page: number;
   totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }

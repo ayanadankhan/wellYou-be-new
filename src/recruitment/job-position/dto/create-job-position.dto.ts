@@ -8,12 +8,38 @@ import {
   IsEnum,
   IsArray,
   ArrayMinSize,
-  ArrayMaxSize,
   IsDateString,
   ValidateIf,
+  IsObject,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer'; // Needed for @Type decorator with nested objects
 import { ApiProperty } from '@nestjs/swagger';
-import { JobStatus } from 'src/recruitment/shared/enums';
+import { JobType, ExperienceLevel, JobStatus } from '../../shared/enums'; // Adjust path as needed for your enums
+
+// DTO for salaryRange nested object
+export class SalaryRangeDto {
+  @ApiProperty({ description: 'Minimum salary for the position', example: 80000 })
+  @IsNumber()
+  @Min(0)
+  min: number;
+
+  @ApiProperty({ description: 'Maximum salary for the position', example: 120000 })
+  @IsNumber()
+  @Min(0)
+  max: number;
+
+  @ApiProperty({ description: 'Currency of the salary', example: 'USD', default: 'USD' })
+  @IsString()
+  @IsNotEmpty()
+  currency: string;
+
+  @ApiProperty({ description: 'Period of salary (e.g., yearly, monthly, hourly)', example: 'yearly' })
+  @IsString()
+  @IsNotEmpty()
+  period: 'yearly' | 'monthly' | 'hourly'; // Ensure this matches your schema's period type
+}
+
 
 export class CreateJobPositionDto {
   @ApiProperty({
@@ -38,7 +64,7 @@ export class CreateJobPositionDto {
   })
   @IsString()
   @IsNotEmpty()
-  department: string;
+  department: string; // ✨ Kept as required based on error "department should not be empty"
 
   @ApiProperty({
     description: 'Location of the job',
@@ -49,43 +75,33 @@ export class CreateJobPositionDto {
   location: string;
 
   @ApiProperty({
-    description: 'Employment type',
-    enum: ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'],
-    example: 'Full-time',
+    description: 'Type of job (e.g., FULL_TIME, PART_TIME)',
+    enum: JobType, // ✨ Using the enum
+    example: JobType.FULL_TIME,
   })
-  @IsEnum(['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'])
+  @IsEnum(JobType) // ✨ Use @IsEnum with your actual enum
   @IsNotEmpty()
-  employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
+  jobType: JobType; // ✨ Renamed from employmentType
 
   @ApiProperty({
-    description: 'Minimum salary for the position (optional)',
-    example: 80000,
+    description: 'Experience level required for the job (e.g., ENTRY_LEVEL, SENIOR)',
+    enum: ExperienceLevel, // ✨ Using the enum
+    example: ExperienceLevel.SENIOR,
+  })
+  @IsEnum(ExperienceLevel) // ✨ Use @IsEnum with your actual enum
+  @IsNotEmpty()
+  experienceLevel: ExperienceLevel; // ✨ New field added
+
+  @ApiProperty({
+    description: 'Salary range for the position',
+    type: SalaryRangeDto,
     required: false,
   })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  salaryMin?: number;
-
-  @ApiProperty({
-    description: 'Maximum salary for the position (optional)',
-    example: 120000,
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @ValidateIf(o => o.salaryMin !== undefined) // Only validate if salaryMin is provided
-  salaryMax?: number; // Add a custom validator to ensure salaryMax >= salaryMin
-
-  @ApiProperty({
-    description: 'Currency of the salary',
-    example: 'USD',
-    default: 'USD',
-  })
-  @IsString()
-  @IsNotEmpty()
-  currency: string;
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SalaryRangeDto) // Important for nested DTOs
+  salaryRange?: SalaryRangeDto; // ✨ Aligned with schema's nested object structure
 
   @ApiProperty({
     description: 'List of responsibilities for the job',

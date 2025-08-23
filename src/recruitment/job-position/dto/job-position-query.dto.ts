@@ -1,8 +1,8 @@
 // src/recruitment/job-position/dto/job-position-query.dto.ts
-import { IsOptional, IsString, IsNumberString, IsEnum, IsBooleanString, IsDateString, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { JobStatus } from 'src/recruitment/shared/enums';
 import { Transform, Type } from 'class-transformer';
+import { JobStatus, JobType, ExperienceLevel } from '../../shared/enums'; // Import JobType and ExperienceLevel
 
 export class JobPositionQueryDto {
   @ApiProperty({ description: 'Page number for pagination', required: false, default: 1 })
@@ -37,10 +37,15 @@ export class JobPositionQueryDto {
   @IsString()
   location?: string;
 
-  @ApiProperty({ description: 'Filter by employment type', required: false, enum: ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'] })
+  @ApiProperty({ description: 'Filter by job type', required: false, enum: JobType })
   @IsOptional()
-  @IsEnum(['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'])
-  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
+  @IsEnum(JobType)
+  jobType?: JobType; // ✨ Renamed from employmentType and using JobType enum
+
+  @ApiProperty({ description: 'Filter by experience level', required: false, enum: ExperienceLevel })
+  @IsOptional()
+  @IsEnum(ExperienceLevel)
+  experienceLevel?: ExperienceLevel; // ✨ New field added
 
   @ApiProperty({ description: 'Filter by minimum salary', required: false })
   @IsOptional()
