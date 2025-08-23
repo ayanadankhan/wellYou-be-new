@@ -3,9 +3,9 @@ import { AppModule } from '@/app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-// import * as crypto from 'crypto';
+import * as crypto from 'crypto';
 
-// (globalThis as any).crypto = crypto;
+(globalThis as any).crypto = crypto;
 
 async function bootstrap() {
   try {
@@ -38,7 +38,11 @@ async function bootstrap() {
 
     // CORS configuration - be more specific in production
     app.enableCors({
-     origin: '*', // Allows requests from ANY origin. DO NOT USE IN PRODUCTION.
+      origin: process.env.NODE_ENV === 'production' 
+        ? 
+        ['https://hrms.bitsbuffer.com','https://localhost:3001.com'] // Replace with your actual frontend URL
+         // Replace with your actual frontend URL
+        : true, // Allow all origins in development
       credentials: true,
     });
 

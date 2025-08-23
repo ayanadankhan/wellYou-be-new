@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Schema as MongooseSchema, Types } from "mongoose";
 import { Gender, MaritalStatus, EmploymentStatus, EmploymentType, SkillLevel } from '../dto/create-Employee.dto';
+import { Status } from '@/document/dto/create-document.dto';
 
 export type EmployeeDocument = Employee & Document;
 
@@ -15,6 +16,38 @@ class Document {
   @Prop({ required: false, type: String })
   url: string;
 
+  @Prop({ type: String, required: false })
+  documentType: string;
+
+  @Prop({ type: String, required: false })
+  title: string;
+
+  @Prop({ type: String, required: false })
+  instruction: string;
+
+  @Prop({ type: String, required: false })
+  templateUrl: string;
+
+  @Prop({ type: Boolean, default: false })
+  isDefault: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  requireApproval: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isExpiry: boolean;
+
+  @Prop({ type: String, enum: Status, default: Status.PENDING })
+  status: Status;
+
+  @Prop({ type: [String], default: [] })
+  allowedTypes: string[];
+
+  @Prop({ type: Date, required: false })
+  uploadedAt: Date;
+
+  @Prop({ type: String, required: false })
+  documentId: string;
 }
 
 @Schema({ _id: false })

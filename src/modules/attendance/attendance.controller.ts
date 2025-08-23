@@ -284,8 +284,9 @@ export class AttendanceController {
   async getAttendanceReport(
     @CurrentUser() user: User,
     @Query('month') month?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('departmentId') departmentId?: string
   ) {
     try {
       if (!user.tenantId) {
@@ -297,18 +298,18 @@ export class AttendanceController {
 
       this.logger.log(`📊 Generating attendance report for tenant: ${user.tenantId}`);
 
-      if (month && (from || to)) {
+      if (month && (fromDate || toDate)) {
         throw new HttpException(
           'Please provide either month filter OR date range filter, not both',
           HttpStatus.BAD_REQUEST
         );
       }
 
-      if (from && to) {
-        const fromDate = new Date(from);
-        const toDate = new Date(to);
+      if (fromDate && toDate) {
+        const f = new Date(fromDate);
+        const t = new Date(toDate);
 
-        if (fromDate > toDate) {
+        if (f > t) {
           throw new HttpException(
             'From date cannot be after To date',
             HttpStatus.BAD_REQUEST
@@ -319,8 +320,9 @@ export class AttendanceController {
       const report = await this.attendanceService.attendanceReport(
         user.tenantId.toString(),
         month,
-        from,
-        to
+        fromDate,
+        toDate,
+        departmentId
       );
 
       return {
@@ -329,7 +331,10 @@ export class AttendanceController {
         message: 'Attendance report generated successfully'
       };
     } catch (error) {
-      this.logger.error(`❌ Attendance report generation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `❌ Attendance report generation failed: ${error.message}`,
+        error.stack
+      );
       throw new HttpException(
         {
           status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,

@@ -1,16 +1,23 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document as MongooseDocument } from 'mongoose';
+import { boolean } from 'joi';
+import { Document as MongooseDocument, Types } from 'mongoose';
+import { Status } from '../dto/create-document.dto';
 
 @Schema({ timestamps: true })
 export class Document extends MongooseDocument {
-  @Prop({ type: String, required: true, ref: 'Category' })
-  categoryId: string;
+  @Prop({ type: Types.ObjectId, required: true, ref: 'DocumentType' }) categoryId: Types.ObjectId; 
+
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
 
   @Prop({ type: String, required: true })
   documentType: string;
 
   @Prop({ type: String, required: true })
   title: string;
+
+  @Prop({ type: String})
+  instruction: string;
 
   @Prop({ type: String, required: false })
   templateUrl: string;
@@ -23,6 +30,9 @@ export class Document extends MongooseDocument {
 
   @Prop({ type: Boolean, required: true, default: false })
   requireApproval: boolean;
+
+  @Prop({ type: String , enum: Status , default: Status.PENDING })
+  status: Status;
 
   @Prop({ 
     type: [String], 

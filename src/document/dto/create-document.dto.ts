@@ -8,6 +8,11 @@ import {
   ArrayNotEmpty,
 } from 'class-validator';
 
+export enum Status {
+  PENDING = 'PENDING',
+  UPLOADED = 'UPLOADED',
+  COMPLETED = 'COMPLETED',
+}
 export class CreateDocumentDto {
   @IsMongoId()
   categoryId: string;
@@ -19,6 +24,10 @@ export class CreateDocumentDto {
   @IsString()
   @IsNotEmpty()
   title: string;
+
+  @IsString()
+  @IsOptional()
+  instruction: string;
 
   @IsString()
   @IsOptional()
@@ -37,5 +46,5 @@ export class CreateDocumentDto {
   @IsString({ each: true })
   @ArrayNotEmpty()
   @IsOptional()
-  allowedTypes: string[]; // Array of allowed file types like ["pdf", "doc", "docx"]
+  allowedTypes: string[];
 }

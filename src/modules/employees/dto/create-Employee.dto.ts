@@ -9,7 +9,8 @@ import {
   IsBoolean, 
   ValidateNested,
   IsEnum, 
-  IsObject
+  IsObject,
+  IsDate
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
@@ -211,6 +212,52 @@ class DocumentDto {
   @IsString()
   @IsOptional()
   url: string;
+
+  @IsString()
+  @IsOptional()
+  templateUrl: string;
+
+  @IsString()
+  @IsOptional()
+  documentType: string; // Form, Agreement, ID Proof
+
+  @IsString()
+  @IsOptional()
+  title: string;
+
+  @IsString()
+  @IsOptional()
+  instruction: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isDefault: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isExpiry: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  requireApproval: boolean;  
+
+  @IsBoolean()
+  @IsOptional()
+  status: boolean; 
+  
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  allowedTypes: string[];
+
+  @IsDate()
+  @IsOptional()
+  @Type(() => Date)
+  uploadedAt: Date;
+
+  @IsString()
+  @IsOptional()
+  documentId: string;
 }
 
 export class DependentMemberDto {
@@ -314,11 +361,9 @@ export class CreateEmployeeDto {
   @IsOptional()
   drivingLincenceExpiryDate: string;
 
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => DocumentDto)
+
   @IsOptional()
-  documents?: DocumentDto[];
+  documents?: any[];
 
   @ValidateNested()
   @Type(() => EmergencyContactDto)

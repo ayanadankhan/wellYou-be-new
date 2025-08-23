@@ -28,9 +28,7 @@ export class PayrollController {
   }
 
   @Get('report')
-  async getPayrollSummary(@CurrentUser() user: User) {
-    console.log(`Fetching payroll summary for tenant: ${user.tenantId?.toString()}`);
-    
+  async getPayrollSummary(@CurrentUser() user: User) {   
     return this.payrollService.getCurrentMonthPayrollSummary(user.tenantId?.toString() || '');
   }
 
