@@ -1058,8 +1058,8 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
   async attendanceReport(
     tenantId: string,
     month?: string,
-    fromDate?: string,
-    toDate?: string,
+    from?: string,
+    to?: string,
     departmentId?: string
   ) {
     try {
@@ -1074,9 +1074,9 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
 
         filterStart = new Date(Date.UTC(year, monthNum - 1, 1));
         filterEnd = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
-      } else if (fromDate && toDate) {
-        filterStart = new Date(fromDate);
-        filterEnd = new Date(toDate);
+      } else if (from && to) {
+        filterStart = new Date(from);
+        filterEnd = new Date(to);
         filterStart.setUTCHours(0, 0, 0, 0);
         filterEnd.setUTCHours(23, 59, 59, 999);
 
