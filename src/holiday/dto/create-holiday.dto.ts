@@ -1,6 +1,3 @@
-// src/modules/holiday/dto/create-holiday.dto.ts
-// This DTO defines the data structure for creating a new holiday.
-
 import {
   IsNotEmpty,
   IsString,
@@ -9,12 +6,9 @@ import {
   IsBoolean,
   IsArray,
   IsEnum,
-  ArrayNotEmpty,
-  ArrayUnique,
+  MaxLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
 
-// Define the enum-like types for validation
 export enum HolidayType {
   NATIONAL = 'national',
   RELIGIOUS = 'religious',
@@ -24,6 +18,7 @@ export enum HolidayType {
   FESTIVAL = 'festival',
   MEMORIAL = 'memorial',
   BANK = 'bank',
+  WEEKEND = 'weekend',
 }
 
 export enum RecurringPattern {
@@ -41,105 +36,59 @@ export enum EmployeeType {
   CONSULTANT = 'consultant',
 }
 
-export enum CompensationPolicy {
-  PAID = 'paid',
-  UNPAID = 'unpaid',
-  OPTIONAL_WORK = 'optional_work',
-  PREMIUM_PAY = 'premium_pay',
-  COMP_OFF = 'comp_off',
+export enum DayOfWeek {
+  MONDAY = 'monday',
+  TUESDAY = 'tuesday',
+  WEDNESDAY = 'wednesday',
+  THURSDAY = 'thursday',
+  FRIDAY = 'friday',
+  SATURDAY = 'saturday',
+  SUNDAY = 'sunday',
 }
 
 export class CreateHolidayDto {
-  @ApiProperty({ description: 'The name of the holiday.' })
   @IsNotEmpty()
   @IsString()
+  @MaxLength(100)
   name: string;
 
-  @ApiProperty({
-    enum: HolidayType,
-    description: 'The type of holiday.',
-  })
   @IsEnum(HolidayType)
   type: HolidayType;
 
-  @ApiProperty({
-    required: false,
-    description: 'An optional description of the holiday.',
-  })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
-  @ApiProperty({
-    description: 'The date of the holiday in YYYY-MM-DD format.',
-  })
-  @IsNotEmpty()
+  @IsOptional()
   @IsDateString()
-  date: Date;
+  date?: Date;
 
-  @ApiProperty({
-    default: false,
-    description: 'Indicates if this is a recurring holiday.',
-  })
   @IsOptional()
   @IsBoolean()
   isRecurring?: boolean;
 
-  @ApiProperty({
-    enum: RecurringPattern,
-    required: false,
-    description: 'The pattern for a recurring holiday.',
-  })
   @IsOptional()
   @IsEnum(RecurringPattern)
   recurringPattern?: RecurringPattern;
 
-  @ApiProperty({
-    default: false,
-    description: 'Indicates if this is an optional holiday.',
-  })
   @IsOptional()
-  @IsBoolean()
-  isOptional?: boolean;
-
-  @ApiProperty({
-    enum: CompensationPolicy,
-    description: 'The compensation policy for the holiday.',
-  })
-  @IsEnum(CompensationPolicy)
-  compensationPolicy: CompensationPolicy;
-
-  @ApiProperty({
-    isArray: true,
-    description: 'An array of locations where the holiday is observed.',
-    example: ['New York', 'London'],
-  })
   @IsArray()
   @IsString({ each: true })
-  @ArrayNotEmpty()
+  location?: string[];
 
-  applicableLocations: string[];
-
-  @ApiProperty({
-    isArray: true,
-    description: 'An array of departments to which the holiday applies.',
-    example: ['Engineering', 'Marketing'],
-  })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @ArrayNotEmpty()
+  applicableDepartments?: string[];
 
-  applicableDepartments: string[];
-
-  @ApiProperty({
-    enum: EmployeeType,
-    isArray: true,
-    description: 'An array of employee types to which the holiday applies.',
-    example: ['full_time'],
-  })
+  @IsOptional()
   @IsArray()
   @IsEnum(EmployeeType, { each: true })
-  @ArrayNotEmpty()
- 
-  applicableEmployeeTypes: EmployeeType[];
+  applicableEmployeeTypes?: EmployeeType[];
+
+  @IsOptional()
+  @IsArray()
+  @IsEnum(DayOfWeek, { each: true })
+  days?: DayOfWeek[];
 }

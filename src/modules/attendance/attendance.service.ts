@@ -1170,6 +1170,15 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
         filterEnd
       );
 
+      const tenantMonthToDateAttendance = await this.getTenantMonthlyAttendanceSummary(
+        tenantId,
+        filterStart,
+        filterEnd
+      );
+      
+      const todayDepartmentWiseAttendance = await this.getTodayDepartmentWiseAttendance(
+        tenantId,
+      );
 
       const currentMonthLateCheckIns = await this.getCurrentMonthLateCheckIns(
         tenantId,
