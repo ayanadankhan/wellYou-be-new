@@ -284,8 +284,8 @@ export class AttendanceController {
   async getAttendanceReport(
     @CurrentUser() user: User,
     @Query('month') month?: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('departmentId') departmentId?: string
   ) {
     try {
@@ -298,16 +298,16 @@ export class AttendanceController {
 
       this.logger.log(`📊 Generating attendance report for tenant: ${user.tenantId}`);
 
-      if (month && (fromDate || toDate)) {
+      if (month && (from || to)) {
         throw new HttpException(
           'Please provide either month filter OR date range filter, not both',
           HttpStatus.BAD_REQUEST
         );
       }
 
-      if (fromDate && toDate) {
-        const f = new Date(fromDate);
-        const t = new Date(toDate);
+      if (from && to) {
+        const f = new Date(from);
+        const t = new Date(to);
 
         if (f > t) {
           throw new HttpException(
@@ -320,8 +320,8 @@ export class AttendanceController {
       const report = await this.attendanceService.attendanceReport(
         user.tenantId.toString(),
         month,
-        fromDate,
-        toDate,
+        from,
+        to,
         departmentId
       );
 

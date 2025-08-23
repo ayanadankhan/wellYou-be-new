@@ -967,7 +967,10 @@ export class requestMangmentervice {
   async getRecentLeaveRequests(tenantId: string) {
     return await this.RequestMangmentModel.aggregate([
       {
-        $match: { type: 'leave' }
+        $match: {
+          type: "leave",
+          "workflow.status": "pending"
+        }
       },
       {
         $lookup: {
