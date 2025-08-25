@@ -39,6 +39,3 @@ export class Payroll extends Document {
 }
 
 export const PayrollSchema = SchemaFactory.createForClass(Payroll);
-
-// Compound unique index for payrollMonth + tenantId
-PayrollSchema.index({ payrollMonth: 1, tenantId: 1 }, { unique: true });
