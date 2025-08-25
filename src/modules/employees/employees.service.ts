@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
 import { Employee, EmployeeDocument } from './schemas/Employee.schema';
@@ -14,6 +14,7 @@ import { CreateUserDto } from '../tenant/users/dto/create-user.dto';
 import { Department } from '../departments/entities/department.entity';
 import { Designation } from '../designations/entities/designation.entity';
 import { GetEmployeeDocumentsDto } from './dto/get-EmployeeDocument.dto';
+import { AuthenticatedUser } from '../auth/interfaces/auth.interface';
 
 @Injectable()
 export class EmployeesService {
@@ -211,9 +212,13 @@ export class EmployeesService {
     }
   }
 
-  async findAllWithDocuments(getDto: GetEmployeeDocumentsDto) {
+  async findAllWithDocuments(getDto: GetEmployeeDocumentsDto, user: AuthenticatedUser) {
     try {
       const matchStage: any = {};
+
+      if (user?.tenantId) {
+        matchStage.tenantId = new Types.ObjectId(user.tenantId);
+      }
 
       if (getDto.name) {
         matchStage.$or = [
@@ -225,6 +230,20 @@ export class EmployeesService {
       if (getDto.documentStatus) {
         matchStage["documents.status"] = getDto.documentStatus;
       }
+
+      if (getDto.documentTitle) {
+        matchStage.$or = [
+          { "documents.name": { $regex: getDto.documentTitle, $options: "i" } },
+        ];
+      }
+
+      if (getDto.categoryId) {
+        if (!Types.ObjectId.isValid(getDto.categoryId)) {
+          throw new BadRequestException("Invalid categoryId");
+        }
+        matchStage["documents.categoryId._id"] = new Types.ObjectId(getDto.categoryId);
+      }
+
 
       const [list, countResult] = await Promise.all([
         this.employeeModel.aggregate([
@@ -241,7 +260,6 @@ export class EmployeesService {
           { $unwind: "$documents" },
 
           ...(Object.keys(matchStage).length ? [{ $match: matchStage }] : []),
-
           {
             $project: {
               _id: 1,
@@ -289,139 +307,6 @@ export class EmployeesService {
       );
     }
   }
-  // // Alternative method: Get flattened document list with employee info
-  // async findAllDocumentsFlattened(getDto: GetEmployeeDocumentsDto) {
-  //   const {
-  //     o: offset = 0,
-  //     l: limit = 10,
-  //     name,
-  //     email,
-  //     department,
-  //     designation,
-  //     documentType,
-  //     status,
-  //     tenantId
-  //   } = getDto;
-
-  //   const matchConditions: any = {};
-
-  //   if (tenantId) {
-  //     matchConditions.tenantId = tenantId;
-  //   }
-
-  //   if (name) {
-  //     matchConditions.name = { $regex: name, $options: 'i' };
-  //   }
-
-  //   if (email) {
-  //     matchConditions.email = { $regex: email, $options: 'i' };
-  //   }
-
-  //   if (department) {
-  //     matchConditions.department = { $regex: department, $options: 'i' };
-  //   }
-
-  //   if (designation) {
-  //     matchConditions.designation = { $regex: designation, $options: 'i' };
-  //   }
-
-  //   const pipeline: PipelineStage[] = [
-  //     { $match: matchConditions },
-
-  //     // Only employees with documents
-  //     {
-  //       $match: {
-  //         documents: { $exists: true, $ne: [], $not: { $size: 0 } }
-  //       }
-  //     },
-
-  //     // Unwind documents
-  //     {
-  //       $unwind: {
-  //         path: '$documents',
-  //         preserveNullAndEmptyArrays: false
-  //       }
-  //     }
-  //   ];
-
-  //   // Add document type filter if provided
-  //   if (documentType) {
-  //     pipeline.push({
-  //       $match: {
-  //         'documents.documentType': { $regex: documentType, $options: 'i' }
-  //       }
-  //     });
-  //   }
-
-  //   // Add status filter if provided
-  //   if (status) {
-  //     pipeline.push({
-  //       $match: {
-  //         'documents.status': status
-  //       }
-  //     });
-  //   }
-
-  //   // Continue with projection and sorting
-  //   pipeline.push(
-  //     // Project final structure
-  //     {
-  //       $project: {
-  //         _id: '$documents._id',
-  //         documentTitle: '$documents.title',
-  //         fileName: '$documents.fileName',
-  //         fileUrl: '$documents.fileUrl',
-  //         documentType: '$documents.documentType',
-  //         status: '$documents.status',
-  //         uploadedAt: '$documents.uploadedAt',
-  //         // Employee info
-  //         employee: {
-  //           _id: '$_id',
-  //           name: '$name',
-  //           email: '$email',
-  //           profilePicture: '$profilePicture',
-  //           department: '$department',
-  //           designation: '$designation'
-  //         }
-  //       }
-  //     },
-
-  //     // Sort by upload date
-  //     {
-  //       $sort: { uploadedAt: -1 }
-  //     },
-
-  //     // Pagination
-  //     {
-  //       $facet: {
-  //         documents: [
-  //           { $skip: offset },
-  //           { $limit: limit }
-  //         ],
-  //         totalCount: [
-  //           { $count: 'count' }
-  //         ]
-  //       }
-  //     }
-  //   );
-
-  //   const result = await this.employeeModel.aggregate(pipeline);
-
-  //   const documents = result[0]?.documents || [];
-  //   const totalCount = result[0]?.totalCount[0]?.count || 0;
-
-  //   return {
-  //     documents,
-  //     count: totalCount,
-  //     pagination: {
-  //       offset,
-  //       limit,
-  //       total: totalCount,
-  //       pages: Math.ceil(totalCount / limit),
-  //       currentPage: Math.floor(offset / limit) + 1
-  //     }
-  //   };
-  // }
 
   async findEmployeeIdByUserId(userId: string): Promise<string | null> {
     try {
