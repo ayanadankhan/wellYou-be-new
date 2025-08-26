@@ -493,16 +493,14 @@ constructor(
   }
 
   async getCurrentMonthPayrollSummary(tenantId: string) {
-    // Get current month and year
     const now = new Date();
     const monthName = now.toLocaleString('en-US', { month: 'long' });
     const year = now.getFullYear();
     const currentMonthName = `${monthName} ${year}`;
-    // Find payroll for this tenant and month
     const payroll = await this.payrollModel.findOne({
-      tenantId: new Types.ObjectId(tenantId), // ✅ ObjectId match
+      tenantId: new Types.ObjectId(tenantId),
       payrollMonth: currentMonthName,
-    }).lean<{ 
+    }).lean<{
       netPay?: number;
       selectedEmployees?: {
         salaryPay?: { basePay?: number };
@@ -511,18 +509,7 @@ constructor(
       createdAt?: Date;
     }>();
 
-    // If no payroll found
-    if (!payroll) {
-      return {
-        totalcurrentMonthPayroll: 0,
-        totalEmployeesInRolled: 0,
-        averageSalary: 0,
-        pendingPayments: 0,
-        lastPayrollRun: null,
-      };
-    }
-
-    const selectedEmployees = payroll.selectedEmployees || [];
+    const selectedEmployees = payroll?.selectedEmployees || [];
     const totalEmployeesInRolled = selectedEmployees.length;
 
     const totalBasePay = selectedEmployees.reduce((sum, emp) => {
@@ -537,27 +524,35 @@ constructor(
       emp => emp.status?.toLowerCase() === 'pending'
     ).length;
 
-    const monthyTrend = await this.getMonthlyPayrollTrend(tenantId);
-    const salaryDistribution = await this.getSalaryDistribution({ selectedEmployees });
-    const getDepartmentWisePayroll = await this.getDepartmentWisePayroll(tenantId, currentMonthName);
-    const recentPayrollRuns = await this.getRecentPayrollRuns(tenantId);
-    const departmentWiseOvertimeData = await this.getDepartmentWiseOvertimeData(tenantId);
-
-    return {
-      payrollSummary: {
-      totalcurrentMonthPayroll: payroll.netPay || 0,
-      totalEmployeesInRolled,
-      averageSalary,
-      pendingPayments,
-      lastPayrollRun: payroll.createdAt 
-        ? new Date(payroll.createdAt).toISOString().split('T')[0]
-        : null,
-      },
+    const [
       monthyTrend,
       salaryDistribution,
       getDepartmentWisePayroll,
       recentPayrollRuns,
       departmentWiseOvertimeData
+    ] = await Promise.all([
+      this.getMonthlyPayrollTrend(tenantId),
+      this.getSalaryDistribution({ selectedEmployees }),
+      this.getDepartmentWisePayroll(tenantId, currentMonthName),
+      this.getRecentPayrollRuns(tenantId),
+      this.getDepartmentWiseOvertimeData(tenantId),
+    ]);
+
+    return {
+      payrollSummary: {
+        totalcurrentMonthPayroll: payroll?.netPay || 0,
+        totalEmployeesInRolled,
+        averageSalary,
+        pendingPayments,
+        lastPayrollRun: payroll?.createdAt
+          ? new Date(payroll.createdAt).toISOString().split('T')[0]
+          : null,
+      },
+      monthyTrend,
+      salaryDistribution,
+      getDepartmentWisePayroll,
+      recentPayrollRuns,
+      departmentWiseOvertimeData,
     };
   }
 
