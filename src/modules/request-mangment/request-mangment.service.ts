@@ -121,31 +121,28 @@ export class requestMangmentervice {
     return savedRequest;
   }
 
-private async generateRequestNumber(tenantId: string): Promise<string> {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const prefix = `REQ${year}${month}`;
+  private async generateRequestNumber(tenantId: string): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `REQ${year}${month}`;
 
-  const lastRequest = await this.RequestMangmentModel.findOne(
-    { 
-      tenantId: new Types.ObjectId(tenantId),
-      requestNumber: { $regex: `^${prefix}` }
-    },
-    { requestNumber: 1 }
-  ).sort({ requestNumber: -1 }).lean();
+    const lastRequest = await this.RequestMangmentModel.findOne(
+      { 
+        tenantId: new Types.ObjectId(tenantId),
+        requestNumber: { $regex: `^${prefix}` }
+      },
+      { requestNumber: 1 }
+    ).sort({ requestNumber: -1 }).lean();
 
-  let sequence = 1;
-  if (lastRequest) {
-    const lastSeq = parseInt(lastRequest.requestNumber.slice(-3), 10);
-    sequence = lastSeq + 1;
+    let sequence = 1;
+    if (lastRequest) {
+      const lastSeq = parseInt(lastRequest.requestNumber.slice(-3), 10);
+      sequence = lastSeq + 1;
+    }
+
+    return `${prefix}${String(sequence).padStart(3, '0')}`;
   }
-
-  return `${prefix}${String(sequence).padStart(3, '0')}`;
-}
-
-
-
 
   private calculateLeaveHours(from: Date, to: Date): number {
     const startDate = new Date(from);

@@ -40,7 +40,6 @@ export class RequestMangment {
   @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
   tenantId: Types.ObjectId;
 
-
   @Prop({ type: Date, default: Date.now })
   appliedDate: Date;
 
