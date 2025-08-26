@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User, UserRole, UserSchema } from '../tenant/users/schemas/user.schema';
 import { Public } from '@/common/decorators/public.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/auth.interface';
 @ApiTags('employees')
 @Controller('employees')
 export class EmployeesController {
@@ -85,7 +86,7 @@ export class EmployeesController {
   
   @Get('/documents')
   async findAllEmployeeDocuments(
-    @CurrentUser() user: User, 
+    @CurrentUser() user: AuthenticatedUser, 
     @Query() getDto: GetEmployeeDto
   ) {
     try {
@@ -99,7 +100,7 @@ export class EmployeesController {
         getDto.tenantId = new Types.ObjectId(user.tenantId);
       }
 
-      return this.employeesService.findAllWithDocuments(getDto);
+      return this.employeesService.findAllWithDocuments(getDto , user);
     } catch (error) {
       throw new HttpException(
         {

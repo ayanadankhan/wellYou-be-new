@@ -38,6 +38,11 @@ export class GetHolidayDto extends GetApiDto {
   @IsString()
   updatedBy?: string;
 
+  @Expose()
+  @IsOptional()
+  @IsString()
+  month: string;
+
   constructor() {
     super();
     this.sb = 'createdAt';

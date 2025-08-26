@@ -20,106 +20,110 @@ export class HolidayService {
     return newHoliday.save();
   }
 
-async findAll(getDto: GetHolidayDto) {
-  try {
-    const pipeline: any[] = [
-      // populate createdBy
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'createdBy',
-          foreignField: '_id',
-          as: 'createdByUser',
-        },
-      },
-      { $unwind: { path: '$createdByUser', preserveNullAndEmptyArrays: true } },
+  async findAll(getDto: GetHolidayDto) {
+    try {
+      const pipeline: any[] = [
 
-      // populate updatedBy
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'updatedBy',
-          foreignField: '_id',
-          as: 'updatedByUser',
-        },
-      },
-      { $unwind: { path: '$updatedByUser', preserveNullAndEmptyArrays: true } },
-    ];
-
-    // 🔎 Filters
-    if (getDto.name) {
-      pipeline.push({ $match: { name: new RegExp(getDto.name, 'i') } });
-    }
-
-    if (getDto.type) {
-      pipeline.push({ $match: { type: getDto.type } });
-    }
-
-    if (getDto.createdBy) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { 'createdByUser.firstName': new RegExp(getDto.createdBy, 'i') },
-            { 'createdByUser.lastName': new RegExp(getDto.createdBy, 'i') },
-          ],
-        },
-      });
-    }
-
-    if (getDto.updatedBy) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { 'updatedByUser.firstName': new RegExp(getDto.updatedBy, 'i') },
-            { 'updatedByUser.lastName': new RegExp(getDto.updatedBy, 'i') },
-          ],
-        },
-      });
-    }
-
-    // ✅ List + Pagination
-    const [list, countQuery] = await Promise.all([
-      this.holidayModel.aggregate([
-        ...pipeline,
-        { $sort: { [getDto.sb]: getDto.sd === '1' ? 1 : -1 } },
-        { $skip: Number(getDto.o || 0) },
-        { $limit: Number(getDto.l || 10) },
         {
-          $project: {
-            _id: 1,
-            name: 1,
-            type: 1,
-            description: 1,
-            date: 1,
-            isRecurring: 1,
-            recurringPattern: 1,
-            location: 1,
-            applicableDepartments: 1,
-            applicableEmployeeTypes: 1,
-            days: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            createdBy: {
-              $concat: ['$createdByUser.firstName', ' ', '$createdByUser.lastName'],
-            },
-            updatedBy: {
-              $concat: ['$updatedByUser.firstName', ' ', '$updatedByUser.lastName'],
-            },
+          $lookup: {
+            from: 'users',
+            localField: 'createdBy',
+            foreignField: '_id',
+            as: 'createdByUser',
           },
         },
-      ]).exec(),
-      this.holidayModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
-    ]);
+        { $unwind: { path: '$createdByUser', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'updatedBy',
+            foreignField: '_id',
+            as: 'updatedByUser',
+          },
+        },
+        { $unwind: { path: '$updatedByUser', preserveNullAndEmptyArrays: true } },
+      ];
 
-    return {
-      count: countQuery[0]?.total || 0,
-      list: list || [],
-    };
-  } catch (error) {
-    throw new BadRequestException('Failed to retrieve holidays');
+      if (getDto.name) {
+        pipeline.push({ $match: { name: new RegExp(getDto.name, 'i') } });
+      }
+
+      if (getDto.type) {
+        pipeline.push({ $match: { type: getDto.type } });
+      }
+
+      if (getDto.createdBy) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'createdByUser.firstName': new RegExp(getDto.createdBy, 'i') },
+              { 'createdByUser.lastName': new RegExp(getDto.createdBy, 'i') },
+            ],
+          },
+        });
+      }
+
+      if (getDto.updatedBy) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'updatedByUser.firstName': new RegExp(getDto.updatedBy, 'i') },
+              { 'updatedByUser.lastName': new RegExp(getDto.updatedBy, 'i') },
+            ],
+          },
+        });
+      }
+
+      const sortStage = { $sort: { [getDto.sb]: getDto.sd === '1' ? 1 : -1 } };
+
+      const paginationStages =
+        getDto.month
+          ? []
+          : [
+              { $skip: Number(getDto.o || 0) },
+              { $limit: Number(getDto.l || 10) },
+            ];
+
+      const [list, countQuery] = await Promise.all([
+        this.holidayModel.aggregate([
+          ...pipeline,
+          sortStage,
+          ...paginationStages,
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              type: 1,
+              description: 1,
+              date: 1,
+              isRecurring: 1,
+              recurringPattern: 1,
+              location: 1,
+              applicableDepartments: 1,
+              applicableEmployeeTypes: 1,
+              days: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              createdBy: {
+                $concat: ['$createdByUser.firstName', ' ', '$createdByUser.lastName'],
+              },
+              updatedBy: {
+                $concat: ['$updatedByUser.firstName', ' ', '$updatedByUser.lastName'],
+              },
+            },
+          },
+        ]).exec(),
+        this.holidayModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to retrieve holidays');
+    }
   }
-}
-
 
   async findOne(id: string): Promise<Holiday> {
     const holiday = await this.holidayModel.findById(id).exec();
