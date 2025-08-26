@@ -125,7 +125,7 @@ export class requestMangmentervice {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const prefix = `REQ${year}${month}`;
+    const prefix = `Req-${year}${month}`;
 
     const lastRequest = await this.RequestMangmentModel.findOne(
       { 
@@ -140,8 +140,9 @@ export class requestMangmentervice {
       const lastSeq = parseInt(lastRequest.requestNumber.slice(-3), 10);
       sequence = lastSeq + 1;
     }
+    const seq = String(sequence).padStart(3, "0");
 
-    return `${prefix}${String(sequence).padStart(3, '0')}`;
+    return `${prefix}-${seq}`;
   }
 
   private calculateLeaveHours(from: Date, to: Date): number {
