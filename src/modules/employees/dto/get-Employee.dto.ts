@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsDateString, IsNumber, IsArray, IsBoolean, ValidateNested, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsEmail, IsDateString, IsNumber, IsArray, IsBoolean, ValidateNested, IsOptional, IsEnum, IsMongoId } from 'class-validator';
 import { GetApiDto } from '../../shared/dto/get-api.dto';
 import { Types } from 'mongoose';
 
@@ -37,6 +37,14 @@ export class GetEmployeeDto extends GetApiDto {
   @IsOptional()
   @IsEnum(DocumentStatus)
   documentStatus?: DocumentStatus;
+
+  @IsMongoId()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  documentTitle?: string;
   
   constructor() {
     super();

@@ -73,94 +73,74 @@ export class DocumentService {
 
     return responseDoc;
   }
+async findAll(getDto: GetDocumentDto, user: AuthenticatedUser) {
+  try {
+    const pipeline: any[] = [];
 
-  async findAll(getDto: GetDocumentDto, user: AuthenticatedUser) {
-    try {
-      const pipeline: any[] = [];
+    // Tenant filter
+    if (user?.tenantId) {
+      pipeline.push({
+        $match: { tenantId: new Types.ObjectId(user.tenantId) },
+      });
+    }
 
-      // Tenant filter
-      if (user?.tenantId) {
-        pipeline.push({
-          $match: { tenantId: new Types.ObjectId(user.tenantId) },
-        });
-      }
+    // Title filter
+    if (getDto.title) {
+      pipeline.push({
+        $match: { title: new RegExp(getDto.title, 'i') },
+      });
+    }
 
-      // Title filter
-      if (getDto.title) {
-        pipeline.push({
-          $match: { title: new RegExp(getDto.title, 'i') },
-        });
-      }
+    if (getDto.documentType) {
+      pipeline.push({
+        $match: { documentType: new RegExp(getDto.documentType, 'i') },
+      });
+    }
 
-      if (getDto.documentType) {
-        pipeline.push({
-          $match: { documentType: new RegExp(getDto.documentType, 'i') },
-        });
-      }
+    // Document Type filter
+    if (getDto.categoryId) {
+      pipeline.push({
+        $match: { categoryId: new Types.ObjectId(getDto.categoryId) },
+      });
+    }
 
-      // Document Type filter
-      if (getDto.categoryId) {
-        pipeline.push({
-          $match: { categoryId: new Types.ObjectId(getDto.categoryId) },
-        });
-      }
+    // Boolean filters
+    const isExpiry =
+      typeof getDto.isExpiry === 'string'
+        ? getDto.isExpiry === 'true'
+        : getDto.isExpiry;
 
-      // Boolean filters
-      const isExpiry =
-        typeof getDto.isExpiry === 'string'
-          ? getDto.isExpiry === 'true'
-          : getDto.isExpiry;
+    const requireApproval =
+      typeof getDto.requireApproval === 'string'
+        ? getDto.requireApproval === 'true'
+        : getDto.requireApproval;
 
-      const requireApproval =
-        typeof getDto.requireApproval === 'string'
-          ? getDto.requireApproval === 'true'
-          : getDto.requireApproval;
+    const isDefault =
+      typeof getDto.isDefault === 'string'
+        ? getDto.isDefault === 'true'
+        : getDto.isDefault;
 
-      const isDefault =
-        typeof getDto.isDefault === 'string'
-          ? getDto.isDefault === 'true'
-          : getDto.isDefault;
+    if (isDefault !== undefined) {
+      pipeline.push({ $match: { isDefault } });
+    }
 
-      if (isDefault !== undefined) {
-        pipeline.push({ $match: { isDefault } });
-      }
+    if (isExpiry !== undefined) {
+      pipeline.push({ $match: { isExpiry } });
+    }
 
-      if (isExpiry !== undefined) {
-        pipeline.push({ $match: { isExpiry } });
-      }
+    if (requireApproval !== undefined) {
+      pipeline.push({ $match: { requireApproval } });
+    }
 
-      if (requireApproval !== undefined) {
-        pipeline.push({ $match: { requireApproval } });
-      }
-
-      // Category Lookup - collection name check karo
-      pipeline.push(
-        {
-          $lookup: {
-            from: this.documentTypeModel.collection.name, // ✅ dynamic collection name
-            localField: 'categoryId',
-            foreignField: '_id',
-            as: 'categoryId',
-          },
-        },
-        {
-          $unwind: {
-            path: '$categoryId',
-            preserveNullAndEmptyArrays: true,
-          },
-        }
-      );
-
-      // Sorting, Pagination and Count
-      const [list, countQuery] = await Promise.all([
-        this.docRequestModel
-          .aggregate([
-            ...pipeline,
-            { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
-            { $skip: Number(getDto.o || 0) },
-            { $limit: Number(getDto.l || 10) },
-          ])
-          .exec(),
+    const [list, countQuery] = await Promise.all([
+      this.docRequestModel
+        .aggregate([
+          ...pipeline,
+          { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
+          { $skip: Number(getDto.o || 0) },
+          { $limit: Number(getDto.l || 10) },
+        ])
+        .exec(),
         this.docRequestModel
           .aggregate([
             ...pipeline,
@@ -169,16 +149,38 @@ export class DocumentService {
           .exec(),
       ]);
 
-      return {
-        count: countQuery[0]?.total || 0,
-        list: list || [],
-      };
-    } catch (error) {
-      console.error(error);
-      throw new BadRequestException('Failed to retrieve documents');
-    }
-  }
+    // ✅ GUARANTEED MANUAL POPULATE - exactly like create method
+    const populatedList = await Promise.all(
+      list.map(async (doc) => {
+        try {
+          // Manual populate using separate query (same as create method)
+          const categoryDoc = await this.documentTypeModel.findById(doc.categoryId).exec();
+          
+          // Create response object manually (same as create method)
+          return {
+            ...doc,
+            categoryId: categoryDoc || null, // ✅ manual populate exactly like create
+          };
+        } catch (error) {
+          console.error('Error populating categoryId for doc:', doc._id, error);
+          return {
+            ...doc,
+            categoryId: null, // fallback
+          };
+        }
+      })
+    );
 
+    return {
+      count: countQuery[0]?.total || 0,
+      list: populatedList || [],
+    };
+  } catch (error) {
+    console.error(error);
+    throw new BadRequestException('Failed to retrieve documents');
+  }
+}
+  
   async findOne(id: string): Promise<Document | null> {
     // ✅ findOne me bhi populate karte hain
     return this.docRequestModel
