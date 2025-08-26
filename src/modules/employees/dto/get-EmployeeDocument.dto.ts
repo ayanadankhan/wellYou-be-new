@@ -30,6 +30,10 @@ export class GetEmployeeDocumentsDto extends GetApiDto {
 
   @IsOptional()
   @IsString()
+  documentTitle?: string;
+
+  @IsOptional()
+  @IsString()
   documentStatus?: string;
 
   @IsOptional()
@@ -51,6 +55,10 @@ export class GetEmployeeDocumentsDto extends GetApiDto {
   @IsOptional()
   @Transform(({ value }) => value ? new Types.ObjectId(value) : undefined)
   positionId?: Types.ObjectId;
+
+  @IsMongoId()
+  @IsOptional()
+  categoryId?: string;
 
   constructor() {
     super();
