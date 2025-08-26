@@ -81,15 +81,27 @@ export class requestMangmentervice {
       // No validation — attendanceDetails may exist, but no check on time order
     }
 
-      if (createRequestMangmentDto.type === 'loan') {
+    if (createRequestMangmentDto.type === 'loan') {
       adminApproval = true;
     }
+
+    if (!employee) {
+      throw new NotFoundException("Employee not found");
+    }
+
+    if (!employee.tenantId) {
+      throw new BadRequestException("Employee tenantId not found");
+    }
+
+    const requestNumber = await this.generateRequestNumber(employee.tenantId.toString());
 
     const RequestMangment = new this.RequestMangmentModel({
       ...createRequestMangmentDto,
       employeeId: new Types.ObjectId(createRequestMangmentDto.employeeId),
       appliedDate: new Date(),
       adminApproval,
+      requestNumber,
+      tenantId: employee.tenantId,
       workflow: {
         status: 'pending',
         ...createRequestMangmentDto.workflow,
@@ -107,6 +119,29 @@ export class requestMangmentervice {
       );
 
     return savedRequest;
+  }
+
+  private async generateRequestNumber(tenantId: string): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `REQ${year}${month}`;
+
+    const lastRequest = await this.RequestMangmentModel.findOne(
+      { 
+        tenantId: new Types.ObjectId(tenantId),
+        requestNumber: { $regex: `^${prefix}` }
+      },
+      { requestNumber: 1 }
+    ).sort({ requestNumber: -1 }).lean();
+
+    let sequence = 1;
+    if (lastRequest) {
+      const lastSeq = parseInt(lastRequest.requestNumber.slice(-3), 10);
+      sequence = lastSeq + 1;
+    }
+
+    return `${prefix}${String(sequence).padStart(3, '0')}`;
   }
 
   private calculateLeaveHours(from: Date, to: Date): number {
