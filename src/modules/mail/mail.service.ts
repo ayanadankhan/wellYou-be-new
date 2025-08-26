@@ -17,7 +17,7 @@ export class MailService {
   async sendOtpEmail(to: string, otp: string) {
     try {
       const mailOptions = {
-        from: '"BitsBuffer" <teambitsbuffer@gmail.com>',
+        from: '"WellYou" <teambitsbuffer@gmail.com>',
         to,
         subject: 'Your Password Reset OTP',
         html: `
@@ -41,8 +41,8 @@ export class MailService {
               </p>
             </div>
             
-            <div style="margin-top: 20px; text-align: center; font-size: 0.8em; color: #7f8c8d;">
-              <p>© ${new Date().getFullYear()} BitsBuffer. All rights reserved.</p>
+            <div style="background-color: #f4f6f8; padding: 15px; text-align: center; font-size: 12px; color: #7f8c8d;">
+              <p>© ${new Date().getFullYear()} WellYou by BitsBuffer. All rights reserved.</p>
             </div>
           </div>
         `,
