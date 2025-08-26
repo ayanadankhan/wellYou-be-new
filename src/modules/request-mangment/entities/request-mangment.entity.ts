@@ -34,6 +34,12 @@ export class RequestMangment {
   })
   type: string;
 
+  @Prop({ type: String, required: true, unique: true })
+  requestNumber: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
+
   @Prop({ type: Date, default: Date.now })
   appliedDate: Date;
 
@@ -162,12 +168,3 @@ export class RequestMangment {
 }
 
 export const requestMangmentchema = SchemaFactory.createForClass(RequestMangment);
-
-// Add indexes for better query performance
-requestMangmentchema.index({ employeeId: 1 });
-requestMangmentchema.index({ type: 1 });
-requestMangmentchema.index({ appliedDate: 1 });
-requestMangmentchema.index({ 'workflow.status': 1 });
-requestMangmentchema.index({ 'leaveDetails.from': 1 });
-requestMangmentchema.index({ 'leaveDetails.to': 1 });
-requestMangmentchema.index({ adminApproval: 1 });
