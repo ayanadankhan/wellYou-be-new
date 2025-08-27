@@ -1,10 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
 import { Skill } from './entities/skill.entity';
 import { GetSkillDto } from './dto/get-skill.dto';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
 
 @Injectable()
 export class SkillsService {
@@ -12,14 +13,21 @@ export class SkillsService {
     @InjectModel(Skill.name) private readonly skillModel: Model<Skill>,
   ) {}
 
-  async create(createSkillDto: CreateSkillDto): Promise<Skill> {
-    const createdSkill = new this.skillModel(createSkillDto);
+  async create(createSkillDto: CreateSkillDto , user: AuthenticatedUser): Promise<Skill> {
+    const createdSkill = new this.skillModel({
+      ...createSkillDto,
+     tenantId: new Types.ObjectId(user.tenantId),
+    });
     return createdSkill.save();
   }
 
-  async findAll(getDto: GetSkillDto) {
+  async findAll(getDto: GetSkillDto, user: AuthenticatedUser) {
     try {
       const pipeline: any[] = [];
+
+      if (user?.tenantId) {
+        pipeline.push({ $match: { tenantId: new Types.ObjectId(user.tenantId) } });
+      }
 
       if (getDto.s) {
         pipeline.push({ $match: { name: new RegExp(getDto.s, 'i') } });

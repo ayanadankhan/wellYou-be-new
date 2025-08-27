@@ -9,9 +9,9 @@ export class GetSkillDto extends GetApiDto {
   @IsEnum(SkillType)
   skillType?: SkillType;
 
-  constructor() {
-    super();
-    this.sb = 'createdAt';
-    this.sd = '-1';
+ constructor() {
+  super();
+  this.sb = 'title';
+  this.sd = '1';  
   }
 }

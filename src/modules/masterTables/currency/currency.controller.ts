@@ -1,20 +1,24 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, HttpException, Query } from '@nestjs/common';
 import { CurrencyService } from './currency.service';
 import { CreateCurrencyDto } from './dto/create-currency.dto';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { GetCurrencyDto } from './dto/get-currency.dto';
 
 @Controller('currency')
 export class CurrencyController {
   constructor(private readonly currencyService: CurrencyService) {}
 
   @Post()
-  async create(@Body() createCurrencyDto: CreateCurrencyDto) {
-    return this.currencyService.create(createCurrencyDto);
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() createCurrencyDto: CreateCurrencyDto) {
+    if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    return this.currencyService.create(createCurrencyDto , user);
   }
 
   @Get()
-  async findAll() {
-    return this.currencyService.findAll();
+  findAll(@Query() getDto: GetCurrencyDto , @CurrentUser() user : AuthenticatedUser) {
+    return this.currencyService.findAll(getDto, user);
   }
 
   @Get(':id')

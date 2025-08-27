@@ -9,6 +9,9 @@ export enum DepartmentStatus {
 
 @Schema({ timestamps: true })
 export class Department extends Document {
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
+  
   @Prop({ required: true, unique: true })
   departmentCode: string;
 
