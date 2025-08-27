@@ -15,6 +15,7 @@ import { Department } from '../departments/entities/department.entity';
 import { Designation } from '../designations/entities/designation.entity';
 import { GetEmployeeDocumentsDto } from './dto/get-EmployeeDocument.dto';
 import { AuthenticatedUser } from '../auth/interfaces/auth.interface';
+import { Company } from '../tenant/companies/schemas/company.schema';
 
 @Injectable()
 export class EmployeesService {
@@ -25,6 +26,7 @@ export class EmployeesService {
     @InjectModel(User.name) private readonly userModel: Model<any>,
     @InjectModel(Department.name) private readonly departmentModel: Model<Department>,
     @InjectModel(Designation.name) private readonly designationModel: Model<Designation>,
+    @InjectModel(Company.name) private readonly companyModel: Model<Company>,
     private userService: UserService,
   ) { }
 
@@ -44,17 +46,39 @@ export class EmployeesService {
       const createdUser: any = await this.userService.create(createUserDto);
       this.logger.log(`User created with ID: ${createdUser._id}`);
 
+      const company = await this.companyModel
+        .findById(createEmployeeDto.tenantId)
+        .lean();
+      if (!company) {
+        throw new Error('Company not found for tenantId');
+      }
+
+      const employeeCount = await this.employeeModel.countDocuments({
+        tenantId: createEmployeeDto.tenantId,
+      });
+
+      const sequence = String(employeeCount + 1).padStart(4, '0');
+      const workId = `${company.shortCode.toUpperCase()}-${sequence}`;
+
       const employeeData = {
         ...createEmployeeDto,
-        userId: createdUser._id.toString()
+        userId: createdUser._id.toString(),
+        workId,
       };
 
       const employee = new this.employeeModel(employeeData);
       const savedEmployee = await employee.save();
 
+      this.logger.log(
+        `Employee created with workId: ${workId}, ID: ${savedEmployee._id}`,
+      );
+
       return plainToClass(GetEmployeeDto, savedEmployee.toObject());
     } catch (error) {
-      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create employee: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           status: HttpStatus.BAD_REQUEST,

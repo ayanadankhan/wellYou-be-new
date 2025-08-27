@@ -32,6 +32,9 @@ export class Company extends BaseDto {
   address: string;
 
   @Prop({ required: true })
+  shortCode: string;
+
+  @Prop({ required: true })
   foundedYear: number;
 
   @Prop({ required: true })

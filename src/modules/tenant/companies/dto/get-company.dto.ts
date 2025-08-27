@@ -30,6 +30,11 @@ export class GetCompanyDto extends GetApiDto {
   @IsOptional()
   @IsString()
   address?: string;
+  
+  @Expose()
+  @IsOptional()
+  @IsString()
+  shortCode?: string;
 
   @Expose()
   @IsOptional()
