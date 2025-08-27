@@ -1039,48 +1039,79 @@ export class EmployeesService {
     return leavers;
   }
 
-  public async getPendingDocuments(tenantId: string) {
-  const employeesWithPendingDocs = await this.employeeModel.aggregate([
-    {
-      $match: {
-        tenantId: new Types.ObjectId(tenantId),
-        'documents.status': 'PENDING',
-      },
-    },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'userId',
-        foreignField: '_id',
-        as: 'user',
-      },
-    },
-    {
-      $unwind: '$user',
-    },
-    {
-      $project: {
-        _id: 0,
-        employeeName: {
-          $concat: ['$user.firstName', ' ', '$user.lastName'],
+public async getPendingDocuments(tenantId: string) {
+  // Step 1: Log the input tenantId to ensure the function is called with the correct value.
+  console.log(`[LOG] Starting aggregation for tenantId: ${tenantId}`);
+
+  try {
+    const employeesWithPendingDocs = await this.employeeModel.aggregate([
+      // Stage 1: $match
+      // We log the criteria for the first match operation.
+      {
+        $match: {
+          tenantId: new Types.ObjectId(tenantId),
+          'documents.status': 'PENDING',
         },
-        pendingDocuments: {
-          $filter: {
-            input: '$documents',
-            as: 'doc',
-            cond: { $eq: ['$$doc.status', 'PENDING'] },
+      },
+      // Stage 2: $lookup
+      // We'll log the number of documents that made it past the $match stage.
+      // Note: This requires an extra pipeline stage to count. We'll add the log outside the aggregate.
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      // Stage 3: $unwind
+      // Unwinding the 'user' array. The 'preserveNullAndEmptyArrays' option ensures that documents without a matching user are not dropped.
+      {
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Stage 4: $project (first)
+      // We are projecting the employee name and filtering for pending documents.
+      {
+        $project: {
+          _id: 0,
+          employeeName: {
+            $concat: ['$user.firstName', ' ', '$user.lastName'],
+          },
+          pendingDocuments: {
+            $filter: {
+              input: '$documents',
+              as: 'doc',
+              cond: { $eq: ['$$doc.status', 'PENDING'] },
+            },
           },
         },
       },
-    },
-    {
-      $project: {
-        employeeName: 1,
-        pendingDocumentNames: '$pendingDocuments.name',
+      // Stage 5: $project (second)
+      // This is the final projection to get the employee name and pending document names.
+      {
+        $project: {
+          employeeName: 1,
+          pendingDocumentNames: '$pendingDocuments.name',
+        },
       },
-    },
-  ]);
+    ]);
 
-  return employeesWithPendingDocs;
+    // Step 2: Log the final result of the aggregation pipeline.
+    // This will show you the exact data returned from the database.
+    console.log('[LOG] Aggregation pipeline completed.');
+    console.log(`[LOG] Found ${employeesWithPendingDocs.length} employees with pending documents.`);
+    console.log('[LOG] Final Result:', JSON.stringify(employeesWithPendingDocs, null, 2));
+
+    return employeesWithPendingDocs;
+  } catch (error) {
+    // Step 3: Catch and log any errors that occur during the aggregation.
+    console.error('[ERROR] An error occurred during the aggregation pipeline:');
+    console.error(error);
+    // Re-throw the error so it can be handled by the calling function.
+    throw error;
+  }
 }
 }
