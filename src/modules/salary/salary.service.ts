@@ -60,6 +60,7 @@ export class SalaryService {
       {
         $match: {
           'employeeData.tenantId': new Types.ObjectId(user.tenantId),
+          'employeeData.employmentStatus': { $ne: 'INACTIVE' }
         },
       },
       {

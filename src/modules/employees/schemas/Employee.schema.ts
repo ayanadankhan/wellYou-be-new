@@ -245,6 +245,9 @@ export class Employee {
   @Prop({ required: false, type: Date })
   drivingLincenceExpiryDate: Date;
 
+  @Prop({ required: false, type: String })
+  workId: string;
+
   @Prop({ required: false, type: EmergencyContact })
   emergencyContact: EmergencyContact;
 
