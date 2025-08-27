@@ -916,6 +916,7 @@ export class EmployeesService {
 
     const currentMonthHires = await this.getCurrentMonthHires(tenantId);
     const currentMonthLeavers = await this.getCurrentMonthLeavers(tenantId);
+    const pendingDocuments = await this.getPendingDocuments(tenantId);
 
     return {
       totalEmployees: employees.length,
@@ -934,7 +935,8 @@ export class EmployeesService {
       missingDocuments: missingDocumentsCount,
       openJobs: 0,
       currentMonthHires,
-      currentMonthLeavers
+      currentMonthLeavers,
+       pendingDocuments
     };
   }
 
@@ -1151,4 +1153,49 @@ export class EmployeesService {
 
     return leavers;
   }
+
+  public async getPendingDocuments(tenantId: string) {
+  const employeesWithPendingDocs = await this.employeeModel.aggregate([
+    {
+      $match: {
+        tenantId: new Types.ObjectId(tenantId),
+        'documents.status': 'PENDING',
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'userId',
+        foreignField: '_id',
+        as: 'user',
+      },
+    },
+    {
+      $unwind: '$user',
+    },
+    {
+      $project: {
+        _id: 0,
+        employeeName: {
+          $concat: ['$user.firstName', ' ', '$user.lastName'],
+        },
+        pendingDocuments: {
+          $filter: {
+            input: '$documents',
+            as: 'doc',
+            cond: { $eq: ['$$doc.status', 'PENDING'] },
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        employeeName: 1,
+        pendingDocumentNames: '$pendingDocuments.name',
+      },
+    },
+  ]);
+
+  return employeesWithPendingDocs;
+}
 }
