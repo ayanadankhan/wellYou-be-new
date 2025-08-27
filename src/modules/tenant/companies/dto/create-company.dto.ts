@@ -29,6 +29,10 @@ export class CreateCompanyDto {
   @IsNotEmpty()
   address: string;
 
+  @IsString()
+  @IsNotEmpty()
+  shortCode: string;
+
   @IsNotEmpty()
   foundedYear: number;
 
