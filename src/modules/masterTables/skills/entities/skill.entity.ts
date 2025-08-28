@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum SkillType {
   ENGINEERING = 'Engineering',
@@ -26,6 +26,9 @@ export enum SkillType {
 
 @Schema({ timestamps: true })
 export class Skill extends Document {
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
+  
   @Prop({ required: true, unique: true })
   name: string;
 

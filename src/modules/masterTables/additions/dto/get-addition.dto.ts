@@ -1,23 +1,19 @@
-import { IsOptional, IsString, IsBoolean, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsNumber, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { GetApiDto } from '@/modules/shared/dto';
 
-export class GetAdditionDto {
+export class GetAdditionDto extends GetApiDto {
   @IsOptional()
   @IsString()
   title: string;
 
   @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  isDefault?: boolean;
+  @IsString()
+  isDefault?: boolean; 
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  o?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  l?: number;
+   constructor() {
+    super();
+    this.sb = 'title';
+    this.sd = '1';  
+   }
 }

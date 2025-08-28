@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type LeaveTypeDocument = LeaveType & Document;
 
@@ -8,6 +8,9 @@ export type LeaveTypeDocument = LeaveType & Document;
   collection: 'leave_types'
 })
 export class LeaveType {
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
+  
   @Prop({ required: true, maxlength: 100, unique: true })
   name: string;
 
