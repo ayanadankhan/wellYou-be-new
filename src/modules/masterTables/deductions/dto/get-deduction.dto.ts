@@ -1,19 +1,15 @@
-import { IsOptional, IsString, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsBoolean, IsOptional, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { GetApiDto } from '@/modules/shared/dto';
 
-export class GetDesignationDto extends GetApiDto {
+export class GetDeductionDto extends GetApiDto {
   @IsOptional()
   @IsString()
   title?: string;
 
   @IsOptional()
   @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsString()
-  isActive?: boolean;
+  isDefault?: boolean;
 
   constructor() {
   super();

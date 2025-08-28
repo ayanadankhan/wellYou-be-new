@@ -3,6 +3,9 @@ import { DeductionsService } from './deductions.service';
 import { CreateDeductionDto } from './dto/create-deduction.dto';
 import { UpdateDeductionDto } from './dto/update-deduction.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { GetDeductionDto } from './dto/get-deduction.dto';
 
 @ApiTags('deductions')
 @Controller('deductions')
@@ -16,10 +19,11 @@ export class DeductionsController {
   @ApiBody({ type: CreateDeductionDto })
   @ApiResponse({ status: 201, description: 'Deduction created successfully.' })
   @ApiResponse({ status: 400, description: 'Invalid input data.' })
-  async create(@Body() createDeductionDto: CreateDeductionDto) {
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() createDeductionDto: CreateDeductionDto) {
     try {
       this.logger.log(`Creating deduction with title: ${createDeductionDto.title}`);
-      const result = await this.deductionsService.create(createDeductionDto);
+      if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+      const result = await this.deductionsService.create(createDeductionDto , user);
       this.logger.log(`Deduction created successfully with ID: ${result._id}`);
       return result;
     } catch (error) {
@@ -36,31 +40,8 @@ export class DeductionsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Retrieve all deductions' })
-  @ApiQuery({ name: 'title', required: false, type: String, description: 'Filter by title (partial match)' })
-  @ApiQuery({ name: 'isDefault', required: false, type: Boolean, description: 'Filter by isDefault status' })
-  @ApiResponse({ status: 200, description: 'List of all deductions.' })
-  @ApiResponse({ status: 500, description: 'Internal server error.' })
-  async findAll(@Query('title') title?: string, @Query('isDefault') isDefault?: string) {
-    try {
-      this.logger.log(`Fetching deductions with query: title=${title}, isDefault=${isDefault}`);
-      const query: { title?: string; isDefault?: boolean } = {};
-      if (title) query.title = title;
-      if (isDefault !== undefined) query.isDefault = isDefault === 'true';
-      const deductions = await this.deductionsService.findAll(query);
-      this.logger.log(`Retrieved ${deductions.length} deductions`);
-      return deductions;
-    } catch (error) {
-      this.logger.error(`Failed to fetch deductions: ${error.message}`, error.stack);
-      throw new HttpException(
-        {
-          status: HttpStatus.INTERNAL_SERVER_ERROR,
-          error: 'Failed to fetch deductions',
-          message: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  findAll(@Query() getDto: GetDeductionDto , @CurrentUser() user : AuthenticatedUser) {
+    return this.deductionsService.findAll(getDto, user);
   }
 
   @Get(':id')

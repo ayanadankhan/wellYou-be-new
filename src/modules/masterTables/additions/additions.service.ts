@@ -1,11 +1,12 @@
 import { Injectable, HttpException, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Addition, AdditionSchema } from './entities/addition.entity';
 import { CreateAdditionDto } from './dto/create-addition.dto';
 import { UpdateAdditionDto } from './dto/update-addition.dto';
 import { isValidObjectId } from 'mongoose';
 import { GetAdditionDto } from './dto/get-addition.dto';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
 
 @Injectable()
 export class AdditionsService {
@@ -15,58 +16,78 @@ export class AdditionsService {
     @InjectModel(Addition.name) private readonly additionModel: Model<Addition>,
   ) {}
 
-  async create(createAdditionDto: CreateAdditionDto): Promise<Addition> {
-    try {
-      this.logger.log(`Creating addition with title: ${createAdditionDto.title}`);
-      const addition = new this.additionModel(createAdditionDto);
-      const savedAddition = await addition.save();
-      this.logger.log(`Addition created successfully with ID: ${savedAddition._id}`);
-      return savedAddition;
-    } catch (error) {
-      this.logger.error(`Failed to create addition: ${error.message}`, error.stack);
-      throw new HttpException(
-        {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Failed to create addition',
-          message: error.message,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  async create(createAdditionDto: CreateAdditionDto, user: AuthenticatedUser): Promise<Addition> {
+  try {
+    this.logger.log(`Creating addition with title: ${createAdditionDto.title}`);
+
+    const addition = new this.additionModel({
+      ...createAdditionDto,
+      tenantId: new Types.ObjectId(user.tenantId),
+    });
+
+    const savedAddition = await addition.save();
+    this.logger.log(`Addition created successfully with ID: ${savedAddition._id}`);
+
+    return savedAddition;
+  } catch (error) {
+    this.logger.error(`Failed to create addition: ${error.message}`, error.stack);
+    throw new HttpException(
+      {
+        status: HttpStatus.BAD_REQUEST,
+        error: 'Failed to create addition',
+        message: error.message,
+      },
+      HttpStatus.BAD_REQUEST,
+    );
   }
+}
 
-  async findAll(getDto: GetAdditionDto) {
-    try {
-      const pipeline: any[] = [];
+async findAll(getDto: GetAdditionDto, user: AuthenticatedUser) {
+  try {
+    const pipeline: any[] = [];
 
-      if (getDto.title) {
-        pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
-      }
-
-      if (getDto.isDefault !== undefined) {
-        pipeline.push({ $match: { isDefault: getDto.isDefault } });
-      }
-
-      const offset = getDto.o || 0;
-      const limit = getDto.l || 5;
-
-      const [list, countQuery] = await Promise.all([
-        this.additionModel.aggregate([
-          ...pipeline,
-          { $skip: offset },
-          { $limit: limit },
-        ]),
-        this.additionModel.aggregate([...pipeline, { $count: 'total' }]),
-      ]);
-
-      return {
-        count: countQuery[0] ? countQuery[0].total : 0,
-        list,
-      };
-    } catch (error) {
-      throw new BadRequestException('Failed to retrieve additions');
+    if (user?.tenantId) {
+      pipeline.push({ $match: { tenantId: new Types.ObjectId(user.tenantId) } });
     }
+
+    if (getDto.title) {
+      pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
+    }
+
+    const isDefault =
+    typeof getDto.isDefault === 'string'
+      ? getDto.isDefault === 'true'
+      : getDto.isDefault;
+
+    if (isDefault !== undefined) {
+      pipeline.push({ $match: { isDefault } });
+    }
+    const [list, countQuery] = await Promise.all([
+      this.additionModel.aggregate([
+        ...pipeline,
+        { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
+        { $skip: Number(getDto.o || 0) },
+        { $limit: Number(getDto.l || 10) },
+      ]).exec(),
+
+      this.additionModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+    ]);
+
+    return {
+      count: countQuery[0]?.total || 0,
+      list: list || [],
+    };
+  } catch (error) {
+    throw new HttpException(
+      {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: 'Failed to fetch additions',
+        message: error.message,
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
+}
 
   async findOne(id: string): Promise<Addition> {
     try {

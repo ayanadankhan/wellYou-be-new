@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateDepartmentDto } from './dto/create-Department-dto';
 import { UpdateDepartmentDto } from './dto/update-Department-dto';
 import { Department } from './entities/department.entity';
+import { AuthenticatedUser } from '../auth/interfaces/auth.interface';
+import { GetDocumentDto } from '@/document/dto/get-document.dto';
+import { GetDepartmentDto } from './dto/get-Department-dto';
 
 @Injectable()
 export class DepartmentsService {
@@ -11,10 +14,11 @@ export class DepartmentsService {
     @InjectModel(Department.name) private readonly departmentModel: Model<Department>,
   ) {}
 
-  async create(createDepartmentDto: CreateDepartmentDto): Promise<Department> {
+  async create(createDepartmentDto: CreateDepartmentDto , user: AuthenticatedUser): Promise<Department> {
     const createdDepartment = new this.departmentModel({
       isActive: true,
       ...createDepartmentDto,
+      tenantId: new Types.ObjectId(user.tenantId),
       parentDepartmentId: createDepartmentDto.parentDepartmentId 
         ? new Types.ObjectId(createDepartmentDto.parentDepartmentId) 
         : null,
@@ -25,9 +29,45 @@ export class DepartmentsService {
     return createdDepartment.save();
   }
 
-  async findAll(): Promise<Department[]> {
-    return this.departmentModel.find().exec();
+  async findAll(getDto: GetDepartmentDto, user: AuthenticatedUser) {
+    try {
+      const pipeline: any[] = [];
+
+      if (user?.tenantId) {
+        pipeline.push({ $match: { tenantId: new Types.ObjectId(user.tenantId) } });
+      }
+
+      if (getDto.departmentName) {
+        pipeline.push({ $match: { departmentName: new RegExp(getDto.departmentName, 'i') } });
+      }
+      
+      const [list, countQuery] = await Promise.all([
+        this.departmentModel.aggregate([
+          ...pipeline,
+          { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
+          { $skip: Number(getDto.o || 0) },
+          { $limit: Number(getDto.l || 10) },
+        ]).exec(),
+
+        this.departmentModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to fetch departments',
+          message: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
+
 
   async findOne(id: string): Promise<Department> {
     const department = await this.departmentModel.findById(id)
