@@ -5,6 +5,8 @@ import { UpdateAdditionDto } from './dto/update-addition.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { Public } from '@/common/decorators/public.decorator';
 import { GetAdditionDto } from './dto/get-addition.dto';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { CurrentUser } from '@/common/decorators/user.decorator';
 
 @ApiTags('additions')
 @Controller('additions')
@@ -18,10 +20,11 @@ export class AdditionsController {
   @ApiBody({ type: CreateAdditionDto })
   @ApiResponse({ status: 201, description: 'Addition created successfully.' })
   @ApiResponse({ status: 400, description: 'Invalid input data.' })
-  async create(@Body() createAdditionDto: CreateAdditionDto) {
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() createAdditionDto: CreateAdditionDto) {
     try {
       this.logger.log(`Creating addition with title: ${createAdditionDto.title}`);
-      const result = await this.additionsService.create(createAdditionDto);
+      if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+      const result = await this.additionsService.create(createAdditionDto , user);
    
       return result;
     } catch (error) {
@@ -38,11 +41,9 @@ export class AdditionsController {
   }
 
   @Get()
-  @Public()
-  findAll(@Query() getDto: GetAdditionDto) {
-    return this.additionsService.findAll(getDto);
+  findAll(@Query() getDto: GetAdditionDto , @CurrentUser() user : AuthenticatedUser) {
+    return this.additionsService.findAll(getDto, user);
   }
-
 
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a single addition by ID' })

@@ -6,23 +6,30 @@ import {
   Param,
   Patch,
   Delete,
+  HttpStatus,
+  HttpException,
+  Query,
 } from '@nestjs/common';
 import { DocumentTypeService } from './document-type.service';
 import { CreateDocumentTypeDto } from './dto/create-document-type.dto';
 import { UpdateDocumentTypeDto } from './dto/update-document-type.dto';
+import { AuthenticatedUser } from '../auth/interfaces/auth.interface';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { GetDocumentTypeDto } from './dto/get-document-type.dto';
 
 @Controller('document-types')
 export class DocumentTypeController {
   constructor(private readonly documentTypeService: DocumentTypeService) {}
 
   @Post()
-  create(@Body() createDocumentTypeDto: CreateDocumentTypeDto) {
-    return this.documentTypeService.create(createDocumentTypeDto);
+  create(@CurrentUser() user: AuthenticatedUser, @Body() createDocumentTypeDto: CreateDocumentTypeDto) {
+    if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    return this.documentTypeService.create(createDocumentTypeDto , user);
   }
 
   @Get()
-  findAll() {
-    return this.documentTypeService.findAll();
+  findAll(@Query() getDto: GetDocumentTypeDto , @CurrentUser() user : AuthenticatedUser) {
+    return this.documentTypeService.findAll(getDto, user);
   }
 
   @Get(':id')

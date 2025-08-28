@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  HttpException,
 } from '@nestjs/common';
 import { LeaveTypeService } from './leave-type.service';
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
@@ -18,31 +19,24 @@ import { LeaveTypeResponseDto } from './dto/leaveTyperesponse-dto'; // Adjust im
 import { LeaveTypeDocument } from './entities/leave-type.entity'; // Adjust import path as
 import { plainToClass } from 'class-transformer'; // for transforming entities to DTOs
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/auth.interface';
+import { GetLeaveTypeDto } from './dto/get-leave-type.dto';
 @Controller('leaveTypes')
 
 export class LeaveTypeController {
   constructor(private readonly leaveTypeService: LeaveTypeService) {}
 
   @Post()
-  async create(@Body() createLeaveTypeDto: CreateLeaveTypeDto): Promise<LeaveTypeResponseDto> {
-    const leaveType = await this.leaveTypeService.create(createLeaveTypeDto);
-    return plainToClass(LeaveTypeResponseDto, leaveType.toObject(), { excludeExtraneousValues: true });
+  async create(@Body() createLeaveTypeDto: CreateLeaveTypeDto , @CurrentUser() user: AuthenticatedUser): Promise<LeaveTypeDocument> {
+    if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    const leaveType = await this.leaveTypeService.create(createLeaveTypeDto , user);
+    return leaveType
   }
 
   @Get()
-  async findAll(@Query('active') active?: string): Promise<LeaveTypeResponseDto[]> {
-    let leaveTypes;
-    
-    if (active === 'true') {
-      leaveTypes = await this.leaveTypeService.findActive();
-    } else {
-      leaveTypes = await this.leaveTypeService.findAll();
-    }
-    
-
-    return leaveTypes.map(leaveType => 
-      plainToClass(LeaveTypeResponseDto, leaveType.toObject(), { excludeExtraneousValues: true })
-    );
+  findAll(@Query() getDto: GetLeaveTypeDto , @CurrentUser() user : AuthenticatedUser) {
+    return this.leaveTypeService.findAll(getDto, user);
   }
 
   @Get('count')

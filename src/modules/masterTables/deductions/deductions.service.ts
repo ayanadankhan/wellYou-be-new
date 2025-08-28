@@ -1,10 +1,12 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Deduction, DeductionSchema } from './entities/deduction.entity';
 import { CreateDeductionDto } from './dto/create-deduction.dto';
 import { UpdateDeductionDto } from './dto/update-deduction.dto';
 import { isValidObjectId } from 'mongoose';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { GetDeductionDto } from './dto/get-deduction.dto';
 
 @Injectable()
 export class DeductionsService {
@@ -14,10 +16,13 @@ export class DeductionsService {
     @InjectModel(Deduction.name) private readonly deductionModel: Model<Deduction>,
   ) {}
 
-  async create(createDeductionDto: CreateDeductionDto): Promise<Deduction> {
+  async create(createDeductionDto: CreateDeductionDto , user: AuthenticatedUser): Promise<Deduction> {
     try {
       this.logger.log(`Creating deduction with title: ${createDeductionDto.title}`);
-      const deduction = new this.deductionModel(createDeductionDto);
+      const deduction = new this.deductionModel({
+        ...createDeductionDto,
+       tenantId: new Types.ObjectId(user.tenantId),
+      });
       const savedDeduction = await deduction.save();
       this.logger.log(`Deduction created successfully with ID: ${savedDeduction._id}`);
       return savedDeduction;
@@ -34,21 +39,41 @@ export class DeductionsService {
     }
   }
 
-  async findAll(query: { title?: string; isDefault?: boolean } = {}): Promise<Deduction[]> {
+  async findAll(getDto: GetDeductionDto, user: AuthenticatedUser) {
     try {
-      this.logger.log(`Fetching deductions with query: ${JSON.stringify(query)}`);
-      const filter: any = {};
-      if (query.title) {
-        filter.title = { $regex: query.title, $options: 'i' };
+      const pipeline: any[] = [];
+
+      if (user?.tenantId) {
+        pipeline.push({ $match: { tenantId: new Types.ObjectId(user.tenantId) } });
       }
-      if (query.isDefault !== undefined) {
-        filter.isDefault = query.isDefault;
+
+      if (getDto.title) {
+        pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
       }
-      const deductions = await this.deductionModel.find(filter).exec();
-      this.logger.log(`Retrieved ${deductions.length} deductions`);
-      return deductions;
+      const isDefault =
+        typeof getDto.isDefault === 'string'
+          ? getDto.isDefault === 'true'
+          : getDto.isDefault;
+
+        if (isDefault !== undefined) {
+          pipeline.push({ $match: { isDefault } });
+        }
+      const [list, countQuery] = await Promise.all([
+        this.deductionModel.aggregate([
+          ...pipeline,
+          { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
+          { $skip: Number(getDto.o || 0) },
+          { $limit: Number(getDto.l || 10) },
+        ]).exec(),
+
+        this.deductionModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+      ]);
+
+      return {
+        count: countQuery[0]?.total || 0,
+        list: list || [],
+      };
     } catch (error) {
-      this.logger.error(`Failed to fetch deductions: ${error.message}`, error.stack);
       throw new HttpException(
         {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
