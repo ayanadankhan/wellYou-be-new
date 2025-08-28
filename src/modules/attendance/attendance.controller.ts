@@ -247,10 +247,11 @@ export class AttendanceController {
   async update(
     @Param('id') id: string,
     @Body() updateAttendanceDto: UpdateAttendanceDto,
+    @CurrentUser() user: User
   ) {
     try {
       this.logger.log(`Update attendance request for ID: ${id}`);
-      const result = await this.attendanceService.update(id, updateAttendanceDto);
+      const result = await this.attendanceService.update(id, updateAttendanceDto, user);
 
       return {
         success: true,

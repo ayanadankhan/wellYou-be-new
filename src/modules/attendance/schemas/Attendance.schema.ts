@@ -34,10 +34,36 @@ export class Attendance {
    @Prop({ default: false })
   isManual: boolean;
 
-
-
   @Prop({ type: String, default: '' })
   remarks: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  updatedBy: Types.ObjectId;
+
+  // 🔹 audit history
+  @Prop({
+    type: [
+      {
+        checkInTime: Date,
+        checkOutTime: Date,
+        totalHours: Number,
+        status: String,
+        isAutoCheckout: Boolean,
+        isManual: Boolean,
+        remarks: String,
+        updatedAt: Date,
+        updatedBy: { type: Types.ObjectId, ref: 'User' },
+      },
+    ],
+    default: [],
+  })
+  audit: Record<string, any>[];
+
+  @Prop()
+  createdAt: Date;
+
+  @Prop()
+  updatedAt: Date;
 }
 
 export const AttendanceSchema = SchemaFactory.createForClass(Attendance);
