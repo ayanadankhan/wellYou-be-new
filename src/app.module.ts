@@ -34,6 +34,7 @@ import { SurveyModule } from './modules/survey/survey.module';
 import { QuestionSurveyModule } from './modules/question-survey/question-survey.module';
 import { AnswerSurveyModule } from './modules/answer-survey/answer-survey.module';
 import { DocumentModule } from './document/document.module';
+import { EventsModule } from './modules/events/events.module';
 
 @Module({
   imports: [
@@ -79,7 +80,8 @@ import { DocumentModule } from './document/document.module';
     RecruitmentModule,
     DocumentModule,
     // ExpensesModule,
-    DocumentTypeModule
+    DocumentTypeModule,
+    EventsModule
 
   ]
 })export class AppModule { }
