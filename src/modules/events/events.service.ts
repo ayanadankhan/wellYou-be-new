@@ -119,6 +119,9 @@ export class EventsService {
           startDate: 1,
           endDate: 1,
           createdAt: 1,
+          location: 1,
+          budget: 1,
+          currency: 1,
           departmentNames: '$organizerDepartments.departmentName',
           organizerEmployees: {
             $map: {
@@ -130,17 +133,23 @@ export class EventsService {
               },
             },
           },
-          targetDepartments: '$targetDepartments.departmentName',
-          targetIndividuals: {
-            $map: {
-              input: '$targetIndividuals',
-              as: 'u',
-              in: {
-                name: { $concat: ['$$u.firstName', ' ', '$$u.lastName'] },
-                email: '$$u.email',
+
+          targetAudience: {
+            type: '$targetAudience.type',
+            visibility: '$targetAudience.visibility',
+            departments: '$targetDepartments.departmentName',
+            individuals: {
+              $map: {
+                input: '$targetIndividuals',
+                as: 'u',
+                in: {
+                  name: { $concat: ['$$u.firstName', ' ', '$$u.lastName'] },
+                  email: '$$u.email',
+                },
               },
             },
           },
+
           createdBy: {
             name: { $concat: ['$createdByUser.firstName', ' ', '$createdByUser.lastName'] },
             email: '$createdByUser.email',
