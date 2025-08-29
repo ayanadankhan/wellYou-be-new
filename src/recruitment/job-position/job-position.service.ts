@@ -1,5 +1,5 @@
 // src/recruitment/job-position/job-position.service.ts
-import { Injectable, NotFoundException, ConflictException, InternalServerErrorException, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, InternalServerErrorException, Logger, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, FilterQuery, Types } from 'mongoose';
 import { JobPosition, IJobPositionDocument } from './schemas/job-position.schema';
@@ -8,6 +8,8 @@ import { UpdateJobPositionDto } from './dto/update-job-position.dto';
 import { JobPositionQueryDto } from './dto/job-position-query.dto';
 import { IPaginatedResponse } from 'src/recruitment/shared/interfaces';
 import { JobStatus } from 'src/recruitment/shared/enums';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { GetJobPositionDto } from './dto/get-job-position.dto';
 
 @Injectable()
 export class JobPositionService {
@@ -25,12 +27,10 @@ export class JobPositionService {
    */
   async createJobPosition(
     createJobPositionDto: CreateJobPositionDto,
+    user: AuthenticatedUser,
     createdBy?: string
   ): Promise<IJobPositionDocument> {
     this.logger.log(`Attempting to create a new job position: ${createJobPositionDto.title}`);
-
-    // Optional: Check for duplicate job titles if uniqueness is a business rule
-    // This check should ideally be an index on title with unique: true, but manual check is also valid.
     const existingJob = await this.jobPositionModel.findOne({
       title: createJobPositionDto.title,
       isDeleted: false,
@@ -45,6 +45,8 @@ export class JobPositionService {
         status: JobStatus.DRAFT, // Default status
         postedDate: new Date(), // Automatically set postedDate
         createdBy: createdBy ? new Types.ObjectId(createdBy) : undefined, // Assign createdBy
+        tenantId: new Types.ObjectId(user.tenantId),
+        department: new Types.ObjectId(createJobPositionDto.department),
       });
       const savedJob = await newJobPosition.save();
       this.logger.log(`Job position created successfully with ID: ${savedJob._id}`);
@@ -87,110 +89,87 @@ export class JobPositionService {
     }
   }
 
-  /**
-   * Retrieves job positions with pagination, filtering, and search.
-   * @param queryDto Query parameters for filtering and pagination.
-   * @returns Paginated list of job positions.
-   */
-  async getJobPositions(queryDto: JobPositionQueryDto): Promise<IPaginatedResponse<IJobPositionDocument>> {
-    this.logger.log('Attempting to retrieve job positions with query parameters.');
+  async getJobPositions(getDto: GetJobPositionDto, user: AuthenticatedUser) {
+  try {
+    const pipeline: any[] = [];
 
-    try {
-      const {
-        page = 1,
-        limit = 10,
-        sortBy = 'postedDate',
-        sortOrder = 'desc',
-        department,
-        location,
-        jobType, // Changed from employmentType to jobType
-        experienceLevel, // Added experienceLevel
-        salaryMin,
-        salaryMax,
-        status,
-        search,
-        postedDateFrom,
-        postedDateTo,
-      } = queryDto;
-
-      const filter: FilterQuery<IJobPositionDocument> = { isDeleted: false };
-
-      if (department) filter.department = new RegExp(department, 'i');
-      if (location) filter.location = new RegExp(location, 'i');
-      if (jobType) filter.jobType = jobType; // Use jobType
-      if (experienceLevel) filter.experienceLevel = experienceLevel; // Use experienceLevel
-      if (status) filter.status = status;
-
-      if (salaryMin !== undefined || salaryMax !== undefined) {
-        filter.salaryRange = {}; // Initialize salaryRange for nested queries
-        if (salaryMin !== undefined) {
-          // A job's salaryMax must be greater than or equal to the requested salaryMin
-          (filter.salaryRange as any).max = { $gte: salaryMin };
-        }
-        if (salaryMax !== undefined) {
-          // A job's salaryMin must be less than or equal to the requested salaryMax
-          (filter.salaryRange as any).min = { $lte: salaryMax };
-        }
-      }
-
-      if (postedDateFrom || postedDateTo) {
-        filter.postedDate = {};
-        if (postedDateFrom) {
-          (filter.postedDate as any).$gte = new Date(postedDateFrom);
-        }
-        if (postedDateTo) {
-          const endOfDay = new Date(postedDateTo);
-          endOfDay.setUTCHours(23, 59, 59, 999);
-          (filter.postedDate as any).$lte = endOfDay;
-        }
-      }
-
-      // ✨ CORRECTED: Search filter logic using $or with $regex
-      if (search) {
-        filter.$or = [
-          { title: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
-          { department: { $regex: search, $options: 'i' } },
-          { location: { $regex: search, $options: 'i' } },
-          { 'responsibilities': { $regex: search, $options: 'i' } }, // Match within array of strings
-          { 'requirements': { $regex: search, $options: 'i' } }, // Match within array of strings
-        ];
-      }
-
-      const total = await this.jobPositionModel.countDocuments(filter).exec();
-      const jobPositions = await this.jobPositionModel
-        .find(filter)
-        .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .exec();
-
-      this.logger.log(`Retrieved ${jobPositions.length} job positions (total: ${total}).`);
-      return {
-        data: jobPositions,
-        totalDocs: total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page * limit < total,
-        hasPrevPage: page > 1,
-      };
-    } catch (error) {
-      this.logger.error(`Error retrieving job positions: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Could not retrieve job positions due to an unexpected internal error.');
+    if (user?.tenantId) {
+      pipeline.push({ $match: { tenantId: new Types.ObjectId(user.tenantId) } });
     }
-  }
 
-  /**
-   * Updates an existing job position.
-   * @param id The ID of the job position to update.
-   * @param updateJobPositionDto Data for updating the job position.
-   * @param updatedBy Optional ID of the user updating the record.
-   * @returns The updated job position document.
-   */
+    if (getDto.title) {
+      pipeline.push({ $match: { title: new RegExp(getDto.title, 'i') } });
+    }
+
+      if (getDto.jobType) {
+      pipeline.push({ $match: { jobType: new RegExp(getDto.jobType, 'i') } });
+    }
+
+    if (getDto.experienceLevel) {
+      pipeline.push({ $match: { experienceLevel: new RegExp(getDto.experienceLevel, 'i') } });
+    }
+
+    // if (getDto.department) {
+    //   if (!Types.ObjectId.isValid(getDto.department)) {
+    //     throw new BadRequestException("Invalid departmentId");
+    //   }
+    //   pipeline.push({ $match: { department: new Types.ObjectId(getDto.department) } });
+    // }
+     if (getDto.department) {
+      pipeline.push({
+        $match: { department: new Types.ObjectId(getDto.department) },
+      });
+    }
+
+    // 👇 Department object ko include karne k liye lookup
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'departments', // Department collection ka naam
+          localField: 'department', // jobPosition.department
+          foreignField: '_id', // departments._id
+          as: 'department',
+        },
+      },
+      {
+        $unwind: {
+          path: '$department',
+          preserveNullAndEmptyArrays: true, // agar department missing ho to null return karega
+        },
+      }
+    );
+
+    const [list, countQuery] = await Promise.all([
+      this.jobPositionModel.aggregate([
+        ...pipeline,
+        { $sort: { [getDto.sb || 'createdAt']: getDto.sd === '1' ? 1 : -1 } },
+        { $skip: Number(getDto.o || 0) },
+        { $limit: Number(getDto.l || 10) },
+      ]).exec(),
+
+      this.jobPositionModel.aggregate([...pipeline, { $count: 'total' }]).exec(),
+    ]);
+
+    return {
+      count: countQuery[0]?.total || 0,
+      list: list || [],
+    };
+  } catch (error) {
+    throw new HttpException(
+      {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: 'Failed to fetch job positions',
+        message: error.message,
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+}
+
+
   async updateJobPosition(
     id: string,
-    updateJobPositionDto: UpdateJobPositionDto,
+    updateJobPositionDto: CreateJobPositionDto,
     updatedBy?: string
   ): Promise<IJobPositionDocument> {
     this.logger.log(`Attempting to update job position with ID: ${id}`);
@@ -314,24 +293,30 @@ export class JobPositionService {
    * Hard deletes a job position by its ID (for admin/testing purposes, bypasses soft delete).
    * @param id The ID of the job position to hard delete.
    */
-  async hardDeleteJobPosition(id: string): Promise<void> {
-    this.logger.log(`Attempting to hard delete job position with ID: ${id}`);
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Invalid ID format: ${id}`);
-    }
+  // async hardDeleteJobPosition(id: string): Promise<void> {
+  //   this.logger.log(`Attempting to hard delete job position with ID: ${id}`);
+  //   if (!Types.ObjectId.isValid(id)) {
+  //     throw new BadRequestException(`Invalid ID format: ${id}`);
+  //   }
 
-    try {
-      const result = await this.jobPositionModel.deleteOne({ _id: new Types.ObjectId(id) }).exec(); // Ensure ObjectId for deletion
-      if (result.deletedCount === 0) {
-        throw new NotFoundException(`Job Position with ID '${id}' not found for hard delete.`);
-      }
-      this.logger.log(`Job position hard deleted successfully for ID: ${id}`);
-    } catch (error) {
-      this.logger.error(`Error hard deleting job position with ID ${id}: ${error.message}`, error.stack);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Could not hard delete job position due to an unexpected internal error.');
+  //   try {
+  //     const result = await this.jobPositionModel.deleteOne({ _id: new Types.ObjectId(id) }).exec(); // Ensure ObjectId for deletion
+  //     if (result.deletedCount === 0) {
+  //       throw new NotFoundException(`Job Position with ID '${id}' not found for hard delete.`);
+  //     }
+  //     this.logger.log(`Job position hard deleted successfully for ID: ${id}`);
+  //   } catch (error) {
+  //     this.logger.error(`Error hard deleting job position with ID ${id}: ${error.message}`, error.stack);
+  //     if (error instanceof NotFoundException || error instanceof BadRequestException) {
+  //       throw error;
+  //     }
+  //     throw new InternalServerErrorException('Could not hard delete job position due to an unexpected internal error.');
+  //   }
+  // }
+   async remove(id: string): Promise<void> {
+    const result = await this.jobPositionModel.findByIdAndDelete(id).exec();
+    if (!result) {
+      throw new NotFoundException(`Currency with ID ${id} not found`);
     }
   }
 }
