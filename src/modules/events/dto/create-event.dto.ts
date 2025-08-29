@@ -92,7 +92,7 @@ export class CreateEventDto {
     currency: string;
 
     @IsOptional()
-    @IsString()
+    @IsMongoId()
     createdBy?: string;
 }
 

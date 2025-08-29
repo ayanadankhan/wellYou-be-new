@@ -13,6 +13,10 @@ export class EventsService {
   ) {}
 
   async create(createEventDto: CreateEventDto): Promise<Event> {
+    if (createEventDto.createdBy) {
+      createEventDto.createdBy = new Types.ObjectId(createEventDto.createdBy) as any;
+    }
+  
     if (createEventDto.organizers && createEventDto.organizers.length > 0) {
       (createEventDto.organizers as any) = createEventDto.organizers.map(org => ({
         ...org,
