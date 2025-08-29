@@ -11,6 +11,7 @@ import {
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { GetEventDto } from './dto/get-event.dto';
 
 @Controller('events')
 export class EventsController {
@@ -28,23 +29,8 @@ export class EventsController {
   }
 
   @Get()
-  async findAll(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-    @Query('title') title?: string,
-    @Query('createdBy') createdBy?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    const filters: any = {};
-    if (title) filters.title = title;
-    if (createdBy) filters.createdBy = createdBy;
-    if (startDate && endDate) {
-      filters.startDate = new Date(startDate);
-      filters.endDate = new Date(endDate);
-    }
-
-    return this.eventsService.findAll(+page, +limit, filters);
+  findAll(@Query() getDto: GetEventDto) {
+    return this.eventsService.findAll(getDto);
   }
 
   @Get(':id')

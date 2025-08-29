@@ -54,7 +54,7 @@ export class TargetAudience {
     @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
     individualIds: Types.ObjectId[];
 
-    @Prop({ type: [{ type: Types.ObjectId, ref: 'Department' }], default: [] })
+    @Prop({ type: [{ type: Types.ObjectId, ref: 'departments' }], default: [] })
     departmentIds: Types.ObjectId[];
 }
 
