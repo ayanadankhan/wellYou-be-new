@@ -88,7 +88,7 @@ export class CreateEventDto {
     @IsNumber()
     budget: number;
 
-    @IsEnum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR'])
+    @IsEnum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR', 'PKR'])
     currency: string;
 
     @IsOptional()

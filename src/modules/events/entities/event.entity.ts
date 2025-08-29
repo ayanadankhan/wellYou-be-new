@@ -18,7 +18,7 @@ export type EventCategory = typeof EVENT_CATEGORIES[number];
 export const EVENT_STATUSES = ['Scheduled', 'Completed', 'Cancelled', 'Postponed'] as const;
 export type EventStatus = typeof EVENT_STATUSES[number];
 
-export const EVENT_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR'] as const;
+export const EVENT_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR', 'PKR'] as const;
 export type EventCurrency = typeof EVENT_CURRENCIES[number];
 
 export const LOCATION_MODES = ['Onsite', 'Online'] as const;
