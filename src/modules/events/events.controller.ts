@@ -43,6 +43,12 @@ export class EventsController {
     @Param('id') id: string,
     @Body() updateEventDto: UpdateEventDto,
   ) {
+    if (updateEventDto?.targetAudience?.type === "Departments") {
+      updateEventDto.targetAudience.departmentIds = updateEventDto.targetAudience.audience
+    }
+    if (updateEventDto?.targetAudience?.type === "Individuals") {
+      updateEventDto.targetAudience.individualIds = updateEventDto.targetAudience.audience
+    }
     return this.eventsService.update(id, updateEventDto);
   }
 
