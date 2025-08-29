@@ -183,12 +183,9 @@ export class EventsService {
   }
 
   async findOne(id: string): Promise<Event> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new NotFoundException(`Invalid event ID: ${id}`);
-    }
-    const event = await this.eventModel.findById(id).populate('createdBy').exec();
+    const event = await this.eventModel.findById(id).exec();
     if (!event) {
-      throw new NotFoundException(`Event with ID "${id}" not found`);
+      throw new NotFoundException(`event with ID "${id}" not found`);
     }
     return event;
   }
@@ -197,13 +194,63 @@ export class EventsService {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException(`Invalid event ID: ${id}`);
     }
+
+    const updatePayload: any = {};
+
+    if (updateEventDto.createdBy) {
+      updatePayload.createdBy = new Types.ObjectId(updateEventDto.createdBy);
+    }
+
+    if (updateEventDto.title) updatePayload.title = updateEventDto.title;
+    if (updateEventDto.category) updatePayload.category = updateEventDto.category;
+    if (updateEventDto.startDate) updatePayload.startDate = updateEventDto.startDate;
+    if (updateEventDto.endDate) updatePayload.endDate = updateEventDto.endDate;
+    if (updateEventDto.status) updatePayload.status = updateEventDto.status;
+    if (updateEventDto.budget !== undefined) updatePayload.budget = updateEventDto.budget;
+    if (updateEventDto.currency) updatePayload.currency = updateEventDto.currency;
+
+    if (updateEventDto.location) {
+      updatePayload.location = {
+        ...updateEventDto.location,
+      };
+    }
+
+    if (updateEventDto.organizers && updateEventDto.organizers.length > 0) {
+      updatePayload.organizers = updateEventDto.organizers.map(org => ({
+        ...org,
+        department: new Types.ObjectId(org.department),
+        selectedEmployees: org.selectedEmployees.map(emp => new Types.ObjectId(emp)),
+      }));
+    }
+
+    if (updateEventDto.targetAudience) {
+      const ta: any = {};
+      if (updateEventDto.targetAudience.type) ta.type = updateEventDto.targetAudience.type;
+      if (updateEventDto.targetAudience.visibility) ta.visibility = updateEventDto.targetAudience.visibility;
+
+      if (updateEventDto.targetAudience.departmentIds) {
+        ta.departmentIds = updateEventDto.targetAudience.departmentIds.map(
+          id => new Types.ObjectId(id),
+        );
+      }
+
+      if (updateEventDto.targetAudience.individualIds) {
+        ta.individualIds = updateEventDto.targetAudience.individualIds.map(
+          id => new Types.ObjectId(id),
+        );
+      }
+
+      updatePayload.targetAudience = ta;
+    }
+
     const updatedEvent = await this.eventModel
-      .findByIdAndUpdate(id, updateEventDto, { new: true })
+      .findByIdAndUpdate(id, { $set: updatePayload }, { new: true })
       .exec();
 
     if (!updatedEvent) {
       throw new NotFoundException(`Event with ID "${id}" not found`);
     }
+
     return updatedEvent;
   }
 
