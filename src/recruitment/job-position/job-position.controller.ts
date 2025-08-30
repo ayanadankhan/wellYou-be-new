@@ -13,15 +13,16 @@ import {
   UsePipes,
   ValidationPipe,
   Logger,
+  HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JobPositionService } from './job-position.service';
 import { CreateJobPositionDto } from './dto/create-job-position.dto';
 import { UpdateJobPositionDto } from './dto/update-job-position.dto';
-import { JobPositionQueryDto } from './dto/job-position-query.dto';
 import { IJobPositionDocument } from './interfaces/job-position.interface';
-import { IPaginatedResponse } from 'src/recruitment/shared/interfaces';
-import { JobStatus } from '../shared/enums';
+import { CurrentUser } from '@/common/decorators/user.decorator';
+import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
+import { GetJobPositionDto } from './dto/get-job-position.dto';
 
 @ApiTags('Job Positions')
 @Controller('job-positions')
@@ -32,54 +33,24 @@ export class JobPositionController {
   constructor(private readonly jobPositionService: JobPositionService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new job position' })
-  @ApiResponse({ status: 201, description: 'The job position has been successfully created.', type: CreateJobPositionDto })
-  @ApiResponse({ status: 400, description: 'Bad Request (Validation Error)' })
-  @ApiResponse({ status: 409, description: 'Conflict (Job position with this title already exists)' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
   async create(
+    @CurrentUser() user: AuthenticatedUser,
     @Body() createJobPositionDto: CreateJobPositionDto,
-    // @Request() req // Uncomment and use for getting user ID for createdBy
   ): Promise<IJobPositionDocument> {
     this.logger.log('Received request to create job position.');
-    // In a real app, get user ID from request (e.g., req.user.id)
-    return this.jobPositionService.createJobPosition(createJobPositionDto /*, req.user.id*/);
+    if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+    return this.jobPositionService.createJobPosition(createJobPositionDto , user);
   }
 
   @Get(':id')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get a job position by ID' })
-  @ApiParam({ name: 'id', description: 'The ID of the job position', type: String })
-  @ApiResponse({ status: 200, description: 'The job position found.', type: CreateJobPositionDto })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
   async findOne(@Param('id') id: string): Promise<IJobPositionDocument> {
-  
     return this.jobPositionService.getJobPositionById(id);
   }
 
   @Get()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get all job positions with filters and pagination' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'sortBy', required: false, type: String })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
-  @ApiQuery({ name: 'department', required: false, type: String })
-  @ApiQuery({ name: 'location', required: false, type: String })
-  @ApiQuery({ name: 'employmentType', required: false, enum: ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'] })
-  @ApiQuery({ name: 'salaryMin', required: false, type: Number })
-  @ApiQuery({ name: 'salaryMax', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false, enum: JobStatus })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'General keyword search' })
-  @ApiQuery({ name: 'postedDateFrom', required: false, type: String,  description: 'Filter by minimum posted date (ISO string)' })
-  @ApiQuery({ name: 'postedDateTo', required: false, type: String,  description: 'Filter by maximum posted date (ISO string)' })
-  @ApiResponse({ status: 200, description: 'A paginated list of job positions.', type: [CreateJobPositionDto] })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async findAll(@Query() queryDto: JobPositionQueryDto): Promise<IPaginatedResponse<IJobPositionDocument>> {
+  async findAll(@Query() queryDto: GetJobPositionDto , @CurrentUser() user : AuthenticatedUser) {
     this.logger.log('Received request to get all job positions with filters.');
-    return this.jobPositionService.getJobPositions(queryDto);
+    return this.jobPositionService.getJobPositions(queryDto, user);
   }
 
   @Put(':id')
@@ -93,7 +64,7 @@ export class JobPositionController {
   @ApiResponse({ status: 500, description: 'Internal Server Error' })
   async update(
     @Param('id') id: string,
-    @Body() updateJobPositionDto: UpdateJobPositionDto,
+    @Body() updateJobPositionDto: CreateJobPositionDto,
     // @Request() req // Uncomment and use for getting user ID for updatedBy
   ): Promise<IJobPositionDocument> {
     
@@ -114,7 +85,7 @@ export class JobPositionController {
   ): Promise<void> {
     
     // In a real app, get user ID from request (e.g., req.user.id)
-    await this.jobPositionService.deleteJobPosition(id /*, req.user.id*/);
+    await this.jobPositionService.remove(id /*, req.user.id*/);
   }
 
   @Put(':id/restore')
@@ -141,6 +112,6 @@ export class JobPositionController {
   @ApiResponse({ status: 500, description: 'Internal Server Error' })
   async hardRemove(@Param('id') id: string): Promise<void> {
     
-    await this.jobPositionService.hardDeleteJobPosition(id);
+    await this.jobPositionService.remove(id);
   }
 }

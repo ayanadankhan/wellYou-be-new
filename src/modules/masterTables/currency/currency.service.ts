@@ -21,9 +21,6 @@ export class CurrencyService {
     return createdCurrency.save();
   }
 
-  // async findAll(): Promise<Currency[]> {
-  //   return this.currencyModel.find().exec();
-  // }
 
   async findAll(getDto: GetCurrencyDto, user: AuthenticatedUser) {
     try {
