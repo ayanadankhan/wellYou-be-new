@@ -14,6 +14,7 @@ import { Employee } from '../employees/schemas/Employee.schema';
 import { AttendanceService } from '../attendance/attendance.service';
 import { GetRequestDto } from './dto/get-request-mangment.dto';
 import { AuditService } from '../audit/audit.service';
+import { HolidayService } from '@/holiday/holiday.service';
 
 @Injectable()
 export class requestMangmentervice {
@@ -25,6 +26,7 @@ export class requestMangmentervice {
     @InjectModel('Employee') private readonly employeeModel: Model<Employee>,
     private attendanceService: AttendanceService,
     private readonly auditService: AuditService,
+    private readonly holidayService: HolidayService,
   ) {}
 
   async create(
@@ -52,10 +54,9 @@ export class requestMangmentervice {
 
       if (createRequestMangmentDto.leaveDetails) {
         const { from, to } = createRequestMangmentDto.leaveDetails;
-        if (from && to) {
-          const totalHours = this.calculateLeaveHours(from, to);
+        if (from && to && currentUser.tenantId) {
+          const totalHours = await this.calculateLeaveHours(from, to, currentUser.tenantId);
           createRequestMangmentDto.leaveDetails.totalHour = totalHours;
-          
           if (totalHours > 8) {
             adminApproval = true;
           }
@@ -145,25 +146,18 @@ export class requestMangmentervice {
     return `${prefix}-${seq}`;
   }
 
-  private calculateLeaveHours(from: Date, to: Date): number {
+  private async calculateLeaveHours(from: Date, to: Date, tenantId: string): Promise<number> {
     const startDate = new Date(from);
     const endDate = new Date(to);
 
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(0, 0, 0, 0);
+    const { workingDays } = await this.holidayService.getWorkingDays(
+      startDate,
+      endDate,
+      tenantId
+    );
 
-    let totalDays = 0;
-    const currentDate = new Date(startDate);
-
-    while (currentDate <= endDate) {
-      if (currentDate.getDay() !== 0) {
-        totalDays++;
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    return totalDays * 8;
-  }
+  return workingDays * 8;
+}
 
   private calculateHoursDifference(fromHour: string, toHour: string): number {
     const fromDate = new Date(`1970-01-01T${fromHour}:00`);

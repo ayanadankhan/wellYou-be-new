@@ -145,7 +145,8 @@ export class HolidayService {
     if (!deletedHoliday) throw new NotFoundException(`Holiday with ID "${id}" not found.`);
   }
 
-  async getWorkingDays(startDate: Date, endDate: Date, tenantId: string): Promise<{ workingDays: number; holidayDays: number }> {
+  async getWorkingDays(startDate: Date, endDate: Date, tenantId: string
+  ): Promise<{ workingDays: number; holidayDays: number; holidayDates: { date: Date; }[] }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('Start date and end date are required');
     }
@@ -159,6 +160,7 @@ export class HolidayService {
 
     let workingDays = 0;
     let holidayDays = 0;
+    const holidayDates: { date: Date;}[] = [];
 
     let current = new Date(startDate);
 
@@ -213,6 +215,9 @@ export class HolidayService {
 
       if (isHoliday) {
         holidayDays++;
+        holidayDates.push({
+          date: new Date(current)
+        });
       } else {
         workingDays++;
       }
@@ -220,6 +225,6 @@ export class HolidayService {
       current.setDate(current.getDate() + 1);
     }
 
-    return { workingDays, holidayDays };
+    return { workingDays, holidayDays, holidayDates };
   }
 }
