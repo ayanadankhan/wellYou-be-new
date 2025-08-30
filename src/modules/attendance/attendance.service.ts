@@ -977,30 +977,50 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
   }
 }
 
-  // Update attendance (for admin use)
-  async update(id: string, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
-    try {
-      this.logger.log(`Updating attendance record: ${id}`);
-
-      if (!Types.ObjectId.isValid(id)) {
-        throw new BadRequestException('Invalid attendance ID format');
-      }
-
-      const updatedAttendance = await this.attendanceModel.findByIdAndUpdate(
-        id,
-        updateAttendanceDto,
-        { new: true },
-      );
-
-      if (!updatedAttendance) {
-        throw new NotFoundException('Attendance record not found');
-      }
-
-      return updatedAttendance;
-    } catch (error) {
-      this.logger.error(`Update attendance failed for ID ${id}:`, error.message);
-      throw error;
+  async update(id: string, updateAttendanceDto: UpdateAttendanceDto, currentUser: any) {
+    const oldRecord = await this.attendanceModel.findById(id);
+    if (!oldRecord) {
+      throw new NotFoundException(`Attendance record not found for id ${id}`);
     }
+
+    const newCheckIn = updateAttendanceDto.checkInTime ?? oldRecord.checkInTime;
+    const newCheckOut = updateAttendanceDto.checkOutTime ?? oldRecord.checkOutTime;
+
+    let newTotalHours = oldRecord.totalHours;
+    if (newCheckIn && newCheckOut) {
+      const diffMs = new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime();
+      newTotalHours = diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
+    }
+
+    const auditEntry = {
+      checkInTime: oldRecord.checkInTime,
+      checkOutTime: oldRecord.checkOutTime,
+      totalHours: oldRecord.totalHours,
+      status: oldRecord.status,
+      isAutoCheckout: oldRecord.isAutoCheckout,
+      isManual: oldRecord.isManual,
+      remarks: oldRecord.remarks,
+      updatedAt: oldRecord.updatedAt,
+      updatedBy: new Types.ObjectId(currentUser._id),
+    };
+
+    const updatedAttendance = await this.attendanceModel.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          ...updateAttendanceDto,
+          checkInTime: newCheckIn,
+          checkOutTime: newCheckOut,
+          totalHours: newTotalHours,
+          updatedAt: new Date(),
+          updatedBy: new Types.ObjectId(currentUser._id),
+        },
+        $push: { audit: auditEntry },
+      },
+      { new: true },
+    );
+
+    return updatedAttendance;
   }
 
   // Delete attendance (for admin use)

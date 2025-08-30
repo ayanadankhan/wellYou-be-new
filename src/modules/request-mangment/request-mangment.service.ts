@@ -426,15 +426,55 @@ export class requestMangmentervice {
       throw new NotFoundException(`Leave request with ID ${id} not found`);
     }
 
-    if (updateRequestMangmentDto.type || updateRequestMangmentDto.leaveDetails || 
-        updateRequestMangmentDto.timeOffDetails || updateRequestMangmentDto.overtimeDetails || updateRequestMangmentDto.loanDetails) {
+    const auditEntry = {
+      type: existing.type,
+      requestNumber: existing.requestNumber, 
+      appliedDate: existing.appliedDate,
+      adminApproval: existing.adminApproval,
+      leaveDetails: existing.leaveDetails ? { ...existing.leaveDetails } : undefined,
+      timeOffDetails: existing.timeOffDetails ? { ...existing.timeOffDetails } : undefined,
+      overtimeDetails: existing.overtimeDetails ? { ...existing.overtimeDetails } : undefined,
+      attendanceDetails: existing.attendanceDetails ? { ...existing.attendanceDetails } : undefined,
+      loanDetails: existing.loanDetails ? { ...existing.loanDetails } : undefined,
+      workflow: existing.workflow ? { ...existing.workflow } : undefined,
+      updatedAt: existing.updatedAt,
+      updatedBy: new Types.ObjectId(currentUser._id),
+    };
+
+    if (
+      updateRequestMangmentDto.type ||
+      updateRequestMangmentDto.leaveDetails ||
+      updateRequestMangmentDto.timeOffDetails ||
+      updateRequestMangmentDto.overtimeDetails ||
+      updateRequestMangmentDto.loanDetails
+    ) {
       const mergedDto = { ...existing.toObject(), ...updateRequestMangmentDto };
       await this.validateRequestByType(mergedDto as any);
     }
 
-    const updated = await this.RequestMangmentModel
-      .findByIdAndUpdate(id, updateRequestMangmentDto, { new: true })
-      .exec();
+    const updateData: Record<string, any> = {
+      updatedAt: new Date(),
+      updatedBy: new Types.ObjectId(currentUser._id),
+    };
+
+    for (const [key, value] of Object.entries(updateRequestMangmentDto)) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        for (const [nestedKey, nestedValue] of Object.entries(value)) {
+          updateData[`${key}.${nestedKey}`] = nestedValue;
+        }
+      } else {
+        updateData[key] = value;
+      }
+    }
+
+    const updated = await this.RequestMangmentModel.findByIdAndUpdate(
+      id,
+      {
+        $set: updateData,
+        $push: { audit: auditEntry },
+      },
+      { new: true }
+    ).exec();
 
     if (!updated) {
       throw new NotFoundException(`Leave request with ID ${id} not found`);

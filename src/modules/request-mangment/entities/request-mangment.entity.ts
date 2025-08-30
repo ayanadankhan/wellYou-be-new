@@ -70,12 +70,10 @@ export class RequestMangment {
     documents?: Document[];
   };
 
-
-  // Time off specific details
   @Prop({
     type: {
       reason: { type: String, required: false },
-      fromHour: { type: String, required: false }, // e.g., "14:00"
+      fromHour: { type: String, required: false },
       toHour: { type: String, required: false },
       totalHour: { type: Number, required: false },
     },
@@ -88,7 +86,6 @@ export class RequestMangment {
     totalHour?: number;
   };
 
-  // Overtime specific details
   @Prop({
     type: {
       reason: { type: String, required: false },
@@ -141,12 +138,11 @@ export class RequestMangment {
     installmentAmount?: number;
   };
 
-  // Workflow management
   @Prop({
     type: {
       status: {
         type: String,
-        enum: Object.values(RequestStatus), // Using enum here too
+        enum: Object.values(RequestStatus),
         default: RequestStatus.PENDING,
       },
       actionBy: { type: String, required: false },
@@ -165,6 +161,75 @@ export class RequestMangment {
     rejectionReason?: string;
     modifications?: Object;
   };
+
+  @Prop({
+    type: [{
+      type: { type: String },
+      requestNumber: String,
+      appliedDate: Date,
+      adminApproval: Boolean,
+      leaveDetails: {
+        leaveType: { type: String, required: false },
+        reason: { type: String, required: false },
+        from: { type: Date, required: false },
+        to: { type: Date, required: false },
+        totalHour: { type: Number, required: false },
+        documents: [{
+          type: { type: String, required: false },
+          name: { type: String, required: false },
+          url: { type: String, required: false }
+        }]
+      },
+      timeOffDetails: {
+        reason: { type: String, required: false },
+        fromHour: { type: String, required: false },
+        toHour: { type: String, required: false },
+        totalHour: { type: Number, required: false }
+      },
+      overtimeDetails: {
+        reason: { type: String, required: false },
+        fromHour: { type: String, required: false },
+        toHour: { type: String, required: false },
+        date: { type: Date, required: false },
+        totalHour: { type: Number, required: false }
+      },
+      attendanceDetails: {
+        reason: { type: String, required: false },
+        checkInTime: { type: String, required: false },
+        checkOutTime: { type: String, required: false },
+        attendanceId: { type: String, required: false }
+      },
+      loanDetails: {
+        loanAmount: { type: Number, required: false },
+        loanType: { type: String, required: false },
+        loanDuration: { type: String, required: false },
+        loanPurpose: { type: String, required: false },
+        installmentAmount: { type: Number, required: false }
+      },
+      workflow: {
+        status: { type: String, enum: Object.values(RequestStatus) },
+        actionBy: { type: String, required: false },
+        actionDate: { type: Date, required: false },
+        rejectionReason: { type: String, required: false },
+        modifications: { type: Object, required: false }
+      },
+      updatedAt: Date,
+      updatedBy: { type: Types.ObjectId, ref: 'User', required: false },
+      changedAt: { type: Date, default: Date.now }
+    }],
+    default: [],
+    _id: false
+  })
+  audit: Record<string, any>[];
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  updatedBy: Types.ObjectId;
+
+  @Prop()
+  createdAt: Date;
+
+  @Prop()
+  updatedAt: Date;
 }
 
 export const requestMangmentchema = SchemaFactory.createForClass(RequestMangment);
