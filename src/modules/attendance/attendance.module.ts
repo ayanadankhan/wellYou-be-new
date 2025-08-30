@@ -10,6 +10,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.gaurd';
 import { Employee, EmployeeSchema } from '../employees/schemas/Employee.schema';
 import { RequestMangmentModule } from '../request-mangment/request-mangment.module';
 import { RequestMangment, requestMangmentchema } from '../request-mangment/entities/request-mangment.entity';
+import { HolidayModule } from '@/holiday/holiday.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { RequestMangment, requestMangmentchema } from '../request-mangment/entit
     ]),
     forwardRef(() => UserModule),
     forwardRef(() => EmployeesModule),
-    forwardRef(() => RequestMangmentModule), // ✅ forwardRef lagaya
+    forwardRef(() => RequestMangmentModule),
+    forwardRef(() => HolidayModule),
   ],
   controllers: [AttendanceController],
   providers: [

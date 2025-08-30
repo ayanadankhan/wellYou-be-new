@@ -11,12 +11,25 @@ export class HolidayController {
   constructor(private readonly holidayService: HolidayService) {}
   @Post()
   create(@Body() createHolidayDto: CreateHolidayDto, @CurrentUser() user: any) {
-    return this.holidayService.create(createHolidayDto, user._id);
+    return this.holidayService.create(createHolidayDto, user);
   }
 
   @Get()
   async findAll(@Query() query: GetHolidayDto) {
     return this.holidayService.findAll(query);
+  }
+
+  @Get('working-days')
+  async getWorkingDays(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('tenantId') tenantId: string,
+  ) {
+    return this.holidayService.getWorkingDays(
+      new Date(from),
+      new Date(to),
+      tenantId,
+    );
   }
 
   @Get(':id')
