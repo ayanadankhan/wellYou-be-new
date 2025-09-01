@@ -12,6 +12,7 @@ import {
   ValidateIf,
   IsObject,
   ValidateNested,
+  IsMongoId,
 } from 'class-validator';
 import { Type } from 'class-transformer'; // Needed for @Type decorator with nested objects
 import { ApiProperty } from '@nestjs/swagger';
@@ -62,7 +63,8 @@ export class CreateJobPositionDto {
     description: 'Department the job belongs to',
     example: 'Engineering',
   })
-  @IsString()
+
+  @IsMongoId()
   @IsNotEmpty()
   department: string; // ✨ Kept as required based on error "department should not be empty"
 

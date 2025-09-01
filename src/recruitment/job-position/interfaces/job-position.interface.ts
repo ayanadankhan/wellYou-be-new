@@ -6,7 +6,7 @@ import { ExperienceLevel, JobStatus, JobType } from 'src/recruitment/shared/enum
 export interface IJobPosition extends IBaseDocument {
   title: string;
   description: string;
-  department: string;
+  department: object | string; // Changed to Object or string to accommodate ObjectId reference
   location: string;
   employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
   salaryMin?: number;

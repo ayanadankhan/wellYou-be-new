@@ -14,7 +14,7 @@ export class CurrencyController {
   async create(@CurrentUser() user: AuthenticatedUser, @Body() createCurrencyDto: CreateCurrencyDto) {
     if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     return this.currencyService.create(createCurrencyDto , user);
-  }
+  } 
 
   @Get()
   findAll(@Query() getDto: GetCurrencyDto , @CurrentUser() user : AuthenticatedUser) {
