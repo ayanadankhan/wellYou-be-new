@@ -8,6 +8,7 @@ import { User, UserSchema } from '../tenant/users/schemas/user.schema';
 import { Attendance, AttendanceSchema } from '../attendance/schemas/Attendance.schema';
 import { AttendanceModule } from '../attendance/attendance.module';
 import { AuditModule } from '../audit/audit.module';
+import { HolidayModule } from '@/holiday/holiday.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AuditModule } from '../audit/audit.module';
       { name: Attendance.name, schema: AttendanceSchema }
     ]),
     forwardRef(() => AttendanceModule),
+    forwardRef(() => HolidayModule),
     AuditModule
   ],
   controllers: [RequestMangmentController],
