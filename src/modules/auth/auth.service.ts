@@ -319,7 +319,7 @@ export class AuthService {
       });
 
       // Send OTP via email
-      await this.mailService.sendOtpEmail(createForgotPasswordDto.email, `${pin}`);
+      await this.mailService.sendOtpEmail(createForgotPasswordDto.email, `${pin}`, 'forgotPassword');
 
       return {
         email: createForgotPasswordDto.email,
@@ -372,25 +372,18 @@ export class AuthService {
         isForLogin: true,
         userId: (user as any)._id ?? (user as any).id,
         isUsed: false,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry for login
+        expiresAt: new Date(Date.now() + 1 * 60 * 1000) // 1 minutes expiry for login
       });
 
-      const employee = await this.employeeModel.findOne({ userId: user._id }).exec();
+      const recipientEmail = trimmedEmail;
 
-      const recipientEmail = (
-        ['super_admin', 'company_admin'].includes(user.role) || 
-        employee?.employmentType === 'REMOTE'
-      ) 
-        ? trimmedEmail 
-        : 'teambitsbuffer@gmail.com';
-
-      await this.mailService.sendOtpEmail(recipientEmail, `${otp} for ${trimmedEmail}`);
+      await this.mailService.sendOtpEmail(recipientEmail, `${otp}`, 'login');
 
       this.logger.log(`Login OTP sent successfully to: ${recipientEmail}`);
       
       return {
         success: true,
-        message: 'OTP sent to your email address'
+        message: `OTP sent to ${recipientEmail}`
       };
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -491,7 +484,7 @@ export class AuthService {
       };
 
       // Handle attendance after successful OTP login
-      await this.handleAttendanceOnLogin(authenticatedUser);
+      // await this.handleAttendanceOnLogin(authenticatedUser);
 
       this.logger.log(`User successfully logged in with OTP: ${trimmedEmail}`);
 
