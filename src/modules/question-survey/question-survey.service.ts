@@ -12,18 +12,28 @@ export class QuestionSurveyService {
     private readonly questionSurveyModel: Model<QuestionSurvey>,
   ) {}
 
-async create(createQuestionSurveyDto: CreateQuestionSurveyDto): Promise<QuestionSurvey> {
-  // Convert string surveyId to ObjectId
-  const questionToCreate = {
-    ...createQuestionSurveyDto,
-    surveyId: new Types.ObjectId(createQuestionSurveyDto.surveyId),
-  };
+  async create(createQuestionSurveyDto: CreateQuestionSurveyDto): Promise<QuestionSurvey> {
+    const questionToCreate = {
+      ...createQuestionSurveyDto,
+      surveyId: new Types.ObjectId(createQuestionSurveyDto.surveyId),
+    };
 
-  const createdQuestion = new this.questionSurveyModel(questionToCreate);
-  return createdQuestion.save();
-}
+    const createdQuestion = new this.questionSurveyModel(questionToCreate);
+    return createdQuestion.save();
+  }
+
+  // THIS IS THE KEY METHOD YOUR FRONTEND NEEDS
+  async createMany(questions: CreateQuestionSurveyDto[]): Promise<QuestionSurvey[]> {
+    const questionsWithObjectId = questions.map(q => ({
+      ...q,
+      surveyId: new Types.ObjectId(q.surveyId),
+    }));
+    
+    return this.questionSurveyModel.insertMany(questionsWithObjectId);
+  }
+
   async findAll(): Promise<QuestionSurvey[]> {
-    return this.questionSurveyModel.find().exec();
+    return this.questionSurveyModel.find().sort({ order: 1 }).exec();
   }
 
   async findOne(id: string): Promise<QuestionSurvey> {
@@ -32,6 +42,14 @@ async create(createQuestionSurveyDto: CreateQuestionSurveyDto): Promise<Question
       throw new NotFoundException(`Question with ID ${id} not found`);
     }
     return question;
+  }
+
+  // FIXED VERSION - properly converts surveyId to ObjectId
+  async findBySurveyId(surveyId: string): Promise<QuestionSurvey[]> {
+    return this.questionSurveyModel
+      .find({ surveyId: new Types.ObjectId(surveyId) })
+      .sort({ order: 1 })
+      .exec();
   }
 
   async update(
@@ -56,7 +74,32 @@ async create(createQuestionSurveyDto: CreateQuestionSurveyDto): Promise<Question
     return deletedQuestion;
   }
 
-  async findBySurveyId(surveyId: string): Promise<QuestionSurvey[]> {
-    return this.questionSurveyModel.find({ surveyId }).sort({ order: 1 }).exec();
+  async removeBySurveyId(surveyId: string): Promise<void> {
+    await this.questionSurveyModel
+      .deleteMany({ surveyId: new Types.ObjectId(surveyId) })
+      .exec();
+  }
+
+  async removeMany(ids: string[]): Promise<void> {
+    const objectIds = ids.map(id => new Types.ObjectId(id));
+    await this.questionSurveyModel
+      .deleteMany({ _id: { $in: objectIds } })
+      .exec();
+  }
+
+  async reorder(surveyId: string, questionIds: string[]): Promise<QuestionSurvey[]> {
+    const bulkOps = questionIds.map((id, index) => ({
+      updateOne: {
+        filter: { 
+          _id: new Types.ObjectId(id), 
+          surveyId: new Types.ObjectId(surveyId) 
+        },
+        update: { order: index + 1 }
+      }
+    }));
+
+    await this.questionSurveyModel.bulkWrite(bulkOps);
+    
+    return this.findBySurveyId(surveyId);
   }
 }

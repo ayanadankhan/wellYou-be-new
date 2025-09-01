@@ -7,7 +7,7 @@ export class Survey extends Document {
   title: string;
 
   @Prop({ required: true })
-  departmentId: string;
+  departmentIds: string[];
 
   @Prop()
   departmentName: string;
