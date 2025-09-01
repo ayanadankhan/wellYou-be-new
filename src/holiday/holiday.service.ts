@@ -12,10 +12,11 @@ export class HolidayService {
     @InjectModel(Holiday.name) private holidayModel: Model<HolidayDocument>,
   ) {}
 
-  async create(createHolidayDto: CreateHolidayDto, userId: string): Promise<Holiday> {
+  async create(createHolidayDto: CreateHolidayDto, currentUser: any): Promise<Holiday> {
     const newHoliday = new this.holidayModel({
       ...createHolidayDto,
-      createdBy: new Types.ObjectId(userId),
+      tenantId: new Types.ObjectId(currentUser.tenantId),
+      createdBy: new Types.ObjectId(currentUser._id),
     });
     return newHoliday.save();
   }
@@ -142,5 +143,88 @@ export class HolidayService {
   async delete(id: string): Promise<void> {
     const deletedHoliday = await this.holidayModel.findByIdAndDelete(id).exec();
     if (!deletedHoliday) throw new NotFoundException(`Holiday with ID "${id}" not found.`);
+  }
+
+  async getWorkingDays(startDate: Date, endDate: Date, tenantId: string
+  ): Promise<{ workingDays: number; holidayDays: number; holidayDates: { date: Date; }[] }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('Start date and end date are required');
+    }
+    if (startDate > endDate) {
+      throw new BadRequestException('Start date cannot be after end date');
+    }
+
+    const holidays = await this.holidayModel.find({
+      tenantId: new Types.ObjectId(tenantId),
+    }).lean();
+
+    let workingDays = 0;
+    let holidayDays = 0;
+    const holidayDates: { date: Date;}[] = [];
+
+    let current = new Date(startDate);
+
+    while (current <= endDate) {
+      const dayName = current.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      let isHoliday = false;
+      let reason = '';
+
+      for (const h of holidays) {
+        if (h.isRecurring && h.recurringPattern === 'weekly' && h.days?.length) {
+          if (h.days.map((d: string) => d.toLowerCase()).includes(dayName)) {
+            isHoliday = true;
+            reason = `Weekly holiday (${dayName})`;
+            break;
+          }
+        }
+
+        if (h.isRecurring && h.recurringPattern === 'monthly' && h.date) {
+          const holidayDate = new Date(h.date);
+          if (holidayDate.getDate() === current.getDate()) {
+            isHoliday = true;
+            reason = 'Monthly recurring holiday';
+            break;
+          }
+        }
+
+        if (h.isRecurring && h.recurringPattern === 'yearly' && h.date) {
+          const holidayDate = new Date(h.date);
+          if (
+            holidayDate.getDate() === current.getDate() &&
+            holidayDate.getMonth() === current.getMonth()
+          ) {
+            isHoliday = true;
+            reason = 'Yearly recurring holiday';
+            break;
+          }
+        }
+
+        if (!h.isRecurring && h.date) {
+          const holidayDate = new Date(h.date);
+          if (holidayDate.toDateString() === current.toDateString()) {
+            isHoliday = true;
+            reason = 'One-time holiday';
+            break;
+          }
+        }
+
+        if (h.isRecurring && h.recurringPattern === 'custom') {
+          // future extension
+        }
+      }
+
+      if (isHoliday) {
+        holidayDays++;
+        holidayDates.push({
+          date: new Date(current)
+        });
+      } else {
+        workingDays++;
+      }
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    return { workingDays, holidayDays, holidayDates };
   }
 }

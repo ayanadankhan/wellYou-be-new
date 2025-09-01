@@ -14,6 +14,7 @@ import { GetEmployeeDto } from '../employees/dto/get-Employee.dto';
 import { RequestMangment, RequestMangmentDocument } from '../request-mangment/entities/request-mangment.entity';
 import { RequestType } from '../request-mangment/dto/create-request-mangment.dto';
 import { CreateBulkAttendanceDto } from './dto/create-bulk-attendance.dto';
+import { HolidayService } from '@/holiday/holiday.service';
 
 interface AttendanceResponse {
   success: boolean;
@@ -38,6 +39,7 @@ export class AttendanceService {
     @InjectModel(Employee.name)
     private employeeModel: Model<EmployeeDocument>,
     private employeeService: EmployeesService,
+    private readonly holidayService: HolidayService,
   ) { }
 
   // Enhanced method to get attendance based on user role
@@ -1138,6 +1140,13 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
       }
 
       const employeeIds = employees.map(emp => emp._id);
+
+      const { workingDays, holidayDays } = await this.holidayService.getWorkingDays(
+        filterStart,
+        filterEnd,
+        tenantId
+      );
+
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);
       let presentToday = 0;
@@ -1164,16 +1173,6 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
       }).lean();
 
       const presentCount = attendanceRecordsInRange.filter(a => a.status?.toLowerCase() === 'present').length;
-      let workingDays = 0;
-        for (
-          let d = new Date(filterStart);
-          d <= filterEnd;
-          d.setUTCDate(d.getUTCDate() + 1)
-        ) {
-          if (d.getUTCDay() !== 0) {
-            workingDays++;
-          }
-        }
       const totalPossibleAttendances = totalEmployees * workingDays;
       const MTDAttendanceRate = totalPossibleAttendances > 0
         ? parseFloat(((presentCount / totalPossibleAttendances) * 100).toFixed(2))
@@ -1187,13 +1186,15 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
       const departmentWiseAttendance = await this.getDepartmentWiseAttendance(
         tenantId,
         filterStart,
-        filterEnd
+        filterEnd, 
+        workingDays
       );
 
       const tenantMonthToDateAttendance = await this.getTenantMonthlyAttendanceSummary(
         tenantId,
         filterStart,
-        filterEnd
+        filterEnd,
+        workingDays
       );
       
       const todayDepartmentWiseAttendance = await this.getTodayDepartmentWiseAttendance(
@@ -1220,7 +1221,9 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
         todayDepartmentWiseAttendance,
         currentMonthLateCheckIns,
         recentCorrectionAttendanceRequests,
-        todayLeaveRequests
+        todayLeaveRequests,
+        workingDays,
+        holidayDays
       };
 
     } catch (error) {
@@ -1286,19 +1289,11 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
 
   private async getTenantMonthlyAttendanceSummary(tenantId: string,
     filterStart: Date,
-    filterEnd: Date
+    filterEnd: Date,
+    workingDays: any
   ) {
     if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
-    }
-
-    let workingDays = 0;
-    const current = new Date(filterStart);
-    while (current <= filterEnd) {
-      if (current.getUTCDay() !== 0) {
-        workingDays++;
-      }
-      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     const employees = await this.employeeModel.find({ tenantId: new Types.ObjectId(tenantId) }).select('_id').lean();
@@ -1354,7 +1349,8 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
   private async getDepartmentWiseAttendance(
     tenantId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    workingDays: any
   ) {
     if (!tenantId || !Types.ObjectId.isValid(tenantId)) {
       throw new HttpException('Invalid tenant ID', HttpStatus.BAD_REQUEST);
@@ -1373,24 +1369,6 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
     ));
 
     const effectiveEndForAbsent = end < todayUTC ? end : todayUTC;
-
-    let workingDays = 0;
-    const current = new Date(start);
-    while (current <= end) {
-      if (current.getUTCDay() !== 0) { 
-        workingDays++;
-      }
-      current.setUTCDate(current.getUTCDate() + 1);
-    }
-
-    let workingDaysForAbsent = 0;
-    const currentForAbsent = new Date(start);
-    while (currentForAbsent <= effectiveEndForAbsent) {
-      if (currentForAbsent.getUTCDay() !== 0) { 
-        workingDaysForAbsent++;
-      }
-      currentForAbsent.setUTCDate(currentForAbsent.getUTCDate() + 1);
-    }
 
     const markedAttendance = await this.attendanceModel.aggregate([
       { $match: { date: { $gte: start, $lte: end } } },
@@ -1445,9 +1423,9 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
     return employeesByDept.map(dept => {
       const present = (markedAttendance.find(m => m._id === dept._id)?.presentCount) ?? 0;
 
-      const totalPossible = dept.totalEmployees * workingDaysForAbsent;      
+      const totalPossible = dept.totalEmployees * workingDays;      
 
-      const totalPossibleForAbsent = dept.totalEmployees * workingDaysForAbsent;
+      const totalPossibleForAbsent = dept.totalEmployees * workingDays;
       const absentCount = Math.max(0, totalPossibleForAbsent - present);
 
       const attendanceRate = totalPossible > 0
@@ -1811,16 +1789,11 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
     const today = new Date();
     const adjustedEndDate = endDate > today ? today : endDate;
 
-    let totalWorkingDays = 0;
-    const currentDate = new Date(startDate);
-    while (currentDate <= adjustedEndDate) {
-      if (currentDate.getDay() !== 0) {
-        totalWorkingDays++;
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    this.logger.log(`📅 Report period: ${startDate.toISOString()} to ${adjustedEndDate.toISOString()} (${totalWorkingDays} working days)`);
+    const { workingDays } = await this.holidayService.getWorkingDays(
+      startDate,
+      endDate,
+      tenantId
+    );
 
     try {
       this.logger.log('Pipeline Stage 1: Aggregation starting...');
@@ -1944,7 +1917,7 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
                 else: ''
               }
             },
-            totalWorkingDays: { $literal: totalWorkingDays },
+            workingDays: { $literal: workingDays },
             presentDays: { $size: '$attendanceRecords' },
             avgCheckInTime: {
               $cond: [
@@ -2028,17 +2001,17 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
           $addFields: {
             absentDays: {
               $subtract: [
-                '$totalWorkingDays',
+                '$workingDays',
                 { $add: ['$presentDays', '$leaveDays'] }
               ]
             },
             attendanceRate: {
               $cond: {
-                if: { $eq: ['$totalWorkingDays', 0] },
+                if: { $eq: ['$workingDays', 0] },
                 then: 0,
                 else: {
                   $round: [
-                    { $multiply: [{ $divide: ['$presentDays', '$totalWorkingDays'] }, 100] },
+                    { $multiply: [{ $divide: ['$presentDays', '$workingDays'] }, 100] },
                     2
                   ]
                 },
@@ -2054,7 +2027,7 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
             department: 1,
             designation: 1,
             reportingTo: 1,
-            totalWorkingDays: 1,
+            workingDays: 1,
             presentDays: 1,
             absentDays: 1,
             leaveDays: 1,

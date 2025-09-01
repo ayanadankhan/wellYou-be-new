@@ -81,6 +81,9 @@ export class Holiday {
   })
   days?: DayOfWeek[];
 
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   createdBy: Types.ObjectId;
 

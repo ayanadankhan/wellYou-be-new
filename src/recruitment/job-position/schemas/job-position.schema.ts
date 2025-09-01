@@ -32,8 +32,10 @@ export class JobPosition extends Document implements IJobPosition {
   @Prop({ required: true, trim: true })
   description: string;
 
-  @Prop({ required: true, trim: true, index: true })
-  department: string;
+  // @Prop({ required: true, trim: true, index: true })
+  // department: string;
+  @Prop({ type: Types.ObjectId, ref: 'departments', required: true })
+  department: Types.ObjectId;
 
   @Prop({ required: true, trim: true, index: true })
   location: string;
@@ -106,6 +108,9 @@ export class JobPosition extends Document implements IJobPosition {
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   deletedBy?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'companies', required: true })
+  tenantId: Types.ObjectId;
 }
 
 export const JobPositionSchema = SchemaFactory.createForClass(JobPosition);

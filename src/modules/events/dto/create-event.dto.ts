@@ -11,6 +11,7 @@ import {
     IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Types } from 'mongoose';
 
 export class LocationDto {
     @IsEnum(['Onsite', 'Online'])
@@ -24,7 +25,7 @@ export class LocationDto {
 export class OrganizerDto {
     @IsMongoId()
     @IsNotEmpty()
-    department: string; // Department ID
+    department: Types.ObjectId;
 
     @IsArray()
     @ArrayMinSize(1)
@@ -87,11 +88,11 @@ export class CreateEventDto {
     @IsNumber()
     budget: number;
 
-    @IsEnum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR'])
+    @IsEnum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR', 'PKR'])
     currency: string;
 
     @IsOptional()
-    @IsString()
+    @IsMongoId()
     createdBy?: string;
 }
 
