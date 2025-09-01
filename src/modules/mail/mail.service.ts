@@ -14,30 +14,47 @@ export class MailService {
   });
 
   // mail.service.ts
-  async sendOtpEmail(to: string, otp: string) {
+  async sendOtpEmail(to: string, otp: string, purpose: 'login' | 'forgotPassword') {
     try {
+      let subject = '';
+      let title = '';
+      let message = '';
+      let validity = '';
+
+      if (purpose === 'login') {
+        subject = 'Your Login OTP';
+        title = 'Login Verification';
+        message = `Use the OTP below to log in to your account.`;
+        validity = 'This OTP is valid for 1 minutes.';
+      } else {
+        subject = 'Your Password Reset OTP';
+        title = 'Password Reset Request';
+        message = `You requested to reset your password. Here’s your OTP:`;
+        validity = 'This OTP is valid for 5 minutes.';
+      }
+
       const mailOptions = {
         from: '"WellYou" <teambitsbuffer@gmail.com>',
         to,
-        subject: 'Your Password Reset OTP',
+        subject,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="text-align: center; margin-bottom: 20px;">
+            <div style="background: linear-gradient(90deg, #4e73df, #1cc88a); padding: 20px; text-align: center;">
               <img src="https://bitsbuffer.com/logo.png" alt="BitsBuffer Logo" style="max-width: 150px;">
-              <h1 style="color: #2c3e50;">Password Reset Request</h1>
+              <h1 style="color: #f8f9fa">${title}</h1>
             </div>
             
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
-              <p>You requested to reset your password. Here's your OTP:</p>
+              <p>${message}</p>
               
               <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0; text-align: center; font-size: 24px; font-weight: bold;">
                 ${otp}
               </div>
               
-              <p>This OTP is valid for 15 minutes. Please don't share it with anyone.</p>
+              <p>${validity} Please don’t share it with anyone.</p>
               
               <p style="font-size: 0.9em; color: #7f8c8d;">
-                If you didn't request this password reset, please contact our IT support team immediately.
+                If you didn’t request this, please contact our IT support team immediately.
               </p>
             </div>
             
@@ -49,9 +66,9 @@ export class MailService {
       };
 
       await this.transporter.sendMail(mailOptions);
-        console.log(`OTP email sent to ${to}`);
+      console.log(`OTP email sent to ${to} for ${purpose}`);
     } catch (error) {
-        console.error('Failed to send OTP email:', error);
+      console.error('Failed to send OTP email:', error);
       throw error;
     }
   }
