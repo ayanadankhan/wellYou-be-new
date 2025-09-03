@@ -7,6 +7,7 @@ import {
   Query,
   Put,
   Delete,
+  Patch,
 } from '@nestjs/common';
 import { SurveyService } from './survey.service';
 import { CreateSurveyDto } from './dto/create-survey.dto';
@@ -29,12 +30,17 @@ export class SurveyController {
     return this.surveyService.findAll({ title, departmentId });
   }
 
+    @Post('analytics')
+  async getSurveyAnalytics(@Body('surveyId') surveyId: string) {
+    return this.surveyService.getSurveyAnalytics(surveyId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.surveyService.findOne(id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   update(@Param('id') id: string, @Body() updateSurveyDto: UpdateSurveyDto) {
     return this.surveyService.update(id, updateSurveyDto);
   }
