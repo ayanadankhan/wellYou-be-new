@@ -4,7 +4,7 @@ import { Document, Query, Types } from 'mongoose';
 import { InterviewType } from 'src/recruitment/shared/enums';
 import { IInterview, IInterviewDocument, IInterviewer } from '../interfaces/interview.interface';
 import { Application } from 'src/recruitment/application/schemas/application.schema';
-import { JobPosition } from 'src/recruitment/job-position/schemas/job-position.schema';
+import { JobPosting} from 'src/recruitment/job-position/schemas/job-position.schema';
 
 // src/recruitment/interview/schemas/interview.schema.ts
 

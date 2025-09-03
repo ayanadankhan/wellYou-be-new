@@ -1,15 +1,22 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray } from 'class-validator';
 
 export class CreateSurveyDto {
   @IsString()
   @IsNotEmpty()
   title: string;
 
-  @IsString()
+  @IsArray()
+  @IsString({ each: true })  // har element string hona chahiye
   @IsNotEmpty()
-  departmentId: string;
-
+  departmentIds: string[];
+  
   @IsString()
   @IsNotEmpty()
   instruction: string;
+
+  @IsString()
+  @IsNotEmpty()
+  status: string;
+
+
 }

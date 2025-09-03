@@ -1,18 +1,23 @@
-// src/recruitment/application/schemas/application.schema.ts
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Query, Types } from 'mongoose';
 import { ApplicationStatus, ExperienceLevel, JobType } from '../../shared/enums';
 import { IApplication, IApplicationDocument } from '../interfaces/application.interface';
-// import { JobPosition } from '../../job-position/schemas/job-position.schema'; // Assuming this exists and is correctly imported
-// import { CandidateProfile } from '../../candidate-profile/schemas/candidate-profile.schema'; // Assuming this exists and is correctly imported
+// import { JobPosition } from '../../job-position/schemas/job-position.schema';
+// import { CandidateProfile } from '../../candidate-profile/schemas/candidate-profile.schema';
+
+// Helper interface for a simple match score detail
+interface MatchScoreDetails {
+  skillScore: number;
+  experienceScore: number;
+  keywordScore: number;
+}
 
 @Schema({
   timestamps: true, // Automatically manage createdAt and updatedAt
   collection: 'applications',
 })
 export class Application extends Document implements IApplication {
-  @Prop({ type: Types.ObjectId, ref: 'CandidateProfile', required: false,  })
+  @Prop({ type: Types.ObjectId, ref: 'CandidateProfile', required: true, })
   candidateProfile: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'JobPosition', required: true, })
@@ -25,11 +30,11 @@ export class Application extends Document implements IApplication {
     required: true,
     enum: ApplicationStatus,
     default: ApplicationStatus.APPLIED,
-    index: true,
+  
   })
   status: ApplicationStatus;
 
-  @Prop({ type: Date, default: Date.now, index: true })
+  @Prop({ type: Date, default: Date.now})
   appliedDate: Date;
 
   @Prop({ type: Date, default: null })
@@ -53,24 +58,35 @@ export class Application extends Document implements IApplication {
   @Prop({ trim: true })
   notes?: string; // Notes specific to THIS application
 
-  @Prop({ trim: true, index: true })
+  @Prop({ trim: true})
   source?: string;
 
-   // 🚀 NEW: Field to store the calculated match score for this application
+  // AI-Augmented Fields
   @Prop({ type: Number, default: 0,})
-  matchScore?: number; // Stores the score of candidate profile against the job position requirements
+  matchScore?: number; // Stores the overall match score of the application against the job
 
-   @Prop({ enum: JobType, required: true })
+  @Prop({ type: Object })
+  matchScoreDetails?: MatchScoreDetails; // Detailed breakdown of the match score
+
+  @Prop({ trim: true })
+  aiSummary?: string; // AI-generated summary of the candidate's profile/resume
+
+  @Prop([String])
+  extractedSkills?: string[]; // Skills extracted by AI from the resume
+
+  @Prop({ type: Date, default: null })
+  resumeAnalysisDate?: Date | null; // Timestamp of the last AI analysis
+
+  @Prop({ enum: JobType, required: true })
   jobType: JobType;
 
   @Prop({ enum: ExperienceLevel, required: true })
   experienceLevel: ExperienceLevel;
 
-
   // Audit fields
   @Prop({ type: Types.ObjectId, ref: 'User' }) createdBy?: Types.ObjectId;
   @Prop({ type: Types.ObjectId, ref: 'User' }) updatedBy?: Types.ObjectId;
-  @Prop({ type: Boolean, default: false, index: true }) isDeleted?: boolean;
+  @Prop({ type: Boolean, default: false }) isDeleted?: boolean;
   @Prop({ type: Date }) deletedAt?: Date;
   @Prop({ type: Types.ObjectId, ref: 'User' }) deletedBy?: Types.ObjectId;
 }

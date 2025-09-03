@@ -20,5 +20,5 @@ export class CreateAnswerSurveyDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
-  userId: string; // Used for token generation but won't be stored
+  userId: string;
 }
