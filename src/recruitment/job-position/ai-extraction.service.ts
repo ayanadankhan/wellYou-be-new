@@ -13,7 +13,7 @@ export class AiExtractionService {
 
   constructor() {
     this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || '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', // Replace with your key
+      apiKey: process.env.OPENAI_API_KEY, // Replace with your key
     });
   }
 
