@@ -1747,14 +1747,16 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
     return requests;
   }
 
- async hrAttendanceReport(
+  async hrAttendanceReport(
     tenantId: string,
     month?: string,
     from?: string,
     to?: string,
+    departmentId?: string,
+    employeeName?: string,
   ): Promise<any[]> {
-    this.logger.log(`📊 Starting hrAttendanceReport for tenant: ${tenantId} with filters: month=${month}, from=${from}, to=${to}`);
-    // --- 1. Date range setup ---
+    this.logger.log(`📊 Starting hrAttendanceReport for tenant: ${tenantId} with filters: month=${month}, from=${from}, to=${to}, department=${departmentId}, employee=${employeeName}`);
+    
     let startDate: Date;
     let endDate: Date;
     const now = new Date();
@@ -1796,13 +1798,19 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
     );
 
     try {
-      this.logger.log('Pipeline Stage 1: Aggregation starting...');
+      this.logger.log('Pipeline Stage 1: Aggregation starting...');   
+      const employeeMatchConditions: any = {
+        tenantId: new Types.ObjectId(tenantId),
+        employmentStatus: 'ACTIVE',
+      };
+
+      if (departmentId) {
+        employeeMatchConditions.departmentId = new Types.ObjectId(departmentId);
+      }
+
       const report = await this.employeeModel.aggregate([
         {
-          $match: {
-            tenantId: new Types.ObjectId(tenantId),
-            employmentStatus: 'ACTIVE',
-          },
+          $match: employeeMatchConditions,
         },
         {
           $lookup: {
@@ -1852,7 +1860,6 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
                       { $eq: ['$employeeId', '$$employeeId'] },
                       { $gte: ['$date', startDate] },
                       { $lte: ['$date', adjustedEndDate] },
-                      // ADDED: New condition to filter by status
                       { $eq: ['$status', 'Present'] }
                     ],
                   },
@@ -1899,6 +1906,7 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
             },
             profilePicture: { $ifNull: ['$profilePicture', ''] },
             department: { $ifNull: ['$department.departmentName', 'N/A'] },
+            departmentId: { $ifNull: ['$department._id', null] },
             designation: { $ifNull: ['$designation.title', 'N/A'] },
             reportingTo: {
               $cond: {
@@ -1947,19 +1955,59 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
                 }
               ]
             },
-            leaveDays: {
+            totalLateArrivals: {
               $size: {
                 $filter: {
-                  input: '$requestRecords',
-                  as: 'req',
+                  input: "$attendanceRecords",
+                  as: "record",
                   cond: {
                     $and: [
-                      { $eq: ['$$req.type', 'leave'] },
-                      { $eq: ['$$req.workflow.status', 'approved'] }
+                      { $ne: ["$$record.checkInTime", null] },
+                      {
+                        $gt: [
+                          {
+                            $add: [
+                              { $multiply: [{ $hour: { date: "$$record.checkInTime", timezone: "Asia/Karachi" } }, 60] },
+                              { $minute: { date: "$$record.checkInTime", timezone: "Asia/Karachi" } }
+                            ]
+                          },
+                          570 // 9:30 AM → (9*60 + 30)
+                        ]
+                      }
                     ]
+                  }
+                }
+              }
+            },
+            leaveDays: {
+              $sum: {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: "$requestRecords",
+                      as: "req",
+                      cond: {
+                        $and: [
+                          { $eq: ["$$req.type", "leave"] },
+                          { $eq: ["$$req.workflow.status", "approved"] }
+                        ]
+                      }
+                    }
                   },
-                },
-              },
+                  as: "leaveReq",
+                  in: {
+                    $add: [
+                      {
+                        $divide: [
+                          { $subtract: ["$$leaveReq.leaveDetails.to", "$$leaveReq.leaveDetails.from"] },
+                          1000 * 60 * 60 * 24
+                        ]
+                      },
+                      1
+                    ]
+                  }
+                }
+              }
             },
             overtimeDays: {
               $size: {
@@ -1970,7 +2018,7 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
                     $and: [
                       { $eq: ['$$req.type', 'overtime'] },
                       { $eq: ['$$req.workflow.status', 'approved'] }
-                    ]
+                    ],
                   },
                 },
               },
@@ -1991,7 +2039,7 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
                     },
                   },
                   as: 'ot',
-                  in: { $ifNull: ['$$ot.overtimeDetails.hours', 0] },
+                  in: { $ifNull: ['$$ot.overtimeDetails.totalHour', 0] },
                 },
               },
             },
@@ -2025,6 +2073,7 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
             name: 1,
             profilePicture: 1,
             department: 1,
+            departmentId: 1,
             designation: 1,
             reportingTo: 1,
             workingDays: 1,
@@ -2035,16 +2084,26 @@ async createBulk(createBulkDto: CreateBulkAttendanceDto): Promise<Attendance[]> 
             totalOvertimeHours: 1,
             attendanceRate: 1,
             avgCheckInTime: 1,
+            totalLateArrivals: 1,
           },
         },
         { $sort: { attendanceRate: -1 } }
       ]);
-      this.logger.log(`✅ Aggregation pipeline executed. Records: ${report.length}`);
-      if (report.length > 0) {
-        this.logger.debug(`Sample record: ${JSON.stringify(report[0], null, 2)}`);
+
+      let filteredReport = report;
+      if (employeeName) {
+        const searchTerm = employeeName.toLowerCase();
+        filteredReport = report.filter(employee => 
+          employee.name.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      this.logger.log(`✅ Aggregation pipeline executed. Records: ${filteredReport.length}`);
+      if (filteredReport.length > 0) {
+        this.logger.debug(`Sample record: ${JSON.stringify(filteredReport[0], null, 2)}`);
       }
       this.logger.log(`🎯 HR attendance report generated successfully.`);
-      return report;
+      return filteredReport;
     } catch (error) {
       this.logger.error(`❌ Failed to generate HR attendance report: ${error.message}`, error.stack);
       throw new HttpException(

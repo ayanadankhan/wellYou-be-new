@@ -1,9 +1,14 @@
-// src/recruitment/application/interfaces/application.interface.ts
-
 import { Document, Types } from 'mongoose';
 import { IBaseDocument, IPaginationQuery } from '../../shared/interfaces';
 import { ApplicationStatus, ExperienceLevel, JobType } from '../../shared/enums';
 import { CreateCandidateProfileDto } from '../../candidate-profile/dto/create-candidate-profile.dto'; // Import for DTO definition
+
+// Helper interface for a simple match score detail
+interface MatchScoreDetails {
+  skillScore: number;
+  experienceScore: number;
+  keywordScore: number;
+}
 
 export interface IApplication extends IBaseDocument {
   // NEW: Reference to the CandidateProfile
@@ -20,14 +25,22 @@ export interface IApplication extends IBaseDocument {
   rejectionReason?: string;
   rejectionDate?: Date | null;
   hireDate?: Date | null;
-  matchScore?: number;
   jobType: JobType;
   experienceLevel: ExperienceLevel;
+    extractedSummary?: string; // New property
+
 
   skills?: string[]; // Job-specific skills provided for THIS application (optional)
 
   notes?: string; // Notes specific to THIS application
   source?: string; // e.g., LinkedIn, Indeed, Referral (for THIS application)
+
+  // AI-Augmented Fields
+  matchScore?: number; // Stores the overall match score of the application against the job
+  matchScoreDetails?: MatchScoreDetails; // Detailed breakdown of the match score
+  aiSummary?: string; // AI-generated summary of the candidate's profile/resume
+  extractedSkills?: string[]; // Skills extracted by AI from the resume
+  resumeAnalysisDate?: Date | null; // Timestamp of the last AI analysis
 }
 
 export interface IApplicationDocument extends IApplication, Document {}

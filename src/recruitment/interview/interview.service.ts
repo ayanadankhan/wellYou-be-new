@@ -14,7 +14,7 @@ import { CreateInterviewDto, CreateInterviewerDto } from './dto/create-interview
 import { InterviewQueryDto } from './dto/interview-query.dto';
 import { IPaginatedResponse } from 'src/recruitment/shared/interfaces';
 import { JobApplicationService } from '../application/job-application.service';
-import { JobPositionService } from 'src/recruitment/job-position/job-position.service'; // Dependency
+import { JobPostingService } from 'src/recruitment/job-position/job-position.service'; // Dependency
 import { ApplicationStatus } from 'src/recruitment/shared/enums'; // For updating application status
 import { IInterviewer } from './interfaces/interview.interface';
 import { UpdateInterviewDto } from './dto/update-interview.dto';
@@ -26,7 +26,7 @@ export class InterviewService {
   constructor(
     @InjectModel(Interview.name) private readonly interviewModel: Model<IInterviewDocument>,
     private readonly jobApplicationService: JobApplicationService,
-    private readonly jobPositionService: JobPositionService,
+    private readonly jobPositionService: JobPostingService,
   ) {}
 
   /**
@@ -47,7 +47,7 @@ async createInterview(
       if (!application) {
         throw new NotFoundException(`Application with ID ${createInterviewDto.applicationId} not found.`); // Add message
       }
-      const jobPosition = await this.jobPositionService.getJobPositionById(createInterviewDto.jobPositionId);
+      const jobPosition = await this.jobPositionService.findOne(createInterviewDto.jobPositionId);
       this.logger.log(`Validating job position ${createInterviewDto.jobPositionId}`);
       if (!jobPosition) {
         throw new NotFoundException(`Job Position with ID ${createInterviewDto.jobPositionId} not found.`); // Add message

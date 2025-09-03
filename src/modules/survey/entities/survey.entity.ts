@@ -7,13 +7,15 @@ export class Survey extends Document {
   title: string;
 
   @Prop({ required: true })
-  departmentId: string;
+  departmentIds: string[];
 
   @Prop()
   departmentName: string;
 
   @Prop({ required: true })
   instruction: string;
+  @Prop({ required: true })
+  status: string;
 }
 
 export const SurveySchema = SchemaFactory.createForClass(Survey);
