@@ -4,7 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
 import { Application, IApplicationDocument } from '../application/schemas/application.schema';
 import { Interview, IInterviewDocument } from 'src/recruitment/interview/schemas/interview.schema';
-import { JobPosition, IJobPositionDocument } from 'src/recruitment/job-position/schemas/job-position.schema';
+import { JobPosting, IJobPostingDocument } from 'src/recruitment/job-position/schemas/job-position.schema';
 import { RecruitmentMetricsQueryDto } from './dto/recruitment-metrics-query.dto';
 import {
   IApplicationsOverview,
@@ -21,7 +21,7 @@ export class ReportingService {
   constructor(
     @InjectModel(Application.name) private readonly applicationModel: Model<IApplicationDocument>,
     @InjectModel(Interview.name) private readonly interviewModel: Model<IInterviewDocument>,
-    @InjectModel(JobPosition.name) private readonly jobPositionModel: Model<IJobPositionDocument>,
+    @InjectModel(JobPosting.name) private readonly jobPositionModel: Model<IJobPostingDocument>,
   ) {}
 
   private buildDateFilter(startDate?: string, endDate?: string, dateField: string = 'createdAt'): any {
