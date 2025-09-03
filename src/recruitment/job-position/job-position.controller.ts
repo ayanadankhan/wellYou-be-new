@@ -1,117 +1,72 @@
-// src/recruitment/job-position/job-position.controller.ts
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  HttpCode,
-  HttpStatus,
-  UsePipes,
-  ValidationPipe,
-  Logger,
-  HttpException,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { JobPositionService } from './job-position.service';
-import { CreateJobPositionDto } from './dto/create-job-position.dto';
-import { UpdateJobPositionDto } from './dto/update-job-position.dto';
-import { IJobPositionDocument } from './interfaces/job-position.interface';
+// ===== 7. CONTROLLER =====
+// src/job-posting/controllers/job-posting.controller.ts
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Put } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { JobPostingService } from './job-position.service';
+import { CreateJobPostingDto } from './dto/create-job-position.dto';
+import { UpdateJobPostingDto } from './dto/update-job-position.dto';
+import { JobPositionQueryDto } from './dto/job-position-query.dto';
+import { GenerateJobDescriptionDto } from './dto/job-description.dto';
 import { CurrentUser } from '@/common/decorators/user.decorator';
-import { AuthenticatedUser } from '@/modules/auth/interfaces/auth.interface';
-import { GetJobPositionDto } from './dto/get-job-position.dto';
+import { User } from '@/modules/tenant/users/schemas/user.schema';
 
-@ApiTags('Job Positions')
-@Controller('job-positions')
-@UsePipes(new ValidationPipe({ whitelist: true, transform: true })) // Enable validation and transformation globally for this controller
-export class JobPositionController {
-  private readonly logger = new Logger(JobPositionController.name);
-
-  constructor(private readonly jobPositionService: JobPositionService) {}
+@ApiTags('job-postings')
+@Controller('job-postings')
+export class JobPostingController {
+  constructor(private readonly jobPostingService: JobPostingService) {}
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() createJobPositionDto: CreateJobPositionDto,
-  ): Promise<IJobPositionDocument> {
-    this.logger.log('Received request to create job position.');
-    if (!user) throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    return this.jobPositionService.createJobPosition(createJobPositionDto , user);
+  create(@Body() createJobPostingDto: CreateJobPostingDto, @CurrentUser() user: User)  {
+    return this.jobPostingService.create(createJobPostingDto, user);
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<IJobPositionDocument> {
-    return this.jobPositionService.getJobPositionById(id);
+    @Post('generate-description')
+  @ApiOperation({ summary: 'Generate a professional job description using AI' })
+  @ApiResponse({ status: 200, description: 'Job description generated successfully', type: 'string' })
+  generateDescription(@Body() generateDto: GenerateJobDescriptionDto) {
+    return this.jobPostingService.generateAiDescription(generateDto);
   }
 
   @Get()
-  async findAll(@Query() queryDto: GetJobPositionDto , @CurrentUser() user : AuthenticatedUser) {
-    this.logger.log('Received request to get all job positions with filters.');
-    return this.jobPositionService.getJobPositions(queryDto, user);
+  @ApiOperation({ summary: 'Get all job postings with filtering' })
+  @ApiResponse({ status: 200, description: 'Job postings retrieved successfully' })
+  findAll(@Query() query: JobPositionQueryDto) {
+    return this.jobPostingService.findAll(query);
   }
 
-  @Put(':id')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update a job position by ID' })
-  @ApiParam({ name: 'id', description: 'The ID of the job position', type: String })
-  @ApiResponse({ status: 200, description: 'The job position has been successfully updated.', type: UpdateJobPositionDto })
-  @ApiResponse({ status: 400, description: 'Bad Request (Validation Error)' })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 409, description: 'Conflict (Job position with this title already exists)' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async update(
-    @Param('id') id: string,
-    @Body() updateJobPositionDto: CreateJobPositionDto,
-    // @Request() req // Uncomment and use for getting user ID for updatedBy
-  ): Promise<IJobPositionDocument> {
-    
-    // In a real app, get user ID from request (e.g., req.user.id)
-    return this.jobPositionService.updateJobPosition(id, updateJobPositionDto /*, req.user.id*/);
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a job posting by ID' })
+  @ApiParam({ name: 'id', description: 'Job posting ID' })
+  @ApiResponse({ status: 200, description: 'Job posting retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Job posting not found' })
+  findOne(@Param('id') id: string) {
+    return this.jobPostingService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a job posting' })
+  @ApiParam({ name: 'id', description: 'Job posting ID' })
+  @ApiResponse({ status: 200, description: 'Job posting updated successfully' })
+  @ApiResponse({ status: 404, description: 'Job posting not found' })
+  update(@Param('id') id: string, @Body() updateJobPostingDto: UpdateJobPostingDto) {
+    return this.jobPostingService.update(id, updateJobPostingDto);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT) // 204 No Content for successful deletion
-  @ApiOperation({ summary: 'Soft delete a job position by ID' })
-  @ApiParam({ name: 'id', description: 'The ID of the job position', type: String })
-  @ApiResponse({ status: 204, description: 'The job position has been successfully soft-deleted.' })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async remove(
-    @Param('id') id: string,
-    // @Request() req // Uncomment and use for getting user ID for deletedBy
-  ): Promise<void> {
-    
-    // In a real app, get user ID from request (e.g., req.user.id)
-    await this.jobPositionService.remove(id /*, req.user.id*/);
+  @ApiOperation({ summary: 'Delete a job posting' })
+  @ApiParam({ name: 'id', description: 'Job posting ID' })
+  @ApiResponse({ status: 200, description: 'Job posting deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Job posting not found' })
+  remove(@Param('id') id: string) {
+    return this.jobPostingService.remove(id);
   }
 
-  @Put(':id/restore')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Restore a soft-deleted job position by ID' })
-  @ApiParam({ name: 'id', description: 'The ID of the job position to restore', type: String })
-  @ApiResponse({ status: 200, description: 'The job position has been successfully restored.', type: CreateJobPositionDto })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async restore(
-    @Param('id') id: string,
-    // @Request() req
-  ): Promise<IJobPositionDocument> {
-    
-    return this.jobPositionService.restoreJobPosition(id /*, req.user.id*/);
-  }
-
-  @Delete(':id/hard-delete')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Hard delete a job position by ID (irreversible, use with caution)' })
-  @ApiParam({ name: 'id', description: 'The ID of the job position to hard delete', type: String })
-  @ApiResponse({ status: 204, description: 'The job position has been successfully hard-deleted.' })
-  @ApiResponse({ status: 404, description: 'Not Found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  async hardRemove(@Param('id') id: string): Promise<void> {
-    
-    await this.jobPositionService.remove(id);
+  @Patch(':id/publish')
+  @ApiOperation({ summary: 'Publish a job posting' })
+  @ApiParam({ name: 'id', description: 'Job posting ID' })
+  @ApiResponse({ status: 200, description: 'Job posting published successfully' })
+  @ApiResponse({ status: 404, description: 'Job posting not found' })
+  publish(@Param('id') id: string) {
+    return this.jobPostingService.publish(id);
   }
 }

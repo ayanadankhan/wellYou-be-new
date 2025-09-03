@@ -1,16 +1,20 @@
-// src/recruitment/job-position/job-position.module.ts
+
+// src/job-posting/job-posting.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { JobPositionController } from './job-position.controller';
-import { JobPositionService } from './job-position.service';
-import { JobPosition, JobPositionSchema } from './schemas/job-position.schema';
+import { JobPostingController } from './job-position.controller';
+import { JobPostingService } from './job-position.service';
+import { AiExtractionService } from './ai-extraction.service';
+import { JobPosting, JobPostingSchema } from './schemas/job-position.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: JobPosition.name, schema: JobPositionSchema }]),
+    MongooseModule.forFeature([
+      { name: JobPosting.name, schema: JobPostingSchema }
+    ])
   ],
-  controllers: [JobPositionController],
-  providers: [JobPositionService],
-  exports: [JobPositionService], // Export service if other modules need to interact with it
+  controllers: [JobPostingController],
+  providers: [JobPostingService, AiExtractionService],
+  exports: [JobPostingService, AiExtractionService], // Export services if other modules need them
 })
 export class JobPositionModule {}

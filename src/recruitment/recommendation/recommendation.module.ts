@@ -2,17 +2,19 @@ import { Module } from '@nestjs/common';
 import { RecommendationService } from './recommendation.service';
 import { RecommendationController } from './recommendation.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { JobPosition, JobPositionSchema } from '../job-position/schemas/job-position.schema';
+import { JobPosting, JobPostingSchema } from '../job-position/schemas/job-position.schema';
+
 import { CandidateProfile, CandidateProfileSchema } from '../candidate-profile/entities/candidate-profile.entity';
 import { Application, ApplicationSchema } from '../application/schemas/application.schema';
-import { JobPositionService } from '../job-position/job-position.service';
+import { JobPostingService } from '../job-position/job-position.service';
 import { CandidateProfileService } from '../candidate-profile/candidate-profile.service';
 import { JobApplicationService } from '../application/job-application.service';
+import { AiExtractionService } from '../job-position/ai-extraction.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: JobPosition.name, schema: JobPositionSchema },
+      { name: JobPosting.name, schema: JobPostingSchema},
       { name: CandidateProfile.name, schema: CandidateProfileSchema },
       { name: Application.name, schema: ApplicationSchema },
     ]),
@@ -24,7 +26,8 @@ import { JobApplicationService } from '../application/job-application.service';
     // For simplicity, we're providing them directly here, assuming RecruitmentModule
     // exports them or they are also provided in the root. If you prefer to import
     // existing modules (e.g., JobPositionModule), that's also a valid approach.
-    JobPositionService,
+    JobPostingService,
+    AiExtractionService,
     CandidateProfileService,
     JobApplicationService,
   ],
