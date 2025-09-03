@@ -5,6 +5,7 @@ export enum JobStatus {
   ACTIVE = 'ACTIVE',
   CLOSED = 'CLOSED',
   ON_HOLD = 'ON_HOLD',
+  PUBLISHED = "PUBLISHED",
 }
 
 export enum ApplicationStatus {
@@ -45,3 +46,24 @@ export enum ExperienceLevel {
   SENIOR = 'SENIOR',
   EXECUTIVE = 'EXECUTIVE',
 }
+
+
+// ===== 1. ENUMS =====
+// src/shared/enums/job.enums.ts
+
+
+export enum WorkplaceType {
+  ONSITE = 'ONSITE',
+  REMOTE = 'REMOTE',
+  HYBRID = 'HYBRID'
+}
+
+
+
+export enum SkillLevel {
+  ENTRY = 'ENTRY',
+  INTERMEDIATE = 'INTERMEDIATE',
+  ADVANCED = 'ADVANCED',
+  EXPERT = 'EXPERT'
+}
+

@@ -1,155 +1,76 @@
-// src/recruitment/job-position/dto/update-job-position.dto.ts
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsNumber,
-  Min,
-  IsEnum,
-  IsArray,
-  ArrayMinSize,
-  IsDateString,
-  ValidateIf,
-} from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { JobStatus } from 'src/recruitment/shared/enums';
-import { Types } from 'mongoose';
+// src/job-posting/dto/update-job-posting.dto.ts
+import { PartialType } from '@nestjs/swagger';
+import { CreateJobPostingDto } from './create-job-position.dto';
 
-export class UpdateJobPositionDto {
-  @ApiProperty({
-    description: 'Title of the job position',
-    example: 'Senior Software Engineer',
-    required: false,
-  })
+export class UpdateJobPostingDto extends PartialType(CreateJobPostingDto) {}
+
+// src/job-posting/dto/query-job-posting.dto.ts
+import { IsOptional, IsEnum, IsString, IsNumber, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { JobType, ExperienceLevel, WorkplaceType, JobStatus } from '../../shared/enums';
+
+export class QueryJobPostingDto {
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  title?: string;
+  search?: string;
 
-  @ApiProperty({
-    description: 'Detailed description of the job position',
-    example: 'We are looking for a passionate Senior Software Engineer...',
-    required: false,
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  description?: string;
+  city?: string;
 
-  @ApiProperty({
-    description: 'Department the job belongs to',
-    example: 'Engineering',
-    required: false,
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  department?: string;
+  country?: string;
 
-  @ApiProperty({
-    description: 'Location of the job',
-    example: 'New York, NY',
-    required: false,
-  })
+  @ApiPropertyOptional({ enum: WorkplaceType })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  location?: string;
+  @IsEnum(WorkplaceType)
+  workplaceType?: WorkplaceType;
 
-  @ApiProperty({
-    description: 'Employment type',
-    enum: ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'],
-    example: 'Full-time',
-    required: false,
-  })
+  @ApiPropertyOptional({ enum: JobType })
   @IsOptional()
-  @IsEnum(['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'])
-  @IsNotEmpty()
-  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
+  @IsEnum(JobType)
+  jobType?: JobType;
 
-  @ApiProperty({
-    description: 'Minimum salary for the position (optional)',
-    example: 80000,
-    required: false,
-  })
+  @ApiPropertyOptional({ enum: ExperienceLevel })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  salaryMin?: number;
+  @IsEnum(ExperienceLevel)
+  experienceLevel?: ExperienceLevel;
 
-  @ApiProperty({
-    description: 'Maximum salary for the position (optional)',
-    example: 120000,
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @ValidateIf(o => o.salaryMin !== undefined)
-  salaryMax?: number;
-
-  @ApiProperty({
-    description: 'Currency of the salary',
-    example: 'USD',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  currency?: string;
-
-  @ApiProperty({
-    description: 'Status of the job position',
-    enum: JobStatus,
-    example: JobStatus.ACTIVE,
-    required: false,
-  })
+  @ApiPropertyOptional({ enum: JobStatus })
   @IsOptional()
   @IsEnum(JobStatus)
   status?: JobStatus;
 
-  @ApiProperty({
-    description: 'List of responsibilities for the job',
-    example: ['Develop and maintain web applications'],
-    required: false,
-  })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @ArrayMinSize(1)
-  responsibilities?: string[];
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  minSalary?: number;
 
-  @ApiProperty({
-    description: 'List of required qualifications and skills',
-    example: ['Bachelor\'s degree in CS'],
-    required: false,
-  })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @ArrayMinSize(1)
-  requirements?: string[];
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  maxSalary?: number;
 
-  @ApiProperty({
-    description: 'List of benefits offered (optional)',
-    example: ['Health insurance'],
-    required: false,
-  })
+  @ApiPropertyOptional({ default: 1 })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  benefits?: string[];
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  page?: number = 1;
 
-  @ApiProperty({
-    description: 'Closing date for applications (optional)',
-    example: '2025-12-31T23:59:59Z',
-    required: false,
-  })
+  @ApiPropertyOptional({ default: 10 })
   @IsOptional()
-  @IsDateString()
-  closingDate?: Date;
-
-  // Add audit fields for update operations if needed for manual tracking
-  // @IsOptional()
-  // updatedBy?: Types.ObjectId;
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  limit?: number = 10;
 }
