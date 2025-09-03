@@ -30,6 +30,11 @@ export class SurveyController {
     return this.surveyService.findAll({ title, departmentId });
   }
 
+    @Post('analytics')
+  async getSurveyAnalytics(@Body('surveyId') surveyId: string) {
+    return this.surveyService.getSurveyAnalytics(surveyId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.surveyService.findOne(id);

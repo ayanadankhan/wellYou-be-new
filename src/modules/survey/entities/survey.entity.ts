@@ -14,6 +14,8 @@ export class Survey extends Document {
 
   @Prop({ required: true })
   instruction: string;
+  @Prop({ required: true })
+  status: string;
 }
 
 export const SurveySchema = SchemaFactory.createForClass(Survey);
