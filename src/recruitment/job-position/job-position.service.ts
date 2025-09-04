@@ -98,6 +98,14 @@ export class JobPostingService {
       }
     };
   }
+  async findAllPublic() {
+  const jobs = await this.jobPostingModel
+    .find({ status: JobStatus.PUBLISHED }) // Only published jobs
+    .lean();
+
+  return { jobs };
+}
+
 
   async findOne(id: string): Promise<IJobPostingDocument> {
     const job = await this.jobPostingModel.findById(id).exec();
