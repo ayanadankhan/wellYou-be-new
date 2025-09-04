@@ -23,20 +23,16 @@ export const User = createParamDecorator(
 
 // Alternative implementation with better type safety and validation
 export const CurrentUser = createParamDecorator(
-  (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext) => {
+  (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext): AuthenticatedUser | any => {
     const request = ctx.switchToHttp().getRequest();
-    const user = request.user as AuthenticatedUser;
+    const user = request.user as AuthenticatedUser | undefined;
 
     if (!user) {
-      throw new Error('User not found in request. Make sure you are using the JWT guard.');
+      return null;
     }
 
     if (data) {
-      const value = user[data];
-      if (value === undefined) {
-        throw new Error(`Property '${data}' not found on user object.`);
-      }
-      return value;
+      return user[data];
     }
 
     return user;

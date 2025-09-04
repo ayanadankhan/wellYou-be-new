@@ -129,7 +129,7 @@ export class AttendanceController {
       date: string | Date;
       checkInTime?: string | Date | null;
       checkOutTime?: string | Date | null;
-      isAutoCheckout?: boolean;
+      // isAutoCheckout?: boolean;
       createdAt?: string | Date;
       updatedAt?: string | Date;
       status?: string;
@@ -148,7 +148,7 @@ export class AttendanceController {
             date: record.date,
             checkInTime: record.checkInTime || null,
             checkOutTime: record.checkOutTime || null,
-            isAutoCheckout: record.isAutoCheckout,
+            // isAutoCheckout: record.isAutoCheckout,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
           }
@@ -188,22 +188,22 @@ export class AttendanceController {
     }
   }
 
-  @Post('auto-checkout')
-  @HttpCode(HttpStatus.OK)
-  async autoCheckout() {
-    try {
-      this.logger.log('Auto check-out request received');
-      await this.attendanceService.autoCheckout();
+  // @Post('auto-checkout')
+  // @HttpCode(HttpStatus.OK)
+  // async autoCheckout() {
+  //   try {
+  //     this.logger.log('Auto check-out request received');
+  //     await this.attendanceService.autoCheckout();
 
-      return {
-        success: true,
-        message: 'Auto check-out completed successfully',
-      };
-    } catch (error) {
-      this.logger.error('Auto check-out failed:', error.message);
-      throw error;
-    }
-  }
+  //     return {
+  //       success: true,
+  //       message: 'Auto check-out completed successfully',
+  //     };
+  //   } catch (error) {
+  //     this.logger.error('Auto check-out failed:', error.message);
+  //     throw error;
+  //   }
+  // }
 
   @Post('mark-absent')
   @HttpCode(HttpStatus.OK)
