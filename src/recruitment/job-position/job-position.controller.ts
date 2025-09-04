@@ -9,6 +9,7 @@ import { JobPositionQueryDto } from './dto/job-position-query.dto';
 import { GenerateJobDescriptionDto } from './dto/job-description.dto';
 import { CurrentUser } from '@/common/decorators/user.decorator';
 import { User } from '@/modules/tenant/users/schemas/user.schema';
+import { Public } from '@/common/decorators/public.decorator';
 
 @ApiTags('job-postings')
 @Controller('job-postings')
@@ -32,6 +33,12 @@ export class JobPostingController {
   @ApiResponse({ status: 200, description: 'Job postings retrieved successfully' })
   findAll(@Query() query: JobPositionQueryDto) {
     return this.jobPostingService.findAll(query);
+  }
+
+  @Get('public')
+  @Public()
+  findAllJobsPublic() {
+    return this.jobPostingService.findAllPublic();
   }
 
   @Get(':id')
