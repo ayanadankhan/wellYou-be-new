@@ -34,7 +34,15 @@ interface AuthenticatedRequest extends Request {
 export class UserController {constructor(private readonly userService: UserService) {}
 
   @Post()
-  async create( @CurrentUser() user: User, @Body() createUserDto: CreateUserDto) {
+  @Public()
+  async create(
+    @CurrentUser() user: User,
+    @Body() createUserDto: CreateUserDto,
+  ) {
+    if (createUserDto.role === UserRole.EMPLOYER) {
+      createUserDto.tenantId = '685d45d3ec54777d1eba7612';
+      return this.userService.create(createUserDto);
+    }
     if (!user) {
       throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
     }

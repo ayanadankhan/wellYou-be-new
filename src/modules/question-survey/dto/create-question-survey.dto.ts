@@ -1,4 +1,10 @@
-import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsString, IsEnum } from 'class-validator';
+
+// Define the question types enum to match your frontend
+export enum QuestionType {  
+  TEXTAREA = 'textarea',
+  LIKERT = 'likert',
+}
 
 export class CreateQuestionSurveyDto {
   @IsNotEmpty()
@@ -8,8 +14,10 @@ export class CreateQuestionSurveyDto {
   @IsNotEmpty()
   questionText: string;
 
+  @IsEnum(QuestionType)
+  questionType: QuestionType;
+
   @IsArray()
-  @IsNotEmpty()
   options: string[];
 
   @IsBoolean()
