@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { QuestionType } from '../dto/create-question-survey.dto';
 
 @Schema({ timestamps: true })
 export class QuestionSurvey extends Document {
@@ -8,6 +9,12 @@ export class QuestionSurvey extends Document {
 
   @Prop({ required: true })
   questionText: string;
+
+  @Prop({ 
+    type: String, 
+    enum: QuestionType, 
+  })
+  questionType: QuestionType;
 
   @Prop({ type: [String], required: true })
   options: string[];
