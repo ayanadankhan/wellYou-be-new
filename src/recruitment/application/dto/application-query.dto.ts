@@ -1,5 +1,3 @@
-// src/recruitment/application/dto/application-query.dto.ts
-
 import { IsOptional, IsString, IsNumber, IsEnum, IsMongoId, IsDateString, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';

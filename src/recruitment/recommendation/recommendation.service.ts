@@ -1,13 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { JobPosition } from '../job-position/schemas/job-position.schema';
+import { JobPosting,  } from '../job-position/schemas/job-position.schema';
+
 import { CandidateProfile } from '../candidate-profile/entities/candidate-profile.entity';
 import { Application } from '../application/schemas/application.schema';
-import { IJobPositionDocument } from '../job-position/interfaces/job-position.interface';
+import { IJobPostingDocument } from '../job-position/interfaces/job-position.interface';
 import { ICandidateProfileDocument } from '../candidate-profile/interfaces/candidate-profile.interface';
 import { IApplicationDocument } from '../application/interfaces/application.interface';
-import { JobPositionService } from '../job-position/job-position.service'; // To use its findOne method
+import { JobPostingService } from '../job-position/job-position.service'; // To use its findOne method
 import { CandidateProfileService } from '../candidate-profile/candidate-profile.service'; // To use its findOne method
 
 @Injectable()
@@ -15,10 +16,10 @@ export class RecommendationService {
   private readonly logger = new Logger(RecommendationService.name);
 
   constructor(
-    @InjectModel(JobPosition.name) private readonly jobPositionModel: Model<IJobPositionDocument>,
+    @InjectModel(JobPosting.name) private readonly jobPositionModel: Model<IJobPostingDocument>,
     @InjectModel(CandidateProfile.name) private readonly candidateProfileModel: Model<ICandidateProfileDocument>,
     @InjectModel(Application.name) private readonly applicationModel: Model<IApplicationDocument>,
-    private readonly jobPositionService: JobPositionService,
+    private readonly jobPositionService: JobPostingService ,
     private readonly candidateProfileService: CandidateProfileService,
   ) {}
 
@@ -31,13 +32,13 @@ export class RecommendationService {
   async rankApplicantsForJob(jobPositionId: string): Promise<{ application: IApplicationDocument; matchScore: number }[]> {
     this.logger.log(`[AUDIT] Starting applicant ranking for Job Position ID: ${jobPositionId}`);
 
-    const jobPosition = await this.jobPositionService.getJobPositionById(jobPositionId);
+    const jobPosition = await this.jobPositionService.findOne(jobPositionId);
     if (!jobPosition) {
       this.logger.error(`[AUDIT] Job Position with ID '${jobPositionId}' not found. Aborting ranking.`);
       throw new NotFoundException(`Job Position with ID '${jobPositionId}' not found.`);
     }
     this.logger.debug(`[AUDIT] Found Job Position: ${jobPosition.title} (ID: ${jobPosition._id})`);
-    this.logger.debug(`[AUDIT] Job Requirements: ${JSON.stringify(jobPosition.requirements)}`);
+    // this.logger.debug(`[AUDIT] Job Requirements: ${JSON.stringify(jobPosition.requirements)}`);
     this.logger.debug(`[AUDIT] Job Experience Level: ${jobPosition.experienceLevel}`);
     this.logger.debug(`[AUDIT] Job Location: ${jobPosition.location}`);
     this.logger.debug(`[AUDIT] Job Type: ${jobPosition.jobType}`);
@@ -72,7 +73,7 @@ export class RecommendationService {
       this.logger.debug(`[AUDIT] Initial matchScore for ${candidateName}: ${currentMatchScore}`);
 
       // --- Simple Matching Logic Calculation ---
-      const jobSkills = jobPosition.requirements || [];
+      // const jobSkills = jobPosition.requirements || [];
       const candidateGeneralSkills = candidateProfile.generalSkills || [];
       const applicationSpecificSkills = app.skills || [];
       const allCandidateSkills = new Set([...candidateGeneralSkills, ...applicationSpecificSkills]);
@@ -80,14 +81,14 @@ export class RecommendationService {
 
       // Skill Match
       let skillMatchPoints = 0;
-      jobSkills.forEach(jobSkill => {
-        if (allCandidateSkills.has(jobSkill)) {
-          skillMatchPoints += 10;
-          this.logger.debug(`[AUDIT] Skill Match: '${jobSkill}' found. Adding 10 points.`);
-        } else {
-          this.logger.debug(`[AUDIT] Skill Mismatch: '${jobSkill}' not found.`);
-        }
-      });
+      // jobSkills.forEach(jobSkill => {
+      //   if (allCandidateSkills.has(jobSkill)) {
+      //     skillMatchPoints += 10;
+      //     this.logger.debug(`[AUDIT] Skill Match: '${jobSkill}' found. Adding 10 points.`);
+      //   } else {
+      //     this.logger.debug(`[AUDIT] Skill Mismatch: '${jobSkill}' not found.`);
+      //   }
+      // });
       currentMatchScore += skillMatchPoints;
       this.logger.debug(`[AUDIT] Score after Skill Match: ${currentMatchScore} (Added ${skillMatchPoints} points)`);
 
@@ -117,12 +118,12 @@ export class RecommendationService {
       // Location Match
       let locationPoints = 0;
       if (jobPosition.location && candidateProfile.location) {
-        if (jobPosition.location.toLowerCase() === candidateProfile.location.toLowerCase()) {
-          locationPoints = 5;
-          this.logger.debug(`[AUDIT] Location Match: Job ('${jobPosition.location}') and Candidate ('${candidateProfile.location}') match. Adding 5 points.`);
-        } else {
-          this.logger.debug(`[AUDIT] Location Mismatch: Job ('${jobPosition.location}') and Candidate ('${candidateProfile.location}') do not match.`);
-        }
+        // if (jobPosition.location === candidateProfile.location) {
+        //   locationPoints = 5;
+        //   this.logger.debug(`[AUDIT] Location Match: Job ('${jobPosition.location}') and Candidate ('${candidateProfile.location}') match. Adding 5 points.`);
+        // } else {
+        //   this.logger.debug(`[AUDIT] Location Mismatch: Job ('${jobPosition.location}') and Candidate ('${candidateProfile.location}') do not match.`);
+        // }
       } else {
           this.logger.debug(`[AUDIT] Location Match: One or both locations are missing.`);
       }
@@ -172,7 +173,7 @@ export class RecommendationService {
   }
 
   // ... (recommendJobsForCandidate method remains unchanged for this request)
-  async recommendJobsForCandidate(candidateProfileId: string): Promise<{ jobPosition: IJobPositionDocument; suitabilityScore: number }[]> {
+  async recommendJobsForCandidate(candidateProfileId: string): Promise<{ jobPosition: IJobPostingDocument; suitabilityScore: number }[]> {
     this.logger.log(`Recommending jobs for Candidate Profile ID: ${candidateProfileId}`);
 
     const candidateProfile = await this.candidateProfileService.findOne(candidateProfileId);
@@ -182,7 +183,7 @@ export class RecommendationService {
 
     const jobPositions = await this.jobPositionModel.find({ isActive: true, isDeleted: false }).exec();
 
-    const recommendedJobs: { jobPosition: IJobPositionDocument; suitabilityScore: number }[] = [];
+    const recommendedJobs: { jobPosition: IJobPostingDocument; suitabilityScore: number }[] = [];
 
     const candidateGeneralSkills = candidateProfile.generalSkills || [];
     const candidateExperienceYears = candidateProfile.overallExperienceYears || 0;
@@ -191,12 +192,12 @@ export class RecommendationService {
     for (const job of jobPositions) {
       let suitabilityScore = 0;
 
-      const jobRequirements = job.requirements || [];
-      jobRequirements.forEach(reqSkill => {
-        if (candidateGeneralSkills.includes(reqSkill)) {
-          suitabilityScore += 10;
-        }
-      });
+      // const jobRequirements = job.requirements || [];
+      // jobRequirements.forEach(reqSkill => {
+      //   if (candidateGeneralSkills.includes(reqSkill)) {
+      //     suitabilityScore += 10;
+      //   }
+      // });
 
       if (job.experienceLevel === 'SENIOR' && candidateExperienceYears >= 5) {
         suitabilityScore += 20;
@@ -206,9 +207,9 @@ export class RecommendationService {
         suitabilityScore += 5;
       }
 
-      if (job.location && candidateLocation && job.location.toLowerCase() === candidateLocation) {
-        suitabilityScore += 5;
-      }
+      // if (job.location && candidateLocation && job.location.toLowerCase() === candidateLocation) {
+      //   suitabilityScore += 5;
+      // }
 
       if (job.jobType && candidateProfile.preferredJobTitles?.some(title => title.includes(job.jobType))) {
         suitabilityScore += 5;

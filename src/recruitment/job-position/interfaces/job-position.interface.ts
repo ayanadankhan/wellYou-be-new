@@ -1,68 +1,72 @@
-// src/recruitment/job-position/interfaces/job-position.interface.ts
+// src/job-posting/interfaces/job-posting.interface.ts
 import { Document, Types } from 'mongoose';
-import { IBaseDocument, IPaginationQuery } from 'src/recruitment/shared/interfaces';
-import { ExperienceLevel, JobStatus, JobType } from 'src/recruitment/shared/enums';
+import { JobType, ExperienceLevel, WorkplaceType, JobStatus, SkillLevel } from '../../shared/enums';
 
-export interface IJobPosition extends IBaseDocument {
+export interface JobLocation {
+  city: string;
+  state?: string;
+  country: string;
+  workplaceType: WorkplaceType;
+}
+
+export interface SalaryRange {
+  min: number;
+  max: number;
+  currency: string;
+  period: 'YEARLY' | 'MONTHLY' | 'HOURLY';
+}
+
+export interface ExtractedSkill {
+  name: string;
+  level: SkillLevel;
+  minYears?: number;
+  required: boolean;
+  confidence: number;
+}
+
+export interface JobEnrichment {
+  extractedAt: Date;
+  confidence: number;
+  skills: ExtractedSkill[];
+  jobFunction: string;
+  industry: string;
+  benefits: string[];
+  keywords: string[];
+  softSkills: string[];
+  urgency: 'LOW' | 'STANDARD' | 'HIGH' | 'URGENT';
+}
+
+export interface JobAnalytics {
+  views: number;
+  applications: number;
+  saves: number;
+  shares: number;
+}
+
+export interface JobSEO {
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+}
+
+export interface IJobPosting {
   title: string;
   description: string;
-  department: object | string; // Changed to Object or string to accommodate ObjectId reference
-  location: string;
-  employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
-  salaryMin?: number;
-  salaryMax?: number;
-  currency: string;
-  status: JobStatus;
-  responsibilities: string[];
-  requirements: string[];
-  benefits?: string[];
-  postedDate?: Date;
-  closingDate?: Date;
+  location: JobLocation;
   jobType: JobType;
   experienceLevel: ExperienceLevel;
-  // Audit fields from IBaseDocument: createdAt, updatedAt, createdBy, updatedBy, isDeleted, deletedAt, deletedBy
-}
-
-export interface IJobPositionDocument extends IJobPosition, Document {}
-
-// DTO Interfaces (for internal use, not directly for Mongoose)
-export interface ICreateJobPositionDto {
-  title: string;
-  description: string;
-  department: string;
-  location: string;
-  employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
-  salaryMin?: number;
-  salaryMax?: number;
-  currency: string;
-  responsibilities: string[];
-  requirements: string[];
-  benefits?: string[];
+  salaryRange?: SalaryRange;
+  applicationEmail: string;
   closingDate?: Date;
+  status: JobStatus;
+  tenantId: Types.ObjectId;
+  enrichment?: JobEnrichment;
+  analytics?: JobAnalytics;
+  seo?: JobSEO;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-export interface IUpdateJobPositionDto {
-  title?: string;
-  description?: string;
-  department?: string;
-  location?: string;
-  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
-  salaryMin?: number;
-  salaryMax?: number;
-  currency?: string;
-  status?: JobStatus;
-  responsibilities?: string[];
-  requirements?: string[];
-  benefits?: string[];
-  closingDate?: Date;
-}
-
-export interface IJobPositionQuery extends IPaginationQuery {
-  department?: string;
-  location?: string;
-  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
-  salaryMin?: number;
-  salaryMax?: number;
-  status?: JobStatus;
-  search?: string; // For general keyword search
+export interface IJobPostingDocument extends IJobPosting, Document {
+  [x: string]: any;
 }

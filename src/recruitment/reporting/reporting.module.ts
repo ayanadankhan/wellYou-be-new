@@ -5,14 +5,14 @@ import { ReportingController } from './reporting.controller';
 import { ReportingService } from './reporting.service';
 import { Application, ApplicationSchema } from 'src/recruitment/application/schemas/application.schema';
 import { Interview, InterviewSchema } from 'src/recruitment/interview/schemas/interview.schema';
-import { JobPosition, JobPositionSchema } from 'src/recruitment/job-position/schemas/job-position.schema';
+import { JobPosting, JobPostingSchema } from 'src/recruitment/job-position/schemas/job-position.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Application.name, schema: ApplicationSchema },
       { name: Interview.name, schema: InterviewSchema },
-      { name: JobPosition.name, schema: JobPositionSchema },
+      { name: JobPosting.name, schema: JobPostingSchema },
     ]),
   ],
   controllers: [ReportingController],

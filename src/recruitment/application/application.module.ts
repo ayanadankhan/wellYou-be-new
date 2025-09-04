@@ -7,6 +7,7 @@ import { JobApplicationService } from './job-application.service'; // Renamed se
 import { Application, ApplicationSchema } from './schemas/application.schema';
 import { JobPositionModule } from '../job-position/job-position.module'; // Import JobPositionModule if it exists
 import { CandidateProfileModule } from '../candidate-profile/candidate-profile.module'; // Crucial: Import CandidateProfileModule
+import { TestExtractionController } from './test-extraction.controller';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { CandidateProfileModule } from '../candidate-profile/candidate-profile.m
     JobPositionModule, // Make sure JobPositionModule exports JobPositionService
     CandidateProfileModule, // Make sure CandidateProfileModule exports CandidateProfileService
   ],
-  controllers: [ApplicationController],
+  controllers: [ApplicationController, TestExtractionController],
   providers: [JobApplicationService],
   exports: [JobApplicationService], // Export JobApplicationService if other modules depend on it
 })

@@ -347,12 +347,14 @@ export class AttendanceController {
     }
   }
 
-    @Get('hr/report')
+  @Get('hr/report')
   async getHrAttendanceReport(
     @CurrentUser() user: User,
     @Query('month') month?: string,
     @Query('from') from?: string,
-    @Query('to') to?: string
+    @Query('to') to?: string,
+    @Query('department') department?: string,
+    @Query('employeeName') employeeName?: string
   ) {
     try {
       if (!user.tenantId) {
@@ -382,7 +384,9 @@ export class AttendanceController {
         user.tenantId.toString(),
         month,
         from,
-        to
+        to,
+        department,
+        employeeName
       );
       return {
         success: true,
@@ -401,5 +405,4 @@ export class AttendanceController {
       );
     }
   }
-  
 }

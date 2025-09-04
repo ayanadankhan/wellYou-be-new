@@ -7,10 +7,11 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { ApplicationQueryDto } from './dto/application-query.dto';
 import { CandidateProfileService } from '../candidate-profile/candidate-profile.service';
-import { JobPositionService } from '../job-position/job-position.service';
+import { JobPostingService } from '../job-position/job-position.service';
 import { IPaginatedResponse } from '../shared/interfaces';
 import { ApplicationStatus } from '../shared/enums';
-import { IJobPositionDocument } from '../job-position/interfaces/job-position.interface';
+import { IJobPostingDocument } from '../job-position/interfaces/job-position.interface';
+import { AiExtractionService } from '../job-position/ai-extraction.service';
 
 @Injectable()
 export class JobApplicationService {
@@ -19,33 +20,36 @@ export class JobApplicationService {
   constructor(
     @InjectModel(Application.name) private readonly applicationModel: Model<IApplicationDocument>,
     private readonly candidateProfileService: CandidateProfileService,
-    private readonly jobPositionService: JobPositionService,
+    private readonly jobPositionService: JobPostingService,
+    private readonly aiExtractionService: AiExtractionService,
   ) {}
 
   async createApplication(createApplicationDto: CreateApplicationDto, createdBy?: string): Promise<IApplicationDocument> {
-    const { jobPositionId, candidateProfileDetails, ...applicationFields } = createApplicationDto;
+    const { jobPositionId, candidateProfileDetails, resumePath, ...applicationFields } = createApplicationDto;
+    this.logger.log(`Received request to create a new application for job ID: ${jobPositionId}`);
 
     // 1. Validate Job Position existence
-    const jobPosition: IJobPositionDocument | null = await this.jobPositionService.getJobPositionById(jobPositionId);
+    this.logger.log(`Checking existence of Job Position ID: ${jobPositionId}`);
+    const jobPosition: IJobPostingDocument | null = await this.jobPositionService.findOne(jobPositionId);
     if (!jobPosition) {
       throw new NotFoundException(`Job Position with ID '${jobPositionId}' not found.`);
     }
+    this.logger.log(`Job Position '${jobPositionId}' found.`);
 
-    // 2. Always create a new Candidate Profile (minimalistic approach)
+    // 2. Create a new Candidate Profile
     let candidateProfileId: Types.ObjectId;
-    this.logger.debug(`Attempting to create a new candidate profile.`);
+    this.logger.log(`Attempting to create a new candidate profile.`);
     try {
       const newCandidateProfile = await this.candidateProfileService.create(candidateProfileDetails, createdBy);
-      candidateProfileId = newCandidateProfile._id as Types.ObjectId; // Ensure correct type
-      this.logger.log(`Created new candidate profile with ID: ${candidateProfileId}`);
+      candidateProfileId = newCandidateProfile._id as Types.ObjectId;
+      this.logger.log(`Successfully created new candidate profile with ID: ${candidateProfileId}`);
     } catch (error) {
       this.logger.error(`Failed to create candidate profile during application submission: ${error.message}`, error.stack);
-      // Re-throw the error as a BadRequest, as profile creation is a prerequisite
       throw new BadRequestException(`Failed to create candidate profile: ${error.message}`);
     }
 
-    // 3. Check for duplicate application for the same job and candidate (optional, but good for data integrity)
-    // This check now relies on the newly created or existing candidateProfileId
+    // 3. Check for duplicate application (optional, but good for data integrity)
+    this.logger.log(`Checking for duplicate application for candidate ${candidateProfileId} and job ${jobPositionId}`);
     const existingApplication = await this.applicationModel.findOne({
       jobPosition: new Types.ObjectId(jobPositionId),
       candidateProfile: candidateProfileId,
@@ -56,16 +60,64 @@ export class JobApplicationService {
       this.logger.warn(`Duplicate application detected for job '${jobPositionId}' by candidate '${candidateProfileId}'.`);
       throw new ConflictException('An application for this candidate to this job position already exists.');
     }
+    this.logger.log(`No existing application found, proceeding with creation.`);
 
-    // 4. Create the Application document
+
+    // 4. Perform AI resume analysis and calculate match score
+    let matchScore = 0;
+    let extractedSkills: string[] = [];
+    let resumeAnalysisDate: Date | null = null;
+    let extractedSummary: string = "";
+
+    try {
+      this.logger.log(`Initiating AI resume analysis for resume path: ${resumePath}`);
+      const extractedData = await this.aiExtractionService.extractResumeData(resumePath);
+      
+      this.logger.log(`AI extraction completed. Extracted skills count: ${extractedData.extractedSkills.length}. Extracted summary length: ${extractedData.summary.length}`);
+      this.logger.log(`Extracted summary: ${extractedData.summary}`);
+      this.logger.log(`Extracted skills: ${extractedData.extractedSkills.join(', ')}`);
+
+      extractedSkills = extractedData.extractedSkills;
+      extractedSummary = extractedData.summary;
+      resumeAnalysisDate = new Date();
+
+      this.logger.log(`Calculating match score...`);
+      this.logger.log(`Candidate extracted skills: ${extractedSkills}`);
+      
+      matchScore = await this.aiExtractionService.calculateMatchScore(extractedData, jobPosition);
+      
+      this.logger.log(`Match score calculated: ${matchScore}`);
+      
+    } catch (error) {
+      this.logger.error(`AI analysis failed: ${error.message}`, error.stack);
+      // Don't throw the error, just proceed with default values to allow application creation
+    }
+
+    // Ensure matchScore is a valid number before saving to the database.
+    const sanitizedMatchScore = isNaN(matchScore) ? 0 : matchScore;
+    this.logger.log(`Sanitized match score to be saved: ${sanitizedMatchScore}`);
+
+    // 5. Create the Application document
     const createdApplication = new this.applicationModel({
       ...applicationFields,
       jobPosition: new Types.ObjectId(jobPositionId),
-      candidateProfile: candidateProfileId, // Link the newly created profile
-      appliedDate: new Date(), // Set appliedDate automatically
-      status: ApplicationStatus.APPLIED, // Default status
+      candidateProfile: candidateProfileId,
+      appliedDate: new Date(),
+      status: ApplicationStatus.APPLIED,
       createdBy: createdBy ? new Types.ObjectId(createdBy) : undefined,
+      matchScore: sanitizedMatchScore, // Use the sanitized value here
+      extractedSkills: extractedSkills,
+      extractedSummary: extractedSummary,
+      resumeAnalysisDate: resumeAnalysisDate,
+      resumePath: resumePath, // Explicitly include the resumePath
     });
+    this.logger.log(`Final application object constructed. Attempting to save...`);
+    this.logger.log(`Application data to be saved: ${JSON.stringify({
+      matchScore: createdApplication.matchScore,
+      extractedSkills: createdApplication.extractedSkills,
+      extractedSummary: createdApplication.extractedSummary,
+      resumePath: createdApplication.resumePath
+    })}`);
 
     try {
       const savedApplication = await createdApplication.save();
@@ -163,7 +215,7 @@ export class JobApplicationService {
         candidateMatch['candidateProfile.candidateEmail'] = { $regex: candidateProfileFilters.candidateEmail, $options: 'i' };
       }
       if (candidateProfileFilters.candidatePhone) {
-        candidateMatch['candidateProfile.candidatePhone'] = { $regex: candidateProfileFilters.candidatePhone, $options: 'i' };
+        candidateMatch['candidateProfile.candidatePhone'] = { $regex: candidateProfileFilters.candidatePhone, 'options': 'i' };
       }
       if (candidateProfileFilters.minExperience) {
         candidateMatch['candidateProfile.overallExperienceYears'] = { $gte: candidateProfileFilters.minExperience };
@@ -191,12 +243,12 @@ export class JobApplicationService {
         $match: {
           $or: [
             { 'notes': { $regex: search, $options: 'i' } },
-            { 'source': { $regex: search, $options: 'i' } },
-            { 'skills': { $regex: search, $options: 'i' } },
-            { 'candidateProfile.candidateName': { $regex: search, $options: 'i' } },
-            { 'candidateProfile.candidateEmail': { $regex: search, $options: 'i' } },
-            { 'candidateProfile.candidatePhone': { $regex: search, $options: 'i' } },
-            { 'candidateProfile.generalSkills': { $regex: search, $options: 'i' } },
+            { 'source': { $regex: search, 'options': 'i' } },
+            { 'skills': { $regex: search, 'options': 'i' } },
+            { 'candidateProfile.candidateName': { $regex: search, 'options': 'i' } },
+            { 'candidateProfile.candidateEmail': { $regex: search, 'options': 'i' } },
+            { 'candidateProfile.candidatePhone': { $regex: search, 'options': 'i' } },
+            { 'candidateProfile.generalSkills': { $regex: search, 'options': 'i' } },
           ],
         },
       });

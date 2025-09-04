@@ -1,144 +1,92 @@
-// src/recruitment/job-position/dto/create-job-position.dto.ts
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsNumber,
-  Min,
-  IsEnum,
-  IsArray,
-  ArrayMinSize,
-  IsDateString,
-  ValidateIf,
-  IsObject,
-  ValidateNested,
-  IsMongoId,
-} from 'class-validator';
-import { Type } from 'class-transformer'; // Needed for @Type decorator with nested objects
-import { ApiProperty } from '@nestjs/swagger';
-import { JobType, ExperienceLevel, JobStatus } from '../../shared/enums'; // Adjust path as needed for your enums
+// ===== 4. DTOs =====
+// src/job-posting/dto/create-job-posting.dto.ts
+import { IsString, IsNotEmpty, IsEnum, IsOptional, IsEmail, IsDate, ValidateNested, IsNumber, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { JobType, ExperienceLevel, WorkplaceType } from '../../shared/enums';
 
-// DTO for salaryRange nested object
-export class SalaryRangeDto {
-  @ApiProperty({ description: 'Minimum salary for the position', example: 80000 })
+class LocationDto {
+  @ApiProperty({ example: 'Bengaluru' })
+  @IsString()
+  @IsNotEmpty()
+  city: string;
+
+  @ApiPropertyOptional({ example: 'Karnataka' })
+  @IsString()
+  @IsOptional()
+  state?: string;
+
+  @ApiProperty({ example: 'IN' })
+  @IsString()
+  @IsNotEmpty()
+  country: string;
+
+  @ApiProperty({ enum: WorkplaceType, example: WorkplaceType.HYBRID })
+  @IsEnum(WorkplaceType)
+  workplaceType: WorkplaceType;
+}
+
+class SalaryRangeDto {
+  @ApiProperty({ example: 90000 })
   @IsNumber()
   @Min(0)
   min: number;
 
-  @ApiProperty({ description: 'Maximum salary for the position', example: 120000 })
+  @ApiProperty({ example: 130000 })
   @IsNumber()
   @Min(0)
   max: number;
 
-  @ApiProperty({ description: 'Currency of the salary', example: 'USD', default: 'USD' })
+  @ApiPropertyOptional({ example: 'USD', default: 'USD' })
   @IsString()
-  @IsNotEmpty()
-  currency: string;
+  @IsOptional()
+  currency?: string = 'USD';
 
-  @ApiProperty({ description: 'Period of salary (e.g., yearly, monthly, hourly)', example: 'yearly' })
+  @ApiPropertyOptional({ example: 'YEARLY', default: 'YEARLY' })
   @IsString()
-  @IsNotEmpty()
-  period: 'yearly' | 'monthly' | 'hourly'; // Ensure this matches your schema's period type
+  @IsOptional()
+  period?: 'YEARLY' | 'MONTHLY' | 'HOURLY' = 'YEARLY';
 }
 
-
-export class CreateJobPositionDto {
-  @ApiProperty({
-    description: 'Title of the job position',
-    example: 'Senior Software Engineer',
-  })
+export class CreateJobPostingDto {
+  @ApiProperty({ example: 'Senior Backend Developer' })
   @IsString()
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({
-    description: 'Detailed description of the job position',
-    example: 'We are looking for a passionate Senior Software Engineer...',
+  @ApiProperty({ 
+    example: 'We are seeking a highly skilled Senior Backend Developer to join our growing engineering team. You will be responsible for designing, developing, and maintaining robust and scalable backend systems using Node.js, NestJS, and MongoDB...' 
   })
   @IsString()
   @IsNotEmpty()
   description: string;
 
-  @ApiProperty({
-    description: 'Department the job belongs to',
-    example: 'Engineering',
-  })
-
-  @IsMongoId()
-  @IsNotEmpty()
-  department: string; // ✨ Kept as required based on error "department should not be empty"
-
-  @ApiProperty({
-    description: 'Location of the job',
-    example: 'New York, NY',
-  })
-  @IsString()
-  @IsNotEmpty()
-  location: string;
-
-  @ApiProperty({
-    description: 'Type of job (e.g., FULL_TIME, PART_TIME)',
-    enum: JobType, // ✨ Using the enum
-    example: JobType.FULL_TIME,
-  })
-  @IsEnum(JobType) // ✨ Use @IsEnum with your actual enum
-  @IsNotEmpty()
-  jobType: JobType; // ✨ Renamed from employmentType
-
-  @ApiProperty({
-    description: 'Experience level required for the job (e.g., ENTRY_LEVEL, SENIOR)',
-    enum: ExperienceLevel, // ✨ Using the enum
-    example: ExperienceLevel.SENIOR,
-  })
-  @IsEnum(ExperienceLevel) // ✨ Use @IsEnum with your actual enum
-  @IsNotEmpty()
-  experienceLevel: ExperienceLevel; // ✨ New field added
-
-  @ApiProperty({
-    description: 'Salary range for the position',
-    type: SalaryRangeDto,
-    required: false,
-  })
-  @IsOptional()
-  @IsObject()
+  @ApiProperty({ type: LocationDto })
   @ValidateNested()
-  @Type(() => SalaryRangeDto) // Important for nested DTOs
-  salaryRange?: SalaryRangeDto; // ✨ Aligned with schema's nested object structure
+  @Type(() => LocationDto)
+  location: LocationDto;
 
-  @ApiProperty({
-    description: 'List of responsibilities for the job',
-    example: ['Develop and maintain web applications', 'Collaborate with cross-functional teams'],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  @ArrayMinSize(1)
-  responsibilities: string[];
+  @ApiProperty({ enum: JobType, example: JobType.FULL_TIME })
+  @IsEnum(JobType)
+  jobType: JobType;
 
-  @ApiProperty({
-    description: 'List of required qualifications and skills',
-    example: ['Bachelor\'s degree in CS', '5+ years of experience with Node.js'],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  @ArrayMinSize(1)
-  requirements: string[];
+  @ApiProperty({ enum: ExperienceLevel, example: ExperienceLevel.SENIOR })
+  @IsEnum(ExperienceLevel)
+  experienceLevel: ExperienceLevel;
 
-  @ApiProperty({
-    description: 'List of benefits offered (optional)',
-    example: ['Health insurance', 'Paid time off'],
-    required: false,
-  })
+  @ApiPropertyOptional({ type: SalaryRangeDto })
+  @ValidateNested()
+  @Type(() => SalaryRangeDto)
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  benefits?: string[];
+  salaryRange?: SalaryRangeDto;
 
-  @ApiProperty({
-    description: 'Closing date for applications (optional)',
-    example: '2025-12-31T23:59:59Z',
-    required: false,
-  })
+  @ApiProperty({ example: 'careers@techinnovators.com' })
+  @IsEmail()
+  applicationEmail: string;
+
+  @ApiPropertyOptional()
+  @IsDate()
+  @Type(() => Date)
   @IsOptional()
-  @IsDateString()
   closingDate?: Date;
 }
