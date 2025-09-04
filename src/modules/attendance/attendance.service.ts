@@ -315,73 +315,73 @@ export class AttendanceService {
   }
 
   // Auto checkout at 5:30 PM (to be called by cron job)
-  @Cron('55 12 * * *')
-  async autoCheckout(): Promise<void> {
-    try {
-      this.logger.log('Processing auto check-out for all incomplete records');
+  // @Cron('55 12 * * *')
+  // async autoCheckout(): Promise<void> {
+  //   try {
+  //     this.logger.log('Processing auto check-out for all incomplete records');
 
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+  //     const today = new Date();
+  //     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  //     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-      const autoCheckoutTime = new Date();
-      autoCheckoutTime.setHours(12, 45, 0, 0);
+  //     const autoCheckoutTime = new Date();
+  //     autoCheckoutTime.setHours(12, 45, 0, 0);
 
-      const incompleteRecords = await this.attendanceModel.find({
-        date: { $gte: startOfDay, $lte: endOfDay },
-        checkOutTime: null,
-        status: { $ne: "Absent" }
-      });
+  //     const incompleteRecords = await this.attendanceModel.find({
+  //       date: { $gte: startOfDay, $lte: endOfDay },
+  //       checkOutTime: null,
+  //       status: { $ne: "Absent" }
+  //     });
 
-      this.logger.log(`Found ${incompleteRecords.length} incomplete records for auto checkout`);
+  //     this.logger.log(`Found ${incompleteRecords.length} incomplete records for auto checkout`);
 
-      for (const record of incompleteRecords) {
+  //     for (const record of incompleteRecords) {
 
-        const totalHours = this.calculateTotalHours(record.checkInTime, autoCheckoutTime);
+  //       const totalHours = this.calculateTotalHours(record.checkInTime, autoCheckoutTime);
 
-        await this.attendanceModel.updateOne(
-          { _id: record._id },
-          {
-            checkOutTime: autoCheckoutTime,
-            totalHours,
-            isAutoCheckout: true,
-            status: 'Present',
-          },
-        );
-      }
+  //       await this.attendanceModel.updateOne(
+  //         { _id: record._id },
+  //         {
+  //           checkOutTime: autoCheckoutTime,
+  //           totalHours,
+  //           isAutoCheckout: true,
+  //           status: 'Present',
+  //         },
+  //       );
+  //     }
 
-      const getEmployeeDto = new GetEmployeeDto();
-      getEmployeeDto.employmentStatus = 'ACTIVE';
-      const EmployeesResponse = await this.employeeService.findAll(getEmployeeDto);
-      const allEmployeeIds = EmployeesResponse.list.map((emp: any) => emp._id.toString());
-      const existingRecords = await this.attendanceModel.find({
-        date: { $gte: startOfDay, $lte: endOfDay },
-      }, { employeeId: 1 });
-      const presentEmployeeIds = existingRecords.map(record => record.employeeId.toString());
-      const missingIds = allEmployeeIds.filter((id: string) => !presentEmployeeIds.includes(id));
+  //     const getEmployeeDto = new GetEmployeeDto();
+  //     getEmployeeDto.employmentStatus = 'ACTIVE';
+  //     const EmployeesResponse = await this.employeeService.findAll(getEmployeeDto);
+  //     const allEmployeeIds = EmployeesResponse.list.map((emp: any) => emp._id.toString());
+  //     const existingRecords = await this.attendanceModel.find({
+  //       date: { $gte: startOfDay, $lte: endOfDay },
+  //     }, { employeeId: 1 });
+  //     const presentEmployeeIds = existingRecords.map(record => record.employeeId.toString());
+  //     const missingIds = allEmployeeIds.filter((id: string) => !presentEmployeeIds.includes(id));
 
-      if (missingIds.length > 0) {
-        this.logger.log(`Marking ${missingIds.length} employees as absent`);
+  //     if (missingIds.length > 0) {
+  //       this.logger.log(`Marking ${missingIds.length} employees as absent`);
 
-        for (const empId of missingIds) {
-          await this.attendanceModel.create({
-            employeeId: empId,
-            date: today,
-            checkInTime: null,
-            checkOutTime: null,
-            status: 'Absent',  // Absent marked
-            isAutoCheckout: false,
-            remarks: 'Auto-marked absent (no check-in)',
-          });
-        }
-      }
+  //       for (const empId of missingIds) {
+  //         await this.attendanceModel.create({
+  //           employeeId: empId,
+  //           date: today,
+  //           checkInTime: null,
+  //           checkOutTime: null,
+  //           status: 'Absent',  // Absent marked
+  //           isAutoCheckout: false,
+  //           remarks: 'Auto-marked absent (no check-in)',
+  //         });
+  //       }
+  //     }
 
-      this.logger.log('Auto check-out completed successfully');
-    } catch (error) {
-      this.logger.error('Auto check-out failed:', error.message);
-      throw error;
-    }
-  }
+  //     this.logger.log('Auto check-out completed successfully');
+  //   } catch (error) {
+  //     this.logger.error('Auto check-out failed:', error.message);
+  //     throw error;
+  //   }
+  // }
 
   // Mark absent employees (to be called by cron job)
   async markAbsentEmployees(employeeIds: string[]): Promise<void> {
